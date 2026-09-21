@@ -51,13 +51,13 @@ jobs:
           bash scripts/verify-adaptive-bridge.sh
           bash scripts/verify-adaptive-experience.sh
 
-      - name: Verifier self-tests (advisory)
-        # Some self-tests validate verifier behavior against .planning artifacts, which are not
-        # part of the public repo, so they are reported but do not block the gate.
-        continue-on-error: true
+      - name: Verifier self-tests
+        # Self-tests that validate verifier behavior against .planning artifacts skip cleanly
+        # (with a ::notice::) when those artifacts are absent from the sanitized public repo,
+        # so this step stays blocking for genuine verifier regressions.
         run: |
           for self_test in scripts/tests/*.sh; do
             echo "::group::$self_test"
-            bash "$self_test" || echo "::warning::self-test failed: $self_test"
+            bash "$self_test"
             echo "::endgroup::"
           done
