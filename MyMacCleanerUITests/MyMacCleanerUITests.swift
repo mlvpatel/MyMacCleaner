@@ -34,7 +34,7 @@ final class MyMacCleanerUITests: XCTestCase {
     }
 
     /// Full-Xcode gate: each formerly actionable family remains reachable through
-    /// locale-independent navigation hooks. This test is checked in but not run on CLT.
+    /// locale-independent navigation hooks. Runs on full Xcode (see 08-04-SUMMARY.md).
     @MainActor
     func testReadOnlySafetyNavigationFlow() throws {
         let app = XCUIApplication()
@@ -43,7 +43,9 @@ final class MyMacCleanerUITests: XCTestCase {
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
 
         for identifier in Self.readOnlyNavigationIdentifiers {
-            let destination = app.descendants(matching: .any)[identifier]
+            // Scope to firstMatch: the identifier can resolve to more than one node in the
+            // split-view hierarchy, and .click() requires a single matching element.
+            let destination = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
             XCTAssertTrue(destination.waitForExistence(timeout: 5), "Missing \(identifier)")
             destination.click()
         }
@@ -69,7 +71,10 @@ final class MyMacCleanerUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
 
-        let destination = app.descendants(matching: .any)["navigation.adaptive-experience"]
+        // Scope to firstMatch: the identifier can resolve to more than one node in the
+        // split-view hierarchy, and .click() requires a single matching element.
+        let destination = app.descendants(matching: .any)
+            .matching(identifier: "navigation.adaptive-experience").firstMatch
         XCTAssertTrue(destination.waitForExistence(timeout: 5), "Missing navigation.adaptive-experience")
         destination.click()
 
