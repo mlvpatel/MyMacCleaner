@@ -32,7 +32,7 @@ jobs:
 
       - name: Select Xcode
         run: |
-          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app | sort -V | tail -1)
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1); [[ -n "$xcode_app" ]] || xcode_app=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
           [[ -n "$xcode_app" ]] || { echo "::error::No Xcode ${XCODE_MAJOR}.x on runner"; exit 1; }
           sudo xcode-select -s "$xcode_app"
           swift --version
