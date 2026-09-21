@@ -942,16 +942,28 @@ run_canonical_gate() (
     touch "$freshness_marker"
     bash "$repository_root/scripts/run-safety-tests.sh" --enable-code-coverage --parallel
 
+    # Classic SwiftPM writes profiles under .build/<triple>/debug/codecov; Xcode 27's build
+    # system writes them under .build/**/out/Products/Debug/codecov. Match on the codecov
+    # segment, still newer than the freshness marker, so this build's profiles are found on
+    # either layout (and stale profiles from an earlier build are excluded by -newer).
     while IFS= read -r -d '' candidate; do
         profile_paths+=("$candidate")
-    done < <(/usr/bin/find "$safety_package_root/.build" -type f -path '*/debug/codecov/*.profraw' -newer "$freshness_marker" -print0)
+    done < <(/usr/bin/find "$safety_package_root/.build" -type f -path '*/codecov/*.profraw' -newer "$freshness_marker" -print0)
     [[ ${#profile_paths[@]} -gt 0 ]] || fail "SC-COVERAGE-PROFILE"
 
+    # Anchor the test binaries to the product directory that holds this build's fresh profiles
+    # (the parent of their codecov directory). That yields the single merged
+    # SafetyContractPackageTests.xctest (classic) or the per-target *Tests.xctest bundles
+    # (Xcode 27) from THIS build, while ignoring stale bundles an earlier toolchain left in
+    # .build. Exclude .dSYM DWARF copies, which also live under the bundle's MacOS directory.
+    coverage_product_root=$(/usr/bin/dirname "$(/usr/bin/dirname "${profile_paths[0]}")")
     while IFS= read -r -d '' candidate; do
         test_binaries+=("$candidate")
-    done < <(/usr/bin/find "$safety_package_root/.build" -type f -path '*/SafetyContractPackageTests.xctest/Contents/MacOS/SafetyContractPackageTests' -print0)
-    [[ ${#test_binaries[@]} -eq 1 ]] || fail "SC-COVERAGE-TEST-BINARY"
-    test_binary="${test_binaries[0]}"
+    done < <(/usr/bin/find "$coverage_product_root" -type f -path '*Tests.xctest/Contents/MacOS/*Tests' -not -path '*.dSYM/*' -print0)
+    [[ ${#test_binaries[@]} -ge 1 ]] || fail "SC-COVERAGE-TEST-BINARY"
+    for test_binary in "${test_binaries[@]}"; do
+        [[ -x "$test_binary" ]] || fail "SC-COVERAGE-TEST-BINARY"
+    done
 
     llvm_profdata=$(/usr/bin/xcrun --find llvm-profdata 2>/dev/null) || fail "SC-COVERAGE-TOOL"
     llvm_cov=$(/usr/bin/xcrun --find llvm-cov 2>/dev/null) || fail "SC-COVERAGE-TOOL"
@@ -961,7 +973,16 @@ run_canonical_gate() (
     coverage_json="$coverage_directory/coverage.json"
     "$llvm_profdata" merge -sparse "${profile_paths[@]}" -o "$coverage_profile" > "$coverage_directory/llvm-profdata.log" 2>&1 \
         || fail "SC-COVERAGE-PROFILE"
-    "$llvm_cov" export -instr-profile "$coverage_profile" "$test_binary" > "$coverage_json" 2> "$coverage_directory/llvm-cov.log" \
+    # Pass every discovered test binary to llvm-cov (first positional, rest via -object) so
+    # coverage merges across the per-target bundles (Xcode 27) or the single merged bundle
+    # (classic). Built as a bash 3.2-safe index loop that never expands an empty array.
+    export_objects=("${test_binaries[0]}")
+    export_index=1
+    while (( export_index < ${#test_binaries[@]} )); do
+        export_objects+=(-object "${test_binaries[$export_index]}")
+        export_index=$(( export_index + 1 ))
+    done
+    "$llvm_cov" export -instr-profile "$coverage_profile" "${export_objects[@]}" > "$coverage_json" 2> "$coverage_directory/llvm-cov.log" \
         || fail "SC-COVERAGE-EXPORT"
     [[ -s "$coverage_json" ]] || fail "SC-COVERAGE-EXPORT"
 
