@@ -19,6 +19,14 @@ struct TrashExecutionHostileFixtureTests {
         )
         let adapter = FoundationTrashAdapter(
             nativeTrash: { try native.invoke($0) },
+            identityProbe: { _, _ in
+                .observed(
+                    device: operation.approvedResourceIdentity.device,
+                    node: operation.approvedResourceIdentity.node,
+                    logicalBytes: operation.approvedLogicalBytes,
+                    modificationUnixNanoseconds: operation.approvedModificationUnixNanoseconds
+                )
+            },
             resolveRoot: { _ in TrashExecutionFixtureFactory.scriptedRoot() }
         )
         let outcome = adapter.revalidateAndMove(
