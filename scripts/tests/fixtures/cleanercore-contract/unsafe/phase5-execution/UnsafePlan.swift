@@ -1,0 +1,3 @@
+protocol ExecutionPort {
+    func execute()
+}

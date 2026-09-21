@@ -1,0 +1,2316 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "common.cancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
+    "common.clean": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clean"
+          }
+        }
+      }
+    },
+    "common.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
+    },
+    "common.complete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Complete"
+          }
+        }
+      }
+    },
+    "common.delete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        }
+      }
+    },
+    "common.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "common.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed"
+          }
+        }
+      }
+    },
+    "common.items %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld items"
+          }
+        }
+      }
+    },
+    "common.ok": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "common.refresh": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh"
+          }
+        }
+      }
+    },
+    "common.remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        }
+      }
+    },
+    "common.revealInFinder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal in Finder"
+          }
+        }
+      }
+    },
+    "common.scanning": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scanning..."
+          }
+        }
+      }
+    },
+    "common.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search"
+          }
+        }
+      }
+    },
+    "common.settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        }
+      }
+    },
+    "common.showInFinder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show in Finder"
+          }
+        }
+      }
+    },
+    "common.skipped": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skipped"
+          }
+        }
+      }
+    },
+    "common.stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        }
+      }
+    },
+    "common.unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
+          }
+        }
+      }
+    },
+    "safety.notice.action.learnWhy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Learn why"
+          }
+        }
+      }
+    },
+    "safety.notice.emptyTrash.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic trash removal is unavailable"
+          }
+        }
+      }
+    },
+    "safety.notice.emptyingTrashIsNotAvailable.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyMacCleaner will not alter Trash automatically. This view can explain what was found and what needs a reviewed plan."
+          }
+        }
+      }
+    },
+    "safety.notice.legacyCleanup.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legacy storage changes are unavailable"
+          }
+        }
+      }
+    },
+    "safety.notice.legacyCleanupRequiresReviewedPlan.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyMacCleaner requires a reviewed cleanup plan before changing files."
+          }
+        }
+      }
+    },
+    "safety.notice.markForReview": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mark for review"
+          }
+        }
+      }
+    },
+    "safety.notice.noSelection": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select at least one finding to review."
+          }
+        }
+      }
+    },
+    "safety.notice.reviewSelected %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review %@"
+          }
+        }
+      }
+    },
+    "safety.notice.reviewable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reviewable"
+          }
+        }
+      }
+    },
+    "safety.notice.reviewedPlanCleanup.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reviewed cleanup plans are coming later"
+          }
+        }
+      }
+    },
+    "safety.notice.reviewedPlanCleanupIsDeferred.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyMacCleaner can show evidence now. File changes require the reviewed-plan safety pipeline."
+          }
+        }
+      }
+    },
+    "safety.notice.selectedForReview": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected for review"
+          }
+        }
+      }
+    },
+    "safety.notice.trashReview.action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trash review"
+          }
+        }
+      }
+    },
+    "safety.notice.trashNoItems": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Trash items were found during inventory."
+          }
+        }
+      }
+    },
+    "safety.notice.trashSize %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trash inventory: %@"
+          }
+        }
+      }
+    },
+    "safety.notice.trashMeasuring": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Measuring Trash…"
+          }
+        }
+      }
+    },
+    "safety.notice.trashSizeUnavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trash size needs Full Disk Access to measure"
+          }
+        }
+      }
+    },
+    "navigation.applications": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applications"
+          }
+        }
+      }
+    },
+    "navigation.applications.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage installed apps"
+          }
+        }
+      }
+    },
+    "navigation.diskCleaner": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disk Cleaner"
+          }
+        }
+      }
+    },
+    "navigation.diskCleaner.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clean junk files"
+          }
+        }
+      }
+    },
+    "navigation.spaceLens": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Space Lens"
+          }
+        }
+      }
+    },
+    "navigation.spaceLens.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See what uses disk space"
+          }
+        }
+      }
+    },
+    "navigation.duplicates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicates"
+          }
+        }
+      }
+    },
+    "navigation.duplicates.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find and remove duplicate files"
+          }
+        }
+      }
+    },
+    "navigation.home": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home"
+          }
+        }
+      }
+    },
+    "navigation.home.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smart scan and overview"
+          }
+        }
+      }
+    },
+    "navigation.orphanedFiles": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orphaned Files"
+          }
+        }
+      }
+    },
+    "navigation.orphanedFiles.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find leftover files from deleted apps"
+          }
+        }
+      }
+    },
+    "navigation.performance": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Performance"
+          }
+        }
+      }
+    },
+    "navigation.performance.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Optimize your Mac"
+          }
+        }
+      }
+    },
+    "navigation.permissions": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permissions"
+          }
+        }
+      }
+    },
+    "navigation.permissions.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage app access"
+          }
+        }
+      }
+    },
+    "navigation.portManagement": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Port Management"
+          }
+        }
+      }
+    },
+    "navigation.portManagement.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View active ports"
+          }
+        }
+      }
+    },
+    "navigation.startupItems": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Startup Items"
+          }
+        }
+      }
+    },
+    "navigation.startupItems.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control startup programs"
+          }
+        }
+      }
+    },
+    "navigation.systemHealth": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Health"
+          }
+        }
+      }
+    },
+    "navigation.systemHealth.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitor system health"
+          }
+        }
+      }
+    },
+    "sidebar.systemHealthy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Healthy"
+          }
+        }
+      }
+    },
+    "navigation.adaptiveExperience": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Experience"
+          }
+        }
+      }
+    },
+    "navigation.adaptiveExperience.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trusted cleanup review"
+          }
+        }
+      }
+    },
+    "adaptive.mode.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detail"
+          }
+        }
+      }
+    },
+    "adaptive.mode.guided": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guided"
+          }
+        }
+      }
+    },
+    "adaptive.mode.standard": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard"
+          }
+        }
+      }
+    },
+    "adaptive.mode.technical": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Technical"
+          }
+        }
+      }
+    },
+    "adaptive.refresh": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh"
+          }
+        }
+      }
+    },
+    "adaptive.onboarding.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Private on this Mac"
+          }
+        }
+      }
+    },
+    "adaptive.onboarding.offline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scans stay on this Mac. Nothing is uploaded."
+          }
+        }
+      }
+    },
+    "adaptive.onboarding.noAccount": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No account is required."
+          }
+        }
+      }
+    },
+    "adaptive.onboarding.noTelemetry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There is no usage telemetry."
+          }
+        }
+      }
+    },
+    "adaptive.onboarding.noScan": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue does not start a scan or open settings."
+          }
+        }
+      }
+    },
+    "adaptive.onboarding.continue": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        }
+      }
+    },
+    "adaptive.dashboard.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trusted storage"
+          }
+        }
+      }
+    },
+    "adaptive.dashboard.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh to load local evidence."
+          }
+        }
+      }
+    },
+    "adaptive.section.opportunities": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opportunities"
+          }
+        }
+      }
+    },
+    "adaptive.section.protected": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protected workflow data"
+          }
+        }
+      }
+    },
+    "adaptive.section.memory": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memory guidance"
+          }
+        }
+      }
+    },
+    "adaptive.section.coverage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission gaps"
+          }
+        }
+      }
+    },
+    "adaptive.section.history": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recovery history"
+          }
+        }
+      }
+    },
+    "adaptive.opportunities.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No eligible cleanup opportunities yet."
+          }
+        }
+      }
+    },
+    "adaptive.opportunity.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review candidate"
+          }
+        }
+      }
+    },
+    "adaptive.protected.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protected"
+          }
+        }
+      }
+    },
+    "adaptive.protected.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editor, Docker, and package-manager stores stay inventory-only."
+          }
+        }
+      }
+    },
+    "adaptive.developer.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Developer tools"
+          }
+        }
+      }
+    },
+    "adaptive.developer.protected": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supported tools are listed as protected inventory."
+          }
+        }
+      }
+    },
+    "adaptive.developer.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No developer-tool inventory in this snapshot."
+          }
+        }
+      }
+    },
+    "adaptive.memory.complete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memory sample is complete."
+          }
+        }
+      }
+    },
+    "adaptive.memory.partial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memory sample is partial."
+          }
+        }
+      }
+    },
+    "adaptive.memory.cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memory sample was cancelled."
+          }
+        }
+      }
+    },
+    "adaptive.memory.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memory sample is unavailable."
+          }
+        }
+      }
+    },
+    "adaptive.memory.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No memory sample yet."
+          }
+        }
+      }
+    },
+    "adaptive.coverage.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No permission gaps in this snapshot."
+          }
+        }
+      }
+    },
+    "adaptive.coverage.fullDiskAccess": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full Disk Access is not granted."
+          }
+        }
+      }
+    },
+    "adaptive.coverage.userLibrary": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "User Library access is limited."
+          }
+        }
+      }
+    },
+    "adaptive.history.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open recovery history"
+          }
+        }
+      }
+    },
+    "adaptive.permission.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission help"
+          }
+        }
+      }
+    },
+    "adaptive.permission.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission gaps never become cleanup eligibility."
+          }
+        }
+      }
+    },
+    "adaptive.review.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review evidence"
+          }
+        }
+      }
+    },
+    "adaptive.review.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh to load a review snapshot."
+          }
+        }
+      }
+    },
+    "adaptive.review.valid": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The current plan is valid for review."
+          }
+        }
+      }
+    },
+    "adaptive.review.invalid.missingApproval": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review this plan, then choose Approve plan. Approval applies only to this current plan."
+          }
+        }
+      }
+    },
+    "adaptive.review.invalid.sessionChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The review session changed."
+          }
+        }
+      }
+    },
+    "adaptive.review.invalid.expired": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The plan expired."
+          }
+        }
+      }
+    },
+    "adaptive.review.invalid.contextChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan context changed."
+          }
+        }
+      }
+    },
+    "adaptive.review.invalid.planDigestChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The plan digest changed."
+          }
+        }
+      }
+    },
+    "adaptive.review.invalid.evidenceChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evidence changed. Refresh required."
+          }
+        }
+      }
+    },
+    "adaptive.review.recovery.rebuildable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebuildable"
+          }
+        }
+      }
+    },
+    "adaptive.review.recovery.redownloadRequired": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redownload required"
+          }
+        }
+      }
+    },
+    "adaptive.review.recovery.inspectBeforeAction": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inspect before action"
+          }
+        }
+      }
+    },
+    "adaptive.review.recovery.protectedNoOperation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protected, no operation"
+          }
+        }
+      }
+    },
+    "adaptive.review.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
+    },
+    "adaptive.receipts.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recovery receipts"
+          }
+        }
+      }
+    },
+    "adaptive.receipts.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No receipts in this snapshot."
+          }
+        }
+      }
+    },
+    "adaptive.receipts.item": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Receipt"
+          }
+        }
+      }
+    },
+    "adaptive.receipts.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
+    },
+    "adaptive.explain.guided.summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Here is what this Mac can review safely."
+          }
+        }
+      }
+    },
+    "adaptive.explain.standard.summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evidence, policy, and recovery stay bound to CleanerCore."
+          }
+        }
+      }
+    },
+    "adaptive.explain.technical.summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authority fields are copied from CleanerCore without recalculation."
+          }
+        }
+      }
+    },
+    "adaptive.explain.guided.scan.complete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan complete."
+          }
+        }
+      }
+    },
+    "adaptive.explain.guided.scan.continuing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan is still running."
+          }
+        }
+      }
+    },
+    "adaptive.explain.guided.scan.partial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan finished with gaps."
+          }
+        }
+      }
+    },
+    "adaptive.explain.guided.scan.permissionDenied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan was permission-denied."
+          }
+        }
+      }
+    },
+    "adaptive.explain.guided.scan.cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan was cancelled."
+          }
+        }
+      }
+    },
+    "adaptive.explain.guided.scan.corruptMetadata": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan stopped on corrupt metadata."
+          }
+        }
+      }
+    },
+    "adaptive.explain.guided.scan.unsupportedLayout": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan stopped on unsupported layout."
+          }
+        }
+      }
+    },
+    "adaptive.explain.standard.scan.complete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan complete."
+          }
+        }
+      }
+    },
+    "adaptive.explain.standard.scan.continuing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan is still running."
+          }
+        }
+      }
+    },
+    "adaptive.explain.standard.scan.partial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan finished with gaps."
+          }
+        }
+      }
+    },
+    "adaptive.explain.standard.scan.permissionDenied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan was permission-denied."
+          }
+        }
+      }
+    },
+    "adaptive.explain.standard.scan.cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan was cancelled."
+          }
+        }
+      }
+    },
+    "adaptive.explain.standard.scan.corruptMetadata": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan stopped on corrupt metadata."
+          }
+        }
+      }
+    },
+    "adaptive.explain.standard.scan.unsupportedLayout": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan stopped on unsupported layout."
+          }
+        }
+      }
+    },
+    "adaptive.explain.technical.scan.complete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan complete."
+          }
+        }
+      }
+    },
+    "adaptive.explain.technical.scan.continuing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan is still running."
+          }
+        }
+      }
+    },
+    "adaptive.explain.technical.scan.partial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan finished with gaps."
+          }
+        }
+      }
+    },
+    "adaptive.explain.technical.scan.permissionDenied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan was permission-denied."
+          }
+        }
+      }
+    },
+    "adaptive.explain.technical.scan.cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan was cancelled."
+          }
+        }
+      }
+    },
+    "adaptive.explain.technical.scan.corruptMetadata": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan stopped on corrupt metadata."
+          }
+        }
+      }
+    },
+    "adaptive.explain.technical.scan.unsupportedLayout": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan stopped on unsupported layout."
+          }
+        }
+      }
+    },
+    "adaptive.explain.guided.recovery": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you approve a cleanup, items go to Trash first so you can restore them."
+          }
+        }
+      }
+    },
+    "adaptive.explain.standard.policy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eligibility comes from policy. The Guided, Standard, or Technical view does not change it."
+          }
+        }
+      }
+    },
+    "adaptive.explain.standard.recovery": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approved cleanup remains Trash-first."
+          }
+        }
+      }
+    },
+    "adaptive.explain.technical.policy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Policy fields are copied from CleanerCore. This view does not recalculate them."
+          }
+        }
+      }
+    },
+    "adaptive.explain.technical.plan": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A review plan is digest-bound. This view cannot edit it."
+          }
+        }
+      }
+    },
+    "adaptive.explain.technical.receipt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Receipts use opaque identifiers. Local paths are not shown."
+          }
+        }
+      }
+    },
+    "adaptive.group.guided.cards": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recommendations"
+          }
+        }
+      }
+    },
+    "adaptive.detail.guided.what": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What this Mac can review"
+          }
+        }
+      }
+    },
+    "adaptive.detail.guided.safeNext": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The next step is review, not deletion."
+          }
+        }
+      }
+    },
+    "adaptive.group.standard.opportunities": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reviewable items"
+          }
+        }
+      }
+    },
+    "adaptive.group.standard.protected": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protected items"
+          }
+        }
+      }
+    },
+    "adaptive.detail.standard.provenance": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source of this evidence"
+          }
+        }
+      }
+    },
+    "adaptive.detail.standard.bytes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conservative size from evidence"
+          }
+        }
+      }
+    },
+    "adaptive.detail.standard.recovery": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recovery path after approval"
+          }
+        }
+      }
+    },
+    "adaptive.group.technical.evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evidence"
+          }
+        }
+      }
+    },
+    "adaptive.group.technical.policy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Policy"
+          }
+        }
+      }
+    },
+    "adaptive.group.technical.history": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History"
+          }
+        }
+      }
+    },
+    "adaptive.detail.technical.identity": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opaque evidence identity"
+          }
+        }
+      }
+    },
+    "adaptive.detail.technical.boundary": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boundary flags from the scan"
+          }
+        }
+      }
+    },
+    "adaptive.detail.technical.eligibility": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eligibility copied from policy"
+          }
+        }
+      }
+    },
+    "adaptive.detail.technical.digest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan digest, when a plan exists"
+          }
+        }
+      }
+    },
+    "adaptive.refresh.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reloads the current evidence. Does not start cleanup."
+          }
+        }
+      }
+    },
+    "adaptive.mode.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes how much is explained. Does not change what is eligible."
+          }
+        }
+      }
+    },
+    "adaptive.onboarding.continue.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Closes this notice. Does not start a scan."
+          }
+        }
+      }
+    },
+    "adaptive.review.close.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Closes review without approving."
+          }
+        }
+      }
+    },
+    "adaptive.history.open.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens local receipt history."
+          }
+        }
+      }
+    },
+    "adaptive.opportunity.open.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens review for this item. Does not approve cleanup."
+          }
+        }
+      }
+    },
+    "adaptive.dashboard.refreshing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refreshing evidence"
+          }
+        }
+      }
+    },
+    "receipt.recovery.mayBeAvailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trash recovery may still be available."
+          }
+        }
+      }
+    },
+    "receipt.recovery.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trash recovery is not available for this receipt."
+          }
+        }
+      }
+    },
+    "receipt.recovery.uncertain": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trash recovery status is uncertain."
+          }
+        }
+      }
+    },
+    "receipt.recovery.mayNoLongerBePresent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The item may no longer be present."
+          }
+        }
+      }
+    },
+    "adaptive.developer.cursor.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cursor is installed."
+          }
+        }
+      }
+    },
+    "adaptive.developer.cursor.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cursor was not found in Applications."
+          }
+        }
+      }
+    },
+    "adaptive.developer.cursor.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cursor presence could not be determined."
+          }
+        }
+      }
+    },
+    "adaptive.developer.vscode.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visual Studio Code is installed."
+          }
+        }
+      }
+    },
+    "adaptive.developer.vscode.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visual Studio Code was not found in Applications."
+          }
+        }
+      }
+    },
+    "adaptive.developer.vscode.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visual Studio Code presence could not be determined."
+          }
+        }
+      }
+    },
+    "adaptive.developer.docker.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Docker is installed."
+          }
+        }
+      }
+    },
+    "adaptive.developer.docker.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Docker was not found in Applications."
+          }
+        }
+      }
+    },
+    "adaptive.developer.docker.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Docker presence could not be determined."
+          }
+        }
+      }
+    },
+    "adaptive.developer.homebrew.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Homebrew is installed."
+          }
+        }
+      }
+    },
+    "adaptive.developer.homebrew.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Homebrew was not found in Applications."
+          }
+        }
+      }
+    },
+    "adaptive.developer.homebrew.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Homebrew presence could not be determined."
+          }
+        }
+      }
+    },
+    "adaptive.onboarding.noLogin": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No account is required."
+          }
+        }
+      }
+    },
+    "adaptive.onboarding.staysLocal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There is no usage telemetry."
+          }
+        }
+      }
+    },
+    "adaptive.onboarding.learn-evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evidence stays on this Mac. Continue does not start a scan or change eligibility."
+          }
+        }
+      }
+    },
+    "adaptive.scan.stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop scan"
+          }
+        }
+      }
+    },
+    "adaptive.scan.stop.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stops the current evidence refresh. Does not clean files."
+          }
+        }
+      }
+    },
+    "adaptive.warning.permission": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A permission gap is visible. It cannot be overridden into cleanup eligibility."
+          }
+        }
+      }
+    },
+    "adaptive.warning.external-volume": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "External-volume evidence is visible and cannot be selected for cleanup."
+          }
+        }
+      }
+    },
+    "adaptive.warning.changed-evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evidence changed. Refresh and review again. Approval is not valid."
+          }
+        }
+      }
+    },
+    "adaptive.warning.unknown-layout": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This layout is not covered by a current safety contract."
+          }
+        }
+      }
+    },
+    "adaptive.receipts.close.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Closes receipt history without revealing a path."
+          }
+        }
+      }
+    },
+    "adaptive.approval.button": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approve plan"
+          }
+        }
+      }
+    },
+    "adaptive.approval.button.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approval applies only to this current plan."
+          }
+        }
+      }
+    },
+    "adaptive.approval.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approve this plan?"
+          }
+        }
+      }
+    },
+    "adaptive.approval.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Items will be revalidated immediately before any eligible item is moved to Trash."
+          }
+        }
+      }
+    },
+    "adaptive.approval.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to Trash"
+          }
+        }
+      }
+    },
+    "adaptive.execution.moved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moved to Trash."
+          }
+        }
+      }
+    },
+    "adaptive.execution.skippedStale": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skipped because evidence changed."
+          }
+        }
+      }
+    },
+    "adaptive.execution.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The move to Trash failed."
+          }
+        }
+      }
+    },
+    "adaptive.execution.cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The move was cancelled."
+          }
+        }
+      }
+    },
+    "adaptive.execution.stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop Moving to Trash"
+          }
+        }
+      }
+    },
+    "adaptive.execution.stop.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stops before the next item. Items already moved stay in the Trash and are listed in the receipt."
+          }
+        }
+      }
+    },
+    "adaptive.failure.sessionUnavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This review session could not start, so no plan can be approved. Restart the app to try again."
+          }
+        }
+      }
+    },
+    "adaptive.failure.scanFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evidence could not be collected. Nothing was changed. Try Refresh."
+          }
+        }
+      }
+    },
+    "adaptive.failure.presentationFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evidence was collected but could not be displayed safely. Nothing was changed."
+          }
+        }
+      }
+    },
+    "adaptive.failure.planChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The plan changed after you reviewed it, so nothing was moved. Review the updated plan before approving again."
+          }
+        }
+      }
+    },
+    "adaptive.failure.receiptHistoryUnavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Receipt history could not be opened, so the run did not start. Nothing was moved."
+          }
+        }
+      }
+    },
+    "adaptive.failure.dismiss": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dismiss"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.1"
+}

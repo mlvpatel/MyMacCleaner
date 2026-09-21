@@ -1,0 +1,12 @@
+{
+  "data": [
+    {
+      "files": [
+        {
+          "filename": "__SOURCE_ROOT__/Alpha.swift",
+          "summary": { "lines": { "count": 10, "covered": 9 } }
+        }
+      ]
+    }
+  ]
+}

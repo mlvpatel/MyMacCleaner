@@ -1,0 +1,5 @@
+// Copy this file to Config/Signing.local.xcconfig (gitignored) and fill in your values.
+// Find your identity with: security find-identity -v -p codesigning
+
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+CODE_SIGN_IDENTITY = Developer ID Application

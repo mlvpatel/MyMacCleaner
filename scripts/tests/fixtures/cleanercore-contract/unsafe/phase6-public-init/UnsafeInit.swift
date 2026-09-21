@@ -1,0 +1,1 @@
+public init(target: ReviewPlanTarget) {}

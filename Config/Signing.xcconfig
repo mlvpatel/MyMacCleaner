@@ -1,0 +1,11 @@
+// Code signing for the MyMacCleaner app target.
+//
+// The defaults sign ad hoc so anyone can build and run locally without an Apple Developer account.
+// For Developer ID builds, copy Signing.local.xcconfig.example to Signing.local.xcconfig
+// (gitignored) and set your team and identity there. No team ID is committed.
+
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+#include? "Signing.local.xcconfig"

@@ -1,0 +1,60 @@
+name: Safety Contract
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: safety-contract-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  XCODE_MAJOR: '27'
+
+jobs:
+  safety-contract:
+    name: Safety, CleanerCore and Adaptive gates
+    # The packages use swift-tools 6.0 and swift-testing, which need Xcode 26.
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app | sort -V | tail -1)
+          [[ -n "$xcode_app" ]] || { echo "::error::No Xcode ${XCODE_MAJOR}.x on runner"; exit 1; }
+          sudo xcode-select -s "$xcode_app"
+          swift --version
+
+      - name: Verify offline safety contract (tests + coverage)
+        run: bash scripts/verify-safety-contract.sh
+
+      - name: Verify CleanerCore (tests + 80% coverage gate)
+        run: bash scripts/verify-cleanercore.sh
+
+      - name: Verify CleanerCore source contract
+        run: bash scripts/verify-cleanercore-contract.sh
+
+      - name: Verify Adaptive Experience bridge and catalog
+        run: |
+          bash scripts/verify-adaptive-bridge.sh
+          bash scripts/verify-adaptive-experience.sh
+
+      - name: Verifier self-tests
+        run: |
+          for self_test in scripts/tests/*.sh; do
+            echo "::group::$self_test"
+            bash "$self_test"
+            echo "::endgroup::"
+          done

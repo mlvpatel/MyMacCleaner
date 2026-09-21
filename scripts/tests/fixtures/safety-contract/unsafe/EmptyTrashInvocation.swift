@@ -1,0 +1,3 @@
+func invokeLegacyTrashAction() {
+    emptyTrash()
+}

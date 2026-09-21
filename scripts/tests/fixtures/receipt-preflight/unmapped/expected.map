@@ -1,0 +1,3 @@
+type:SampleKind	enum	required	excluded		synthetic fixture type
+case:SampleKind.alpha	case	required	excluded		synthetic fixture case
+type:SampleRecord	struct	required	persisted		synthetic fixture type

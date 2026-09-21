@@ -1,0 +1,241 @@
+public struct PolicyEvaluator: Sendable {
+    public init() {}
+
+    /// The public entry point derives all positive facts from immutable scanner
+    /// evidence. Callers cannot supply a hand-written activity or scope proof.
+    public func evaluate(_ finding: GeneralMacFinding) -> PolicyEvaluation {
+        evaluate(.observed(from: finding))
+    }
+
+    func evaluate(_ evidence: GeneralMacPolicyEvidence) -> PolicyEvaluation {
+        let finding = evidence.finding
+        let detector = DetectorSelection(
+            id: finding.finding.detectorID,
+            version: finding.finding.detectorVersion
+        )
+        let owner = semanticOwner(for: finding)
+
+        guard detector == generalMacSelection else {
+            return ineligible(
+                detector: detector,
+                owner: .unknown,
+                disposition: .unknownInspectFirst,
+                rule: .unknownEvidenceV1,
+                rationale: .unsupportedEvidence,
+                recovery: .inspectBeforeAction,
+                confidence: finding.confidence
+            )
+        }
+        guard finding.completeness == .complete else {
+            return ineligible(
+                detector: detector,
+                owner: owner,
+                disposition: .unknownInspectFirst,
+                rule: .unknownEvidenceV1,
+                rationale: .incompleteEvidence,
+                recovery: .inspectBeforeAction,
+                confidence: finding.confidence
+            )
+        }
+        guard hasVerifiedScannerShape(finding) else {
+            return ineligible(
+                detector: detector,
+                owner: owner,
+                disposition: .unknownInspectFirst,
+                rule: .unknownEvidenceV1,
+                rationale: .unsupportedEvidence,
+                recovery: .inspectBeforeAction,
+                confidence: finding.confidence
+            )
+        }
+        guard evidence.activity == .observedInactive else {
+            return ineligible(
+                detector: detector,
+                owner: owner,
+                disposition: .unknownInspectFirst,
+                rule: .unknownEvidenceV1,
+                rationale: evidence.activity == .observedActive ? .activeEvidence : .unsupportedEvidence,
+                recovery: .inspectBeforeAction,
+                confidence: finding.confidence
+            )
+        }
+        guard finding.space.hasObservedNoSharedBytes else {
+            return ineligible(
+                detector: detector,
+                owner: owner,
+                disposition: .unknownInspectFirst,
+                rule: .unknownEvidenceV1,
+                rationale: .linkedOrUnknownSharing,
+                recovery: .inspectBeforeAction,
+                confidence: finding.confidence
+            )
+        }
+
+        switch owner {
+        case .generalRebuildableCache:
+            return evaluateCache(evidence, detector: detector)
+        case .generalLog:
+            return ineligible(detector: detector, owner: owner, disposition: .mayAffectWorkflow,
+                              rule: .generalLogReviewV1, rationale: .namedReviewRule,
+                              recovery: .inspectBeforeAction, confidence: finding.confidence)
+        case .generalCrashReport:
+            return ineligible(detector: detector, owner: owner, disposition: .mayAffectWorkflow,
+                              rule: .generalCrashReviewV1, rationale: .namedReviewRule,
+                              recovery: .inspectBeforeAction, confidence: finding.confidence)
+        case .generalTemporaryData:
+            return ineligible(detector: detector, owner: owner, disposition: .redownloadRequired,
+                              rule: .generalTemporaryReviewV1, rationale: .namedReviewRule,
+                              recovery: .redownloadRequired, confidence: finding.confidence)
+        case .personalLargeFile, .duplicateEvidence, .modelStore, .developerToolState,
+             .credential, .setting, .workloadObservation, .unknown:
+            return protected(detector: detector, owner: owner, confidence: finding.confidence)
+        }
+    }
+
+    public func protectedEvaluation(
+        detector: DetectorSelection,
+        owner: PolicySemanticOwner,
+        confidence: EvidenceConfidence = .unavailable
+    ) -> PolicyEvaluation {
+        protected(detector: detector, owner: owner, confidence: confidence)
+    }
+
+    private func evaluateCache(
+        _ evidence: GeneralMacPolicyEvidence,
+        detector: DetectorSelection
+    ) -> PolicyEvaluation {
+        let finding = evidence.finding
+        guard finding.source == .userLibraryCaches,
+              finding.category == .cache,
+              evidence.scopeProof == .namedFixedScopeGeneralCacheV1,
+              finding.rebuildImpact == .rebuildable,
+              finding.conservativeRisk == .low,
+              finding.confidence == .observed,
+              case let .observed(bytes) = finding.space.conservativeReclaimableBytes,
+              bytes > 0
+        else {
+            return ineligible(
+                detector: detector,
+                owner: .generalRebuildableCache,
+                disposition: .unknownInspectFirst,
+                rule: .unknownEvidenceV1,
+                rationale: .unsupportedEvidence,
+                recovery: .inspectBeforeAction,
+                confidence: finding.confidence
+            )
+        }
+        let factors = CandidateRankFactors(
+            recoveryCost: .rebuild,
+            confidence: finding.confidence,
+            workflowImpact: .none,
+            conservativeBytes: bytes
+        )
+        let candidate = EligibleCandidate(
+            evidence: evidence,
+            semanticOwner: .generalRebuildableCache,
+            rule: .generalCacheRegenerationV1,
+            rationale: .namedSafeRegenerationRule,
+            rankFactors: factors
+        )
+        return .init(
+            detector: detector,
+            disposition: .safeToRegenerate,
+            eligibility: .eligible,
+            semanticOwner: .generalRebuildableCache,
+            rule: .generalCacheRegenerationV1,
+            rationale: .namedSafeRegenerationRule,
+            recoveryPath: .rebuildable,
+            confidence: finding.confidence,
+            candidate: candidate
+        )
+    }
+
+    private func protected(
+        detector: DetectorSelection,
+        owner: PolicySemanticOwner,
+        confidence: EvidenceConfidence
+    ) -> PolicyEvaluation {
+        ineligible(
+            detector: detector,
+            owner: owner,
+            disposition: .keepProtected,
+            rule: .protectedOwnerV1,
+            rationale: .protectedSemanticOwner,
+            recovery: .protectedNoOperation,
+            confidence: confidence
+        )
+    }
+
+    private func ineligible(
+        detector: DetectorSelection,
+        owner: PolicySemanticOwner,
+        disposition: PolicyDisposition,
+        rule: PolicyRuleReference,
+        rationale: PolicyRationale,
+        recovery: PolicyRecoveryPath,
+        confidence: EvidenceConfidence
+    ) -> PolicyEvaluation {
+        .init(
+            detector: detector,
+            disposition: disposition,
+            eligibility: .ineligible,
+            semanticOwner: owner,
+            rule: rule,
+            rationale: rationale,
+            recoveryPath: recovery,
+            confidence: confidence,
+            candidate: nil
+        )
+    }
+
+    private var generalMacSelection: DetectorSelection {
+        .init(id: GeneralMacScopeCatalog.current.detectorID, version: GeneralMacScopeCatalog.current.version)
+    }
+
+    private func semanticOwner(for finding: GeneralMacFinding) -> PolicySemanticOwner {
+        switch finding.category {
+        case .cache: return finding.source == .userLibraryCaches ? .generalRebuildableCache : .unknown
+        case .log: return .generalLog
+        case .crashReport: return .generalCrashReport
+        case .temporary: return .generalTemporaryData
+        case .largeFile: return .personalLargeFile
+        case .duplicate: return .duplicateEvidence
+        }
+    }
+
+    private func hasVerifiedScannerShape(_ finding: GeneralMacFinding) -> Bool {
+        let raw = finding.finding
+        guard raw.id.detectorID == raw.detectorID,
+              raw.id.rootID == raw.declaredRoot.id,
+              raw.id.locatorComponents == raw.locator.components,
+              raw.locator.rootID == raw.declaredRoot.id,
+              raw.provenance == .filesystemObservation,
+              raw.fileKind == .regularFile,
+              raw.resourceIdentity.isObserved,
+              raw.volume.isObserved,
+              raw.linkCount == .observed(1),
+              raw.sizes.logicalBytes == finding.space.logicalBytes,
+              raw.sizes.allocatedBytes == finding.space.allocatedBytes,
+              finding.space.hasObservedNoSharedBytes,
+              finding.space.conservativeReclaimableBytes == raw.sizes.allocatedBytes,
+              allBoundariesAreObservedFalse(raw.boundaries)
+        else {
+            return false
+        }
+        return true
+    }
+
+    private func allBoundariesAreObservedFalse(_ boundaries: BoundaryEvidence) -> Bool {
+        [
+            boundaries.symlink, boundaries.alias, boundaries.package, boundaries.mount,
+            boundaries.protectedRoot, boundaries.homeBoundary, boundaries.externalVolume,
+        ].allSatisfy { $0 == .observed(false) }
+    }
+}
+
+private extension EvidenceValue {
+    var isObserved: Bool {
+        if case .observed = self { return true }
+        return false
+    }
+}

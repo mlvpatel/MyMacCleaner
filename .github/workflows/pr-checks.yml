@@ -1,0 +1,312 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Cancel in-progress runs for the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# `shell: bash` runs steps with `-eo pipefail`, so a failing xcodebuild is never masked by `tee`.
+defaults:
+  run:
+    shell: bash
+
+env:
+  XCODE_MAJOR: '27'
+  APP_NAME: MyMacCleaner
+  SCHEME: MyMacCleaner
+  DESTINATION: 'platform=macOS'
+
+jobs:
+  # ============================================
+  # Build Validation
+  # ============================================
+  build:
+    name: Build
+    runs-on: macos-26
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app | sort -V | tail -1)
+          [[ -n "$xcode_app" ]] || { echo "::error::No Xcode ${XCODE_MAJOR}.x on runner"; exit 1; }
+          sudo xcode-select -s "$xcode_app"
+          xcodebuild -version
+
+      - name: Build (Debug)
+        run: |
+          xcodebuild build \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -configuration Debug \
+            2>&1 | tee build-debug.log
+
+      - name: Build (Release)
+        run: |
+          xcodebuild build \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -configuration Release \
+            2>&1 | tee build-release.log
+
+  # ============================================
+  # Unit Tests + Coverage Ratchet
+  # ============================================
+  test:
+    name: Unit Tests
+    runs-on: macos-26
+    timeout-minutes: 30
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app | sort -V | tail -1)
+          sudo xcode-select -s "$xcode_app"
+
+      - name: Run Unit Tests
+        run: |
+          xcodebuild test \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -only-testing:MyMacCleanerTests \
+            -enableCodeCoverage YES \
+            -resultBundlePath TestResults.xcresult \
+            2>&1 | tee unit-tests.log
+
+      - name: Enforce app coverage baseline
+        run: bash scripts/check-app-coverage.sh TestResults.xcresult
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: |
+            TestResults.xcresult
+            unit-tests.log
+
+  # ============================================
+  # UI Tests (advisory: needs a logged-in GUI session)
+  # ============================================
+  ui-test:
+    name: UI Tests
+    runs-on: macos-26
+    timeout-minutes: 30
+    needs: build
+    # Hosted runners may not grant UI automation; failures are visible but do not block merge.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app | sort -V | tail -1)
+          sudo xcode-select -s "$xcode_app"
+
+      - name: Run UI Tests
+        run: |
+          xcodebuild test \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -only-testing:MyMacCleanerUITests \
+            -resultBundlePath UITestResults.xcresult \
+            2>&1 | tee ui-tests.log
+
+      - name: Upload UI Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-test-results
+          path: |
+            UITestResults.xcresult
+            ui-tests.log
+
+  # ============================================
+  # Archive + Signature Check
+  # ============================================
+  archive:
+    name: Archive Test
+    runs-on: macos-26
+    timeout-minutes: 20
+    needs: [build, test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app | sort -V | tail -1)
+          sudo xcode-select -s "$xcode_app"
+
+      - name: Archive Build (ad hoc signing from Config/Signing.xcconfig)
+        run: |
+          xcodebuild archive \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$SCHEME" \
+            -archivePath "build/$APP_NAME.xcarchive" \
+            -configuration Release \
+            ONLY_ACTIVE_ARCH=NO \
+            2>&1 | tee archive.log
+
+      - name: Verify archive signature and entitlements
+        run: |
+          app="build/$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app"
+          [[ -d "$app" ]] || { echo "::error::App not found in archive"; exit 1; }
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign --display --entitlements - "$app"
+          if [[ -e "$app/Contents/Frameworks/Sparkle.framework" ]]; then
+            echo "::error::Sparkle framework must not ship"
+            exit 1
+          fi
+          echo "Ad hoc archive verified. Gatekeeper (spctl) and notarization are checked by scripts/release.sh on Developer ID builds."
+
+  # ============================================
+  # SwiftLint (blocking)
+  # ============================================
+  lint:
+    name: SwiftLint
+    runs-on: macos-26
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: swiftlint lint --strict --reporter github-actions-logging
+
+  # ============================================
+  # Code Quality Checks (advisory warnings)
+  # ============================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check for print() statements
+        run: |
+          PRINTS=$(grep -rn "print(" "$APP_NAME"/ --include="*.swift" | grep -v "// " | grep -v "#Preview" || true)
+          if [[ -n "$PRINTS" ]]; then
+            echo "::warning::Found print() statements in production code:"
+            echo "$PRINTS"
+          else
+            echo "No print() statements found"
+          fi
+
+      - name: Check macOS 26 availability patterns
+        run: |
+          UNAVAILABLE=$(grep -rn "#unavailable" "$APP_NAME"/ --include="*.swift" || true)
+          if [[ -n "$UNAVAILABLE" ]]; then
+            echo "::error::Found #unavailable patterns (use #available with else instead):"
+            echo "$UNAVAILABLE"
+            exit 1
+          fi
+          GLASS_NO_CHECK=$(grep -rn "\.glassEffect" "$APP_NAME"/ --include="*.swift" | grep -v "#available" | grep -v "//" || true)
+          if [[ -n "$GLASS_NO_CHECK" ]]; then
+            echo "::warning::Found .glassEffect without #available check:"
+            echo "$GLASS_NO_CHECK"
+          fi
+
+      - name: Check file size limit (800 lines)
+        run: |
+          LARGE_FILES=$(find "$APP_NAME" CleanerCore/Sources SafetyContract/Sources -name "*.swift" -exec wc -l {} + | awk '$2 != "total" && $1 > 800 {print}')
+          if [[ -n "$LARGE_FILES" ]]; then
+            echo "::error::Swift files over 800 lines:"
+            echo "$LARGE_FILES"
+            exit 1
+          fi
+          echo "All Swift files are within 800 lines"
+
+      - name: Check for TODO/FIXME comments
+        run: |
+          TODOS=$(grep -rn "TODO\|FIXME\|HACK\|XXX" "$APP_NAME"/ --include="*.swift" || true)
+          if [[ -n "$TODOS" ]]; then
+            echo "::warning::Found TODO/FIXME comments:"
+            echo "$TODOS"
+          else
+            echo "No TODO/FIXME comments found"
+          fi
+
+  # ============================================
+  # Documentation Check
+  # ============================================
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check required documents
+        run: |
+          for doc in CLAUDE.md README.md docs/RELEASE-RUNBOOK.md docs/COVERAGE.md; do
+            [[ -f "$doc" ]] || { echo "::error::$doc is missing"; exit 1; }
+          done
+
+  # ============================================
+  # Summary Job (required for branch protection)
+  # ============================================
+  pr-check-complete:
+    name: PR Checks Complete
+    runs-on: ubuntu-latest
+    needs: [build, test, archive, lint, code-quality, docs]
+    if: always()
+
+    steps:
+      - name: Check Results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          failed=$(jq -r 'to_entries[] | select(.value.result != "success") | "\(.key)=\(.value.result)"' <<<"$RESULTS")
+          if [[ -n "$failed" ]]; then
+            echo "::error::Required checks did not succeed: $failed"
+            exit 1
+          fi
+          echo "All required checks passed"

@@ -1,0 +1,4 @@
+# Minimum line coverage (fraction) for the MyMacCleaner.app target, enforced by scripts/check-app-coverage.sh.
+# Measured 8.4% on 2026-09-17 (107 unit test runs; SwiftUI views are not unit-tested). Set slightly lower to
+# absorb differences between tools; raise it whenever CI reports coverage 1 point above this value. Target: 0.80.
+0.075

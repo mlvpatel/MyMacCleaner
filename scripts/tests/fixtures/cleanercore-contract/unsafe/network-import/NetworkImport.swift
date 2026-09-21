@@ -1,0 +1,3 @@
+import Network
+
+struct NetworkImportFixture {}

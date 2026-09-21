@@ -1,0 +1,468 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "duplicates.changeFolder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change Folder"
+          }
+        }
+      }
+    },
+    "duplicates.chooseFolder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change"
+          }
+        }
+      }
+    },
+    "duplicates.chooseFolderButton": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select"
+          }
+        }
+      }
+    },
+    "duplicates.chooseFolderMessage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a folder to scan for duplicates"
+          }
+        }
+      }
+    },
+    "duplicates.clean": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Selected"
+          }
+        }
+      }
+    },
+    "duplicates.clean.confirmMessage %lld %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This will move %lld duplicate files (%@) to the Trash. You can restore them from Trash if needed."
+          }
+        }
+      }
+    },
+    "duplicates.clean.confirmTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Duplicates to Trash?"
+          }
+        }
+      }
+    },
+    "duplicates.clean.moveToTrash": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to Trash"
+          }
+        }
+      }
+    },
+    "duplicates.clean.partial %lld %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed %lld files, %lld errors occurred"
+          }
+        }
+      }
+    },
+    "duplicates.clean.success %lld %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed %lld duplicates, freed %@"
+          }
+        }
+      }
+    },
+    "duplicates.clearFilters": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Filters"
+          }
+        }
+      }
+    },
+    "duplicates.copies %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld copies"
+          }
+        }
+      }
+    },
+    "duplicates.empty.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No duplicate files were found in the selected location."
+          }
+        }
+      }
+    },
+    "duplicates.empty.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Duplicates Found"
+          }
+        }
+      }
+    },
+    "duplicates.keepNewest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Newest, Select Others"
+          }
+        }
+      }
+    },
+    "duplicates.keepThisCopy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep this copy"
+          }
+        }
+      }
+    },
+    "duplicates.keeping": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KEEPING"
+          }
+        }
+      }
+    },
+    "duplicates.keepingThisCopy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This copy will be kept"
+          }
+        }
+      }
+    },
+    "duplicates.noDuplicatesFound": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No duplicates found"
+          }
+        }
+      }
+    },
+    "duplicates.scan.cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan cancelled"
+          }
+        }
+      }
+    },
+    "duplicates.scan.comparingFiles %lld %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comparing group %lld of %lld..."
+          }
+        }
+      }
+    },
+    "duplicates.scan.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan your files to find exact duplicates. Free up space by removing unnecessary copies."
+          }
+        }
+      }
+    },
+    "duplicates.scan.enumerating": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enumerating files..."
+          }
+        }
+      }
+    },
+    "duplicates.scan.finalizing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finalizing results..."
+          }
+        }
+      }
+    },
+    "duplicates.scan.foundFiles %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Found %lld files"
+          }
+        }
+      }
+    },
+    "duplicates.scan.startButton": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan for Duplicates"
+          }
+        }
+      }
+    },
+    "duplicates.scan.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find Duplicate Files"
+          }
+        }
+      }
+    },
+    "duplicates.scanAgain": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan Again"
+          }
+        }
+      }
+    },
+    "duplicates.search.placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search duplicates..."
+          }
+        }
+      }
+    },
+    "duplicates.selectAllDuplicates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select All Duplicates"
+          }
+        }
+      }
+    },
+    "duplicates.smartSelect": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smart Select"
+          }
+        }
+      }
+    },
+    "duplicates.sort.copiesMost": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copies (Most)"
+          }
+        }
+      }
+    },
+    "duplicates.sort.sizeLargest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File Size (Largest)"
+          }
+        }
+      }
+    },
+    "duplicates.sort.sizeSmallest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File Size (Smallest)"
+          }
+        }
+      }
+    },
+    "duplicates.sort.wastedLeast": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wasted Space (Least)"
+          }
+        }
+      }
+    },
+    "duplicates.sort.wastedMost": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wasted Space (Most)"
+          }
+        }
+      }
+    },
+    "duplicates.wasted": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "wasted"
+          }
+        }
+      }
+    },
+    "duplicates.wastedSpace %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld duplicate groups"
+          }
+        }
+      }
+    },
+    "duplicates.selectedCount %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld selected"
+          }
+        }
+      }
+    },
+    "duplicates.willDelete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Will be deleted"
+          }
+        }
+      }
+    },
+    "duplicates.markForDeletion": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mark for deletion"
+          }
+        }
+      }
+    },
+    "duplicates.willBeDeleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.1"
+}

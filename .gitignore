@@ -1,0 +1,45 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager (Package.resolved is committed to pin dependencies)
+.build/
+Packages/
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/
+
+# Signing material and local identity
+Config/Signing.local.xcconfig
+*.p12
+*.cer
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build/export artifacts
+ExportOptions.plist
+
+# Logs and profiling
+*.log
+*.profraw
+*.profdata

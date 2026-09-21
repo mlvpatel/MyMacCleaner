@@ -1,0 +1,3 @@
+import CryptoKit
+
+struct CryptoKitPureFixture {}
