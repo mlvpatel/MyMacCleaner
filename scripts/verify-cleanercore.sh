@@ -208,7 +208,7 @@ run_stage \
 test_binaries=()
 while IFS= read -r -d '' candidate; do
     test_binaries+=("$candidate")
-done < <(/usr/bin/find "$scratch_path" -type f -path '*Tests.xctest/Contents/MacOS/*Tests' -print0)
+done < <(/usr/bin/find "$scratch_path" -type f -path '*Tests.xctest/Contents/MacOS/*Tests' -not -path '*.dSYM/*' -print0)
 [[ ${#test_binaries[@]} -ge 1 ]] || fail "CC-GATE-TEST-BINARY"
 for test_binary in "${test_binaries[@]}"; do
     [[ -x "$test_binary" && "$test_binary" -nt "$freshness_marker" ]] || fail "CC-GATE-TEST-BINARY"
