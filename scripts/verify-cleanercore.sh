@@ -201,18 +201,25 @@ run_stage \
     --no-parallel \
     --scratch-path "$scratch_path"
 
+# The classic SwiftPM layout emits a single merged CleanerCorePackageTests.xctest under
+# .build/debug; Xcode 27's build system emits one *Tests.xctest bundle per test target
+# under out/Products/Debug. Accept both by matching every *Tests test binary, and require
+# at least one that is executable and newer than the freshness marker.
 test_binaries=()
 while IFS= read -r -d '' candidate; do
     test_binaries+=("$candidate")
-done < <(/usr/bin/find "$scratch_path" -type f -path '*/CleanerCorePackageTests.xctest/Contents/MacOS/CleanerCorePackageTests' -print0)
-[[ ${#test_binaries[@]} -eq 1 ]] || fail "CC-GATE-TEST-BINARY"
-test_binary="${test_binaries[0]}"
-[[ -x "$test_binary" && "$test_binary" -nt "$freshness_marker" ]] || fail "CC-GATE-TEST-BINARY"
+done < <(/usr/bin/find "$scratch_path" -type f -path '*Tests.xctest/Contents/MacOS/*Tests' -print0)
+[[ ${#test_binaries[@]} -ge 1 ]] || fail "CC-GATE-TEST-BINARY"
+for test_binary in "${test_binaries[@]}"; do
+    [[ -x "$test_binary" && "$test_binary" -nt "$freshness_marker" ]] || fail "CC-GATE-TEST-BINARY"
+done
 
+# Coverage profiles live under a codecov directory in both layouts (.build/debug/codecov
+# and out/Products/Debug/codecov), so match on the codecov segment rather than "debug".
 profile_paths=()
 while IFS= read -r -d '' candidate; do
     profile_paths+=("$candidate")
-done < <(/usr/bin/find "$scratch_path" -type f -path '*/debug/codecov/*.profraw' -print0)
+done < <(/usr/bin/find "$scratch_path" -type f -path '*/codecov/*.profraw' -print0)
 [[ ${#profile_paths[@]} -gt 0 ]] || fail "CC-GATE-COVERAGE-PROFILE"
 for profile_path in "${profile_paths[@]}"; do
     [[ "$profile_path" -nt "$freshness_marker" ]] || fail "CC-GATE-COVERAGE-PROFILE"
@@ -225,7 +232,16 @@ printf 'CLEANERCORE-GATE: %s\n' "coverage-profile-merge"
     || fail "CC-GATE-COVERAGE-PROFILE"
 [[ -s "$coverage_profile" ]] || fail "CC-GATE-COVERAGE-PROFILE"
 printf 'CLEANERCORE-GATE: %s\n' "coverage-export"
-"$llvm_cov" export -instr-profile "$coverage_profile" "$test_binary" > "$coverage_json" 2> "$coverage_directory/llvm-cov.log" \
+# Pass every discovered test binary to llvm-cov: the first positionally and the rest via
+# -object, so coverage merges across all per-target bundles (Xcode 27) or the single merged
+# bundle (classic layout). Built as an index loop for bash 3.2 (no empty-array expansion).
+export_objects=("${test_binaries[0]}")
+export_index=1
+while (( export_index < ${#test_binaries[@]} )); do
+    export_objects+=(-object "${test_binaries[$export_index]}")
+    export_index=$(( export_index + 1 ))
+done
+"$llvm_cov" export -instr-profile "$coverage_profile" "${export_objects[@]}" > "$coverage_json" 2> "$coverage_directory/llvm-cov.log" \
     || fail "CC-GATE-COVERAGE-EXPORT"
 [[ -s "$coverage_json" ]] || fail "CC-GATE-COVERAGE-EXPORT"
 
