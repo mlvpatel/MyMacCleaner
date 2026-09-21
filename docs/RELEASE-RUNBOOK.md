@@ -9,7 +9,7 @@ than the row below.
 | Gate | Status | Evidence |
 |------|--------|----------|
 | SafetyContract local | **Locally verified** | `bash scripts/verify-safety-contract.sh` |
-| CleanerCore SwiftPM + coverage | **Locally verified** | `CODEX_SANDBOX=1 bash scripts/verify-cleanercore.sh` — 7982/8940 (89.28%), every production target at or above 80.00%. See [COVERAGE.md](COVERAGE.md) |
+| CleanerCore SwiftPM + coverage | **Locally verified** | `bash scripts/verify-cleanercore.sh` — 8042/9029 (89.07%), every production target at or above 80.00%. See [COVERAGE.md](COVERAGE.md) |
 | Adaptive catalog/IDs (CLT) | **Locally verified** | `bash scripts/verify-adaptive-experience.sh` |
 | Full-Xcode app build | **Pending** | `xcode-select -p` is `/Library/Developer/CommandLineTools`; no Xcode.app |
 | XCUITest / VoiceOver / keyboard / Reduce Motion / Increase Contrast | **Pending** | 08-04 `ui_proof: human_needed` |
