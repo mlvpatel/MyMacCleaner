@@ -1,6 +1,11 @@
 # CleanerCore coverage
 
-Canonical local gate, measured **after Phase 8 production files and Adaptive Experience localization**:
+The 80%-per-target line-coverage gate is enforced continuously by `scripts/verify-cleanercore.sh`
+in CI (`.github/workflows/safety-contract.yml` → "Verify CleanerCore"), which is **green on the
+current `main` HEAD**.
+
+**Last full per-target export** — measured after Phase 8 production files and Adaptive Experience
+localization:
 
 - Date: 2026-08-31
 - Environment: Command Line Tools (`xcode-select` → `/Library/Developer/CommandLineTools`)
@@ -17,6 +22,13 @@ Canonical local gate, measured **after Phase 8 production files and Adaptive Exp
 | CleanerCoreContentAdapter | 374 / 433 | **86.37%** |
 
 Every production target is at or above **80.00%**. This is SwiftPM line coverage, not an Xcode UI coverage report. Signing, notarization, and XCUITest are not part of this measurement.
+
+> Re-run note (2026-09-21, full Xcode 27): all CleanerCore package tests pass, but the gate's
+> `llvm-cov` coverage-export step could not resolve the single `CleanerCorePackageTests.xctest`
+> binary on this local toolchain (`CC-GATE-TEST-BINARY`), so a fresh per-target export was not
+> captured locally. CI's clean macOS runner is unaffected and remains green. Regenerate the table
+> with a clean `swift test --enable-code-coverage` + `llvm-cov report` when a fresh local export is
+> needed. Tracked as a verifier-robustness follow-up (test-binary discovery under Xcode 27).
 
 The previous Phase 7 figure (7567/8461, 89.43%) is superseded.
 
