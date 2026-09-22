@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CleanerCore
 @testable import MyMacCleaner
 
 @Suite("Adaptive Experience Bridge Tests")
@@ -133,6 +134,26 @@ struct AdaptiveExperienceBridgeTests {
     @Test("Only fixed-scope caches resolve as Trash roots")
     func onlyCachesAreTrashEligibleRoots() {
         #expect(AdaptiveTrustSession.trashEligibleRootKinds == [.userLibraryCaches])
+    }
+
+    @Test("Revalidation scan is scoped to the plan targets' distinct root kinds")
+    func revalidationRootsScopeToPlanTargets() throws {
+        let catalog = GeneralMacScopeCatalog.current
+        let caches = try catalog.declaredRoot(for: .userLibraryCaches).id
+        let logs = try catalog.declaredRoot(for: .userLibraryLogs).id
+
+        // Duplicate cache targets collapse to a single caches root — not the full six-root scan,
+        // so an unrelated large root cannot truncate a still-present cache target.
+        #expect(
+            AdaptiveTrustSession.revalidationRootKinds(forRootIDs: [caches, caches]) == [.userLibraryCaches]
+        )
+        // Distinct roots are preserved in first-seen order and de-duplicated.
+        #expect(
+            AdaptiveTrustSession.revalidationRootKinds(forRootIDs: [caches, logs, caches])
+                == [.userLibraryCaches, .userLibraryLogs]
+        )
+        // No targets yields no scoped roots, so the caller falls back to the full scan.
+        #expect(AdaptiveTrustSession.revalidationRootKinds(forRootIDs: []).isEmpty)
     }
 
     private static let sampleDigestHex = String(repeating: "0a", count: 32)
