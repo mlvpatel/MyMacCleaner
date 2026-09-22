@@ -13,6 +13,9 @@ public enum CapabilityProtectionReason: Equatable, Sendable {
     case protectedSemanticOwner
     case unknownOrUnsupportedEvidence
     case activeOrSharedEvidence
+    /// The store was not observed in this scan (e.g. not yet scanned or not wired in), so it is
+    /// reported as "not observed" rather than "protected" — the two must never be conflated.
+    case notObserved
 }
 
 public struct CapabilityCard: Equatable, Sendable {
@@ -76,11 +79,33 @@ public struct CapabilityCardProjection: Sendable {
     public func cards(for evaluations: [PolicyEvaluation]) -> [CapabilityCard] {
         registeredDetectors.map { detector in
             let matching = evaluations.filter { $0.detector == detector }
-            let evaluation = matching.count == 1
-                ? matching[0]
-                : PolicyEvaluator().protectedEvaluation(detector: detector, owner: owner(for: detector))
-            return card(for: detector, evaluation: evaluation)
+            switch matching.count {
+            case 1:
+                return card(for: detector, evaluation: matching[0])
+            case 0:
+                // Never observed in this scan: report "not observed" rather than a synthesized
+                // "protected", so an unscanned store is not mistaken for one we vetted.
+                return notObservedCard(for: detector)
+            default:
+                // Conflicting evaluations for one detector: fail closed to protected.
+                return card(
+                    for: detector,
+                    evaluation: PolicyEvaluator().protectedEvaluation(
+                        detector: detector,
+                        owner: owner(for: detector)
+                    )
+                )
+            }
         }
+    }
+
+    private func notObservedCard(for detector: DetectorSelection) -> CapabilityCard {
+        inventoryCard(
+            detector: detector,
+            recovery: .inspectBeforeAction,
+            confidence: .unavailable,
+            reason: .notObserved
+        )
     }
 
     private var registeredDetectors: [DetectorSelection] {
