@@ -3,7 +3,24 @@ import CleanerCoreFoundation
 import Foundation
 
 struct CleanerCoreLiveScan: Sendable {
+    /// Every root the full presentation scan covers.
+    static let allRootKinds: [GeneralMacRootKind] = [
+        .userLibraryCaches,
+        .userLibraryLogs,
+        .userTemporary,
+        .userDownloads,
+        .userDesktop,
+        .userDocuments
+    ]
+
     func collect() async throws -> AdaptiveScanCollection {
+        try await collect(roots: Self.allRootKinds)
+    }
+
+    /// Scans only the given roots. Execute-time revalidation uses this to re-observe just the
+    /// plan targets' roots, so a large unrelated root cannot consume the scan budget and truncate
+    /// a still-present target into a false `skippedStale(.missing)`.
+    func collect(roots kinds: [GeneralMacRootKind]) async throws -> AdaptiveScanCollection {
         let catalog = GeneralMacScopeCatalog.current
         let adapter = try GeneralMacFilesystemAdapter(catalog: catalog)
         let session = try AdaptiveScanSession(
@@ -11,14 +28,6 @@ struct CleanerCoreLiveScan: Sendable {
             clock: AppAdaptiveClock(),
             cancellation: TaskAdaptiveCancel()
         )
-        let kinds: [GeneralMacRootKind] = [
-            .userLibraryCaches,
-            .userLibraryLogs,
-            .userTemporary,
-            .userDownloads,
-            .userDesktop,
-            .userDocuments
-        ]
         return await session.collect(request: try catalog.scanRequest(for: kinds))
     }
 
