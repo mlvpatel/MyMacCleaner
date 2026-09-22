@@ -58,6 +58,20 @@ actor AdaptiveTrustSession {
         return AppAdaptiveRoots.url(for: kind)
     }
 
+    /// Distinct root kinds the given targets live in, in first-seen order. Execute-time
+    /// revalidation scans only these roots so a large unrelated root cannot consume the scan
+    /// budget and truncate a still-present target into a false `skippedStale(.missing)`.
+    static func revalidationRootKinds(forRootIDs ids: [DeclaredRootID]) -> [GeneralMacRootKind] {
+        let catalog = GeneralMacScopeCatalog.current
+        var seen: Set<GeneralMacRootKind> = []
+        var ordered: [GeneralMacRootKind] = []
+        for id in ids {
+            guard let kind = try? catalog.rootKind(for: id) else { continue }
+            if seen.insert(kind).inserted { ordered.append(kind) }
+        }
+        return ordered
+    }
+
     func makeSource() async -> SourceResult {
         guard let identity else { return .failure(.sessionUnavailable) }
         let collected: AdaptiveScanCollection
@@ -131,9 +145,14 @@ actor AdaptiveTrustSession {
             return refusedRun(.planChanged)
         case let .success(operations):
             guard !cancellation.isCancelled else { return await stoppedBeforeRun() }
+            let revalidationRoots = Self.revalidationRootKinds(
+                forRootIDs: plan.targets.map(\.declaredRootID)
+            )
             let collected: AdaptiveScanCollection
             do {
-                collected = try await liveScan.collect()
+                collected = revalidationRoots.isEmpty
+                    ? try await liveScan.collect()
+                    : try await liveScan.collect(roots: revalidationRoots)
             } catch {
                 return refusedRun(.scanFailed)
             }
