@@ -18,6 +18,7 @@ actor AdaptiveTrustSession {
 
     private let liveScan: CleanerCoreLiveScan
     private let memoryObserver: any MemoryObservationPort
+    private let permissionProbe: any PermissionProbing
     private let digesting = CryptoKitPlanDigestAdapter()
     /// Nil when the plan context cannot be built; every request then fails with `.sessionUnavailable`.
     private let identity: Identity?
@@ -33,10 +34,12 @@ actor AdaptiveTrustSession {
 
     init(
         liveScan: CleanerCoreLiveScan,
-        memoryObserver: any MemoryObservationPort = DarwinMemoryObservationAdapter()
+        memoryObserver: any MemoryObservationPort = DarwinMemoryObservationAdapter(),
+        permissionProbe: any PermissionProbing = POSIXPermissionProbe()
     ) {
         self.liveScan = liveScan
         self.memoryObserver = memoryObserver
+        self.permissionProbe = permissionProbe
         identity = Self.makeIdentity()
     }
 
@@ -110,7 +113,7 @@ actor AdaptiveTrustSession {
                     receipts: receipts,
                     memory: memory,
                     capabilities: CapabilityCardProjection().cards(for: collected.evaluations),
-                    permissionGaps: [],
+                    permissionGaps: PermissionAssessment.permissionGaps(using: permissionProbe),
                     developerInventory: liveScan.developerInventory()
                 )
             )
