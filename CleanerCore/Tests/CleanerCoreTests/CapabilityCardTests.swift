@@ -21,8 +21,30 @@ struct CapabilityCardTests {
         for card in cards.dropFirst() {
             #expect(card.authority == .inventoryOnly)
             #expect(card.conditionalOperation == .none)
-            #expect(card.protectionReason == .protectedSemanticOwner)
+            // Unscanned model-store detectors read "not observed", not a synthesized "protected".
+            #expect(card.protectionReason == .notObserved)
         }
+    }
+
+    @Test
+    func observedProtectedStoreStaysProtectedWhileUnobservedReadsNotObserved() throws {
+        let evaluator = PolicyEvaluator()
+        let cache = try capabilityCacheFinding()
+        let huggingFace = ModelStoreDetectorRegistration.huggingFaceSelection
+        let protectedHuggingFace = evaluator.protectedEvaluation(detector: huggingFace, owner: .modelStore)
+
+        let cards = CapabilityCardProjection().cards(for: [evaluator.evaluate(cache), protectedHuggingFace])
+        let huggingFaceCard = try #require(cards.first { $0.detector == huggingFace })
+        let ollamaCard = try #require(
+            cards.first { $0.detector == ModelStoreDetectorRegistration.ollamaSelection }
+        )
+
+        // A store that WAS observed and is protected keeps the protected reason...
+        #expect(huggingFaceCard.protectionReason == .protectedSemanticOwner)
+        // ...while a store with no evaluation reads notObserved — the two are never conflated.
+        #expect(ollamaCard.protectionReason == .notObserved)
+        #expect(huggingFaceCard.authority == .inventoryOnly)
+        #expect(ollamaCard.authority == .inventoryOnly)
     }
 
     @Test(arguments: PolicySemanticOwner.allCases)
