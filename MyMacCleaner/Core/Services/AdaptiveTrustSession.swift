@@ -1,4 +1,5 @@
 import CleanerCore
+import CleanerCoreDarwin
 import CleanerCoreFoundation
 import Foundation
 
@@ -16,6 +17,7 @@ actor AdaptiveTrustSession {
     }
 
     private let liveScan: CleanerCoreLiveScan
+    private let memoryObserver: any MemoryObservationPort
     private let digesting = CryptoKitPlanDigestAdapter()
     /// Nil when the plan context cannot be built; every request then fails with `.sessionUnavailable`.
     private let identity: Identity?
@@ -29,8 +31,12 @@ actor AdaptiveTrustSession {
     private var lastExecutionState: TrashRunState?
     private var history: ReceiptHistoryCoordinator?
 
-    init(liveScan: CleanerCoreLiveScan) {
+    init(
+        liveScan: CleanerCoreLiveScan,
+        memoryObserver: any MemoryObservationPort = DarwinMemoryObservationAdapter()
+    ) {
         self.liveScan = liveScan
+        self.memoryObserver = memoryObserver
         identity = Self.makeIdentity()
     }
 
@@ -91,6 +97,7 @@ actor AdaptiveTrustSession {
             )
             let validity = displayedValidity(at: now)
             let receipts = await loadReceipts()
+            let memory = await memoryObserver.observe(cancellation: NeverCancelMemoryObservation())
             return .success(
                 AdaptiveExperienceSource(
                     scanState: collected.scanState,
@@ -101,7 +108,7 @@ actor AdaptiveTrustSession {
                     executionState: lastExecutionState,
                     executionOutcomes: lastOutcomes,
                     receipts: receipts,
-                    memory: nil,
+                    memory: memory,
                     capabilities: CapabilityCardProjection().cards(for: collected.evaluations),
                     permissionGaps: [],
                     developerInventory: liveScan.developerInventory()
@@ -303,6 +310,12 @@ actor AdaptiveTrustSession {
 
 private func wallNow() -> WallClockInstant {
     WallClockInstant(unixNanoseconds: Int64(Date().timeIntervalSince1970 * 1_000_000_000))
+}
+
+/// The source snapshot's memory sample always runs to completion; refresh/cancel apply to the scan
+/// and the Trash run, not this read-only observation.
+private struct NeverCancelMemoryObservation: MemoryObservationCancellation {
+    func isCancellationRequested() async -> Bool { false }
 }
 
 /// Wraps the Trash adapter and records each item's outcome for display.
