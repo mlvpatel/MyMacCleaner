@@ -11,71 +11,28 @@ class PermissionsService: ObservableObject {
     @Published var hasFullDiskAccess: Bool = false
     @Published var isCheckingPermissions: Bool = false
 
-    private init() {
+    private let probe: any PermissionProbing
+
+    init(probe: any PermissionProbing = POSIXPermissionProbe()) {
+        self.probe = probe
         checkFullDiskAccess()
     }
 
     // MARK: - Full Disk Access
 
-    /// Check if the app has Full Disk Access permission
-    /// Tests multiple FDA-protected paths to reliably detect permission status
+    /// Check if the app has Full Disk Access permission.
+    ///
+    /// Derived from a read-only open/close probe of an FDA-gated path: the descriptor is closed
+    /// immediately and no contents are read, matching the app's point-of-use permission approach.
     func checkFullDiskAccess() {
         isCheckingPermissions = true
-
-        var hasAccess = false
-
-        // Method 1: Try to read the user's TCC database (most reliable)
-        let tccPath = NSHomeDirectory() + "/Library/Application Support/com.apple.TCC/TCC.db"
-        if FileManager.default.isReadableFile(atPath: tccPath) {
-            hasAccess = true
-        }
-
-        // Method 2: Try Safari bookmarks
-        if !hasAccess {
-            let safariPath = NSHomeDirectory() + "/Library/Safari/Bookmarks.plist"
-            if FileManager.default.fileExists(atPath: safariPath) &&
-               FileManager.default.isReadableFile(atPath: safariPath) {
-                hasAccess = true
-            }
-        }
-
-        // Method 3: Try to list ~/Library/Mail contents
-        if !hasAccess {
-            let mailPath = NSHomeDirectory() + "/Library/Mail"
-            if FileManager.default.fileExists(atPath: mailPath) {
-                do {
-                    _ = try FileManager.default.contentsOfDirectory(atPath: mailPath)
-                    hasAccess = true
-                } catch {
-                    // Access denied
-                }
-            }
-        }
-
-        // Method 4: Try to actually READ a protected file (not just check isReadableFile)
-        if !hasAccess {
-            let safariPath = NSHomeDirectory() + "/Library/Safari/Bookmarks.plist"
-            do {
-                _ = try Data(contentsOf: URL(fileURLWithPath: safariPath))
-                hasAccess = true
-            } catch {
-                // Access denied
-            }
-        }
-
-        hasFullDiskAccess = hasAccess
+        hasFullDiskAccess = PermissionAssessment.hasFullDiskAccess(using: probe)
         isCheckingPermissions = false
     }
 
     /// Open System Preferences to Full Disk Access pane
     func openFullDiskAccessSettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
-        NSWorkspace.shared.open(url)
-    }
-
-    /// Open System Preferences to Automation pane
-    func openAutomationSettings() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
         NSWorkspace.shared.open(url)
     }
 
