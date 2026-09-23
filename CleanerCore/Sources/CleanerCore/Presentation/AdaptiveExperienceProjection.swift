@@ -240,12 +240,15 @@ public struct AdaptiveScanCollection: Equatable, Sendable {
 
 public actor AdaptiveScanSession {
     private let coordinator: ScanCoordinator
+    private let processActivity: any ProcessActivityObserving
 
     public init(
         fileSystem: any FileSystemPort,
         clock: any AdaptiveClocking,
-        cancellation: any AdaptiveCancelling
+        cancellation: any AdaptiveCancelling,
+        processActivity: any ProcessActivityObserving = NoProcessActivity()
     ) throws {
+        self.processActivity = processActivity
         coordinator = try ScanCoordinator(
             dependencies: ScanDependencies(
                 fileSystem: fileSystem,
@@ -320,7 +323,11 @@ public actor AdaptiveScanSession {
             case let .success(maybeFinding):
                 if let macFinding = maybeFinding {
                     general.append(macFinding)
-                    evaluations.append(evaluator.evaluate(macFinding))
+                    let processActive = processActivity.isFileOpen(
+                        rootID: finding.locator.rootID,
+                        components: finding.locator.components
+                    )
+                    evaluations.append(evaluator.evaluate(macFinding, processActive: processActive))
                 }
             case .failure:
                 continue
