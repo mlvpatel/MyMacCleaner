@@ -29,6 +29,8 @@ final class AdaptiveExperienceViewModel: ObservableObject {
         _ approvedDigestHex: String,
         _ cancellation: TrashRunCancellation
     ) async -> SourceResult
+    /// Reads a user-chosen directory as a read-only selected model-store root (C2).
+    typealias ScanSelectedRoot = @Sendable (_ directory: URL) async -> ModelStoreProjection?
 
     @Published private(set) var snapshot: AdaptiveExperienceProjection?
     @Published private(set) var source: AdaptiveExperienceSource?
@@ -42,6 +44,10 @@ final class AdaptiveExperienceViewModel: ObservableObject {
     @Published private(set) var failure: AdaptiveSessionFailure?
     @Published private(set) var showApprovalConfirmation = false
     @Published private(set) var showOnboarding: Bool
+    /// Read-only inventories of directories the user explicitly added (C2).
+    @Published private(set) var selectedModelStores: [ModelStoreProjection] = []
+    /// Names of set model-store env vars (e.g. HF_HOME) surfaced as a prompt (C2).
+    @Published private(set) var environmentModelPrompts: [String]
 
     private var refreshIdentity: UInt64 = 0
     private var refreshTask: Task<Void, Never>?
@@ -50,6 +56,7 @@ final class AdaptiveExperienceViewModel: ObservableObject {
     private var runCancellation: TrashRunCancellation?
     private let loadSource: @Sendable () async -> SourceResult
     private let executeDisplayedPlan: ExecuteDisplayedPlan
+    private let scanSelectedRoot: ScanSelectedRoot
     private let onboardingStore: AdaptiveOnboardingStore
 
     init(
@@ -57,10 +64,14 @@ final class AdaptiveExperienceViewModel: ObservableObject {
         executeDisplayedPlan: @escaping ExecuteDisplayedPlan = { _, _ in
             .failure(.sessionUnavailable)
         },
+        scanSelectedRoot: @escaping ScanSelectedRoot = { _ in nil },
+        environmentModelPrompts: [String] = [],
         onboardingStore: AdaptiveOnboardingStore = AdaptiveOnboardingStore()
     ) {
         self.loadSource = loadSource
         self.executeDisplayedPlan = executeDisplayedPlan
+        self.scanSelectedRoot = scanSelectedRoot
+        self.environmentModelPrompts = environmentModelPrompts
         self.onboardingStore = onboardingStore
         showOnboarding = !onboardingStore.hasAcknowledged
         if !onboardingStore.hasAcknowledged {
@@ -121,6 +132,16 @@ final class AdaptiveExperienceViewModel: ObservableObject {
             dismissApprovalConfirmation()
         case .dismissFailure:
             failure = nil
+        }
+    }
+
+    /// Inventories a directory the user explicitly chose and, if it observed a
+    /// store, adds it to the read-only selected-store list (C2).
+    func addSelectedModelRoot(_ directory: URL) {
+        Task { [scanSelectedRoot] in
+            if let projection = await scanSelectedRoot(directory) {
+                self.selectedModelStores.append(projection)
+            }
         }
     }
 
