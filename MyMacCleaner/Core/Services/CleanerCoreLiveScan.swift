@@ -91,6 +91,39 @@ struct CleanerCoreLiveScan: Sendable {
             || !projection.incompleteBlobs.isEmpty
     }
 
+    /// Read-only inventory of a directory the user explicitly picked (C2). The
+    /// validated selected root comes only from `SelectedModelStoreBridge`, so
+    /// scope widens solely through this user-initiated call — never silently.
+    /// Returns the projection even when empty, so the picker gives feedback.
+    func selectedModelInventory(directory: URL) async -> ModelStoreProjection? {
+        let selection = SelectedModelStoreBridge.makeSelection(forUserChosenDirectory: directory)
+        let adapter: ModelStoreFilesystemAdapter
+        do {
+            adapter = try ModelStoreFilesystemAdapter(
+                rootURLs: [selection.rootID: selection.directory],
+                fileManager: .default
+            )
+        } catch {
+            return nil
+        }
+        let inventory = SelectedRootInventory(
+            limits: .default,
+            port: adapter,
+            cancellation: TaskModelStoreCancel()
+        )
+        guard let result = await inventory.parse(selectedRoot: selection.root) else { return nil }
+        return ModelStoreProjection(result: result)
+    }
+
+    /// Names of the model-store environment variables that are set, surfaced as a
+    /// prompt so the user can *choose* to inventory those roots. The values are
+    /// never read or displayed and never trigger a silent scan (C2).
+    func environmentModelRootPrompts(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> [String] {
+        ["HF_HOME", "OLLAMA_MODELS"].filter { environment[$0]?.isEmpty == false }
+    }
+
     func scanAllCategories(
         progress: @escaping @MainActor @Sendable (Double, ScanCategory?) -> Void
     ) async throws -> [ScanResult] {
