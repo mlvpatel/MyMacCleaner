@@ -2409,6 +2409,28 @@
           }
         }
       }
+    },
+    "adaptive.modelInventory.addRoot": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a model folder…"
+          }
+        }
+      }
+    },
+    "adaptive.modelInventory.envPrompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "custom model path set — choose it to inventory"
+          }
+        }
+      }
     }
   },
   "version": "1.1"
