@@ -60,10 +60,14 @@ public struct GeneralMacPolicyEvidence: Equatable, Sendable {
 }
 
 extension GeneralMacPolicyEvidence {
-    static func observed(from finding: GeneralMacFinding) -> Self {
+    /// `processActive` reflects an external observation that a running process
+    /// currently holds this file open. When true it forces `.observedActive`,
+    /// which the evaluator treats as in-use and never eligible — so process
+    /// correlation can only ever narrow eligibility, never widen it.
+    static func observed(from finding: GeneralMacFinding, processActive: Bool = false) -> Self {
         .init(
             finding: finding,
-            activity: activity(for: finding),
+            activity: processActive ? .observedActive : activity(for: finding),
             scopeProof: scopeProof(for: finding)
         )
     }
