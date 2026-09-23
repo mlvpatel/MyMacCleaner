@@ -89,6 +89,10 @@ public struct AdaptiveExperienceSource: Equatable, Sendable {
     public let capabilities: [CapabilityCard]
     public let permissionGaps: [AdaptivePermissionGap]
     public let developerInventory: [AdaptiveDeveloperInventoryFact]
+    /// Read-only Hugging Face / Ollama model-store graphs. Entries carry
+    /// `operation: Never?`, so these can never become a cleanup candidate; they
+    /// exist only to display the protected-workflow byte breakdown.
+    public let modelInventory: [ModelStoreProjection]
 
     public init(
         scanState: ProjectedScanState,
@@ -102,7 +106,8 @@ public struct AdaptiveExperienceSource: Equatable, Sendable {
         memory: MemoryCoachSnapshot?,
         capabilities: [CapabilityCard],
         permissionGaps: [AdaptivePermissionGap],
-        developerInventory: [AdaptiveDeveloperInventoryFact]
+        developerInventory: [AdaptiveDeveloperInventoryFact],
+        modelInventory: [ModelStoreProjection] = []
     ) {
         self.scanState = scanState
         self.findings = findings
@@ -116,6 +121,7 @@ public struct AdaptiveExperienceSource: Equatable, Sendable {
         self.capabilities = capabilities
         self.permissionGaps = permissionGaps
         self.developerInventory = developerInventory
+        self.modelInventory = modelInventory
     }
 }
 
@@ -143,6 +149,7 @@ public struct AdaptiveExperienceAuthority: Equatable, Sendable {
     public let capabilityAuthorities: [CapabilityAuthority]
     public let capabilityOperations: [ConditionalOperationDescription]
     public let permissionGaps: [AdaptivePermissionGap]
+    public let modelInventoryAccounting: [ModelStoreAccountingSummary]
     public let cardKinds: [AdaptiveCardKind]
 }
 
@@ -191,6 +198,7 @@ public struct AdaptiveExperienceProjector: Sendable {
             capabilityAuthorities: source.capabilities.map(\.authority),
             capabilityOperations: source.capabilities.map(\.conditionalOperation),
             permissionGaps: source.permissionGaps,
+            modelInventoryAccounting: source.modelInventory.map(\.accounting),
             cardKinds: cards
         )
         let formatting = AdaptiveExperienceFormatting.table(mode: mode, authority: authority)
@@ -419,7 +427,8 @@ enum AdaptiveExperienceCards {
             kinds.append(.generalMac)
         }
         if source.capabilities.contains(where: { $0.authority == .inventoryOnly })
-            || source.evaluations.contains(where: { $0.semanticOwner == .modelStore }) {
+            || source.evaluations.contains(where: { $0.semanticOwner == .modelStore })
+            || !source.modelInventory.isEmpty {
             kinds.append(.modelInventory)
         }
         if source.memory != nil {
