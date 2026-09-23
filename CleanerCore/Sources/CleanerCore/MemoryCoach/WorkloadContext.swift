@@ -201,21 +201,24 @@ public struct LocalWorkloadEvidenceProducer: WorkloadEvidencePort, Sendable {
         return .fresh
     }
 
-    private static func mappedFamily(
+    /// Infers a workload family from a process label. Matching is
+    /// case-insensitive and substring-based so helper processes count too
+    /// (e.g. "LM Studio Helper", "mlx_lm.server", a torch host). This only ever
+    /// produces an advisory `.inferred` memory-coach hint — it never affects
+    /// cleanup eligibility. Order matters: "ollama" is checked before the
+    /// broader "llama" so it is not misread as generic local inference.
+    static func mappedFamily(
         for label: ProcessDisplayLabel
     ) -> LocalWorkloadToolFamily? {
-        switch label.value {
-        case "ollama":
-            .ollama
-        case "LM Studio":
-            .lmStudio
-        case "mlx_lm.server":
-            .mlx
-        case "llama-server":
-            .localInference
-        default:
-            nil
+        let value = label.value.lowercased()
+        if value.isEmpty { return nil }
+        if value.contains("ollama") { return .ollama }
+        if value.contains("lm studio") || value.contains("lmstudio") { return .lmStudio }
+        if value.contains("mlx") || value.contains("torch") { return .mlx }
+        if value.contains("llama") || value.contains("com.docker.virtualization") {
+            return .localInference
         }
+        return nil
     }
 }
 
