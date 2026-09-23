@@ -31,15 +31,51 @@ struct CleanerCoreLiveScan: Sendable {
         return await session.collect(request: try catalog.scanRequest(for: kinds))
     }
 
+    /// Upper bound on entries walked while sizing a developer dotfile root, so a
+    /// pathologically large tree cannot stall the scan.
+    private static let maxSizingEntries = 500_000
+
     func developerInventory() -> [AdaptiveDeveloperInventoryFact] {
-        DeveloperInventoryRegistry.facts(
-            presence: Dictionary(
-                uniqueKeysWithValues: DeveloperInventoryAdapter(
-                    applicationsDirectory: URL(fileURLWithPath: "/Applications", isDirectory: true),
-                    fileExists: { FileManager.default.fileExists(atPath: $0.path) }
-                ).observe().map { ($0.tool, $0.presence) }
-            )
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let adapter = DeveloperInventoryAdapter(
+            applicationsDirectory: URL(fileURLWithPath: "/Applications", isDirectory: true),
+            additionalApplicationDirectories: [home.appendingPathComponent("Applications", isDirectory: true)],
+            homeDirectory: home,
+            fileExists: { FileManager.default.fileExists(atPath: $0.path) },
+            directoryAllocatedBytes: Self.allocatedBytes(of:)
         )
+        return adapter.observe().compactMap(\.inventoryFact)
+    }
+
+    /// Content-blind allocated-byte total for a directory: sums filesystem
+    /// allocation metadata for regular files only, skips symlinks (so a link
+    /// cannot escape the root), and never opens or reads a file's contents.
+    private static func allocatedBytes(of directory: URL) -> Int? {
+        let fileManager = FileManager.default
+        let keys: Set<URLResourceKey> = [
+            .isRegularFileKey, .isSymbolicLinkKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey
+        ]
+        guard let enumerator = fileManager.enumerator(
+            at: directory,
+            includingPropertiesForKeys: Array(keys),
+            options: []
+        ) else { return nil }
+
+        var total = 0
+        var visited = 0
+        for case let url as URL in enumerator {
+            visited += 1
+            if visited > maxSizingEntries { break }
+            guard let values = try? url.resourceValues(forKeys: keys) else { continue }
+            if values.isSymbolicLink == true {
+                enumerator.skipDescendants()
+                continue
+            }
+            if values.isRegularFile == true {
+                total += values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? 0
+            }
+        }
+        return total
     }
 
     /// The two model-store roots a live scan inspects: the default Hugging Face
