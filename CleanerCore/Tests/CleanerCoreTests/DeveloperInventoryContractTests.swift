@@ -27,4 +27,20 @@ struct DeveloperInventoryContractTests {
         #expect(records.allSatisfy { $0.presence == .unavailable })
         #expect(records.allSatisfy { $0.protection == .protectedSemanticOwner })
     }
+
+    @Test
+    func sizedRecordsStayProtectedAndSizesNeverAttachToAbsentTools() {
+        let records = DeveloperInventoryRegistry.records(
+            presence: [.claudeConfig: .present, .codex: .absent],
+            sizes: [.claudeConfig: 12_345, .codex: 999]
+        )
+        let claude = records.first { $0.tool == .claudeConfig }
+        #expect(claude?.sizeBytes == 12_345)
+        #expect(claude?.protection == .protectedSemanticOwner)
+        #expect(claude?.inventoryFact?.sizeBytes == 12_345)
+        // An absent tool never surfaces a size, even if one was supplied.
+        #expect(records.first { $0.tool == .codex }?.inventoryFact?.sizeBytes == nil)
+        // Every tool, old and new, remains protected and inventory-only.
+        #expect(records.allSatisfy { $0.protection == .protectedSemanticOwner })
+    }
 }
