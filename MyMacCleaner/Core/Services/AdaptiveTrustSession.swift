@@ -114,7 +114,8 @@ actor AdaptiveTrustSession {
                     memory: memory,
                     capabilities: CapabilityCardProjection().cards(for: collected.evaluations),
                     permissionGaps: PermissionAssessment.permissionGaps(using: permissionProbe),
-                    developerInventory: liveScan.developerInventory()
+                    developerInventory: liveScan.developerInventory(),
+                    modelInventory: await liveScan.modelInventory()
                 )
             )
         } catch {
