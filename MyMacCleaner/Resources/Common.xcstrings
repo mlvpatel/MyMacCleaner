@@ -2310,6 +2310,105 @@
           }
         }
       }
+    },
+    "adaptive.modelInventory.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI model stores"
+          }
+        }
+      }
+    },
+    "adaptive.modelInventory.huggingface": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hugging Face cache"
+          }
+        }
+      }
+    },
+    "adaptive.modelInventory.ollama": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ollama models"
+          }
+        }
+      }
+    },
+    "adaptive.modelInventory.selected": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected model root"
+          }
+        }
+      }
+    },
+    "adaptive.modelInventory.logical": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referenced"
+          }
+        }
+      }
+    },
+    "adaptive.modelInventory.unique": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On disk"
+          }
+        }
+      }
+    },
+    "adaptive.modelInventory.shared": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shared"
+          }
+        }
+      }
+    },
+    "adaptive.modelInventory.incomplete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incomplete"
+          }
+        }
+      }
+    },
+    "adaptive.modelInventory.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "—"
+          }
+        }
+      }
     }
   },
   "version": "1.1"
