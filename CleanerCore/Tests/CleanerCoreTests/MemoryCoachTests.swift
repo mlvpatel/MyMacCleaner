@@ -63,7 +63,10 @@ struct LocalWorkloadEvidenceTests {
         }
     }
 
-    @Test(arguments: ["Ollama", "ollama ", "python", "node", "unknown-local-tool"])
+    // C6 broadened family inference to case-insensitive substrings, so
+    // "Ollama" / "ollama " now infer .ollama (advisory only). Generic runtime
+    // names that contain no known tool keyword still stay absent.
+    @Test(arguments: ["python", "node", "unknown-local-tool"])
     func nearMatchesAndGenericRuntimeNamesStayAbsent(_ label: String) throws {
         let process = try processEvidence(label: label)
         let context = LocalWorkloadEvidenceProducer(completedInventory: [])
