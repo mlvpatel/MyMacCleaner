@@ -2,29 +2,74 @@ import CleanerCore
 import Foundation
 
 public struct DeveloperInventoryAdapter: Sendable {
+    private let applicationDirectories: [URL]
+    private let homeDirectory: URL
     private let fileExists: @Sendable (URL) -> Bool
-    private let applicationsDirectory: URL
+    private let directoryAllocatedBytes: @Sendable (URL) -> Int?
+
+    private static let applications: [(DeveloperToolID, String)] = [
+        (.cursor, "Cursor.app"),
+        (.vscode, "Visual Studio Code.app"),
+        (.docker, "Docker.app"),
+        (.zed, "Zed.app"),
+        (.windsurf, "Windsurf.app"),
+        (.chatgpt, "ChatGPT.app"),
+        (.ollama, "Ollama.app"),
+        (.lmStudio, "LM Studio.app")
+    ]
+
+    private static let dotfileRoots: [(DeveloperToolID, String)] = [
+        (.claudeConfig, ".claude"),
+        (.codex, ".codex"),
+        (.gemini, ".gemini"),
+        (.continueConfig, ".continue"),
+        (.cursorConfig, ".cursor")
+    ]
 
     public init(
         applicationsDirectory: URL,
-        fileExists: @escaping @Sendable (URL) -> Bool
+        additionalApplicationDirectories: [URL] = [],
+        homeDirectory: URL,
+        fileExists: @escaping @Sendable (URL) -> Bool,
+        directoryAllocatedBytes: @escaping @Sendable (URL) -> Int? = { _ in nil }
     ) {
-        self.applicationsDirectory = applicationsDirectory
+        applicationDirectories = [applicationsDirectory] + additionalApplicationDirectories
+        self.homeDirectory = homeDirectory
         self.fileExists = fileExists
+        self.directoryAllocatedBytes = directoryAllocatedBytes
     }
 
     public func observe() -> [DeveloperInventoryRecord] {
         var presence: [DeveloperToolID: DeveloperPresence] = [:]
-        presence[.cursor] = exists("Cursor.app")
-        presence[.vscode] = exists("Visual Studio Code.app")
-        presence[.docker] = exists("Docker.app")
+        var sizes: [DeveloperToolID: Int] = [:]
+
+        for (tool, bundleName) in Self.applications {
+            presence[tool] = appPresence(bundleName)
+        }
         presence[.homebrew] = .unavailable
-        return DeveloperInventoryRegistry.records(presence: presence)
+
+        for (tool, dotfileName) in Self.dotfileRoots {
+            let url = homeDirectory.appendingPathComponent(dotfileName, isDirectory: true)
+            if fileExists(url) {
+                presence[tool] = .present
+                if let bytes = directoryAllocatedBytes(url) {
+                    sizes[tool] = bytes
+                }
+            } else {
+                presence[tool] = .absent
+            }
+        }
+
+        return DeveloperInventoryRegistry.records(presence: presence, sizes: sizes)
     }
 
-    private func exists(_ name: String) -> DeveloperPresence {
-        let url = applicationsDirectory.appendingPathComponent(name)
-        return fileExists(url) ? .present : .absent
+    private func appPresence(_ bundleName: String) -> DeveloperPresence {
+        for directory in applicationDirectories {
+            if fileExists(directory.appendingPathComponent(bundleName)) {
+                return .present
+            }
+        }
+        return .absent
     }
 }
 
