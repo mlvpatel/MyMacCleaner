@@ -32,7 +32,9 @@ class PermissionsService: ObservableObject {
 
     /// Open System Preferences to Full Disk Access pane
     func openFullDiskAccessSettings() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") else {
+            return
+        }
         NSWorkspace.shared.open(url)
     }
 
