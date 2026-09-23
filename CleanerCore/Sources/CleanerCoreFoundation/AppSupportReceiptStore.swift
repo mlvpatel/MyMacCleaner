@@ -147,6 +147,12 @@ public struct AppSupportReceiptStore: ReceiptStorePort, @unchecked Sendable {
             try fileManager.createDirectory(at: receipts, withIntermediateDirectories: true)
             try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: app.path)
             try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: receipts.path)
+            // Keep the trash-recovery receipts out of Time Machine / iCloud
+            // backups: they are private local recovery state, not user data (D5).
+            var excluded = receipts
+            var resourceValues = URLResourceValues()
+            resourceValues.isExcludedFromBackup = true
+            try excluded.setResourceValues(resourceValues)
         } catch {
             return .failure(.rootInvalid)
         }
