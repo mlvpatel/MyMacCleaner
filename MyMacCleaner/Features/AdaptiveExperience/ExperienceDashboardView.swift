@@ -103,10 +103,16 @@ struct ExperienceDashboardView: View {
                 ? [L("adaptive.developer.none")]
                 : facts.map { L($0.presenceKey) })
             ForEach(facts, id: \.opaqueID) { fact in
-                Text(L(fact.protectionKey))
-                    .font(Theme.Typography.subheadline)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("developer.card.\(fact.opaqueID).protected")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L(fact.protectionKey))
+                        .accessibilityIdentifier("developer.card.\(fact.opaqueID).protected")
+                    if let bytes = fact.sizeBytes {
+                        Text(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))
+                            .accessibilityIdentifier("developer.card.\(fact.opaqueID).size")
+                    }
+                }
+                .font(Theme.Typography.subheadline)
+                .foregroundStyle(.secondary)
             }
         }
     }
