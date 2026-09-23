@@ -65,14 +65,24 @@ public struct AdaptiveDeveloperInventoryFact: Equatable, Sendable {
     public let opaqueID: String
     public let presenceKey: String
     public let protectionKey: String
+    /// Content-blind allocated-byte total for a sized root (e.g. a dotfile
+    /// directory), or nil for a presence-only tool. Derived from filesystem
+    /// metadata only — never from reading file contents.
+    public let sizeBytes: Int?
 
-    public init(opaqueID: String, presenceKey: String, protectionKey: String) throws {
+    public init(
+        opaqueID: String,
+        presenceKey: String,
+        protectionKey: String,
+        sizeBytes: Int? = nil
+    ) throws {
         guard !opaqueID.isEmpty, !presenceKey.isEmpty, !protectionKey.isEmpty else {
             throw AdaptiveExperienceProjectionError.malformedSource
         }
         self.opaqueID = opaqueID
         self.presenceKey = presenceKey
         self.protectionKey = protectionKey
+        self.sizeBytes = sizeBytes
     }
 }
 
