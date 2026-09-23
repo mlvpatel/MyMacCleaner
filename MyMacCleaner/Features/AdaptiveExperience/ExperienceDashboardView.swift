@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import CleanerCore
 
@@ -110,18 +111,41 @@ struct ExperienceDashboardView: View {
         }
     }
 
-    @ViewBuilder
     private var modelInventory: some View {
-        let stores = viewModel.source?.modelInventory ?? []
-        if !stores.isEmpty {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text(L("adaptive.modelInventory.title"))
-                    .font(Theme.Typography.subheadline)
-                    .accessibilityIdentifier("adaptive.modelInventory")
-                ForEach(Array(stores.enumerated()), id: \.offset) { index, store in
-                    modelStoreRow(store, index: index)
-                }
+        let defaultStores = viewModel.source?.modelInventory ?? []
+        let selectedStores = viewModel.selectedModelStores
+        return VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text(L("adaptive.modelInventory.title"))
+                .font(Theme.Typography.subheadline)
+                .accessibilityIdentifier("adaptive.modelInventory")
+            ForEach(Array(defaultStores.enumerated()), id: \.offset) { index, store in
+                modelStoreRow(store, index: index)
             }
+            ForEach(Array(selectedStores.enumerated()), id: \.offset) { index, store in
+                modelStoreRow(store, index: 1_000 + index)
+            }
+            ForEach(viewModel.environmentModelPrompts, id: \.self) { name in
+                Text("\(name): \(L("adaptive.modelInventory.envPrompt"))")
+                    .font(Theme.Typography.subheadline)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("adaptive.modelInventory.envPrompt.\(name)")
+            }
+            Button(action: selectModelFolder) {
+                Text(L("adaptive.modelInventory.addRoot"))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("adaptive.modelInventory.addRoot")
+        }
+    }
+
+    private func selectModelFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = L("adaptive.modelInventory.addRoot")
+        if panel.runModal() == .OK, let url = panel.url {
+            viewModel.addSelectedModelRoot(url)
         }
     }
 
