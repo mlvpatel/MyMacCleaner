@@ -45,6 +45,38 @@ struct ModelInventoryLiveScanTests {
         #expect(projections.isEmpty)
     }
 
+    @Test
+    func selectedRootScanIsReadOnlyAndInventoryOnly() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory
+            .appendingPathComponent("mmc-selscan-\(UUID().uuidString)", isDirectory: true)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        try Data(repeating: 0x42, count: 16).write(to: root.appendingPathComponent("model.gguf"))
+
+        let before = try treeSnapshot(of: root, using: fm)
+        let projection = await CleanerCoreLiveScan().selectedModelInventory(directory: root)
+        #expect(try treeSnapshot(of: root, using: fm) == before)
+
+        #expect(projection != nil)
+        if let projection {
+            #expect(projection.entries.allSatisfy { $0.operation == nil })
+            #expect(projection.entries.allSatisfy { $0.reclaimability == .protectedNotEligible })
+        }
+    }
+
+    @Test
+    func environmentPromptsReportOnlySetModelRootVariables() {
+        let scan = CleanerCoreLiveScan()
+        #expect(scan.environmentModelRootPrompts(environment: [:]).isEmpty)
+        #expect(scan.environmentModelRootPrompts(environment: ["HF_HOME": "/x"]) == ["HF_HOME"])
+        #expect(scan.environmentModelRootPrompts(environment: ["HF_HOME": ""]).isEmpty)
+        let both = scan.environmentModelRootPrompts(
+            environment: ["HF_HOME": "/x", "OLLAMA_MODELS": "/y", "PATH": "/bin"]
+        )
+        #expect(both == ["HF_HOME", "OLLAMA_MODELS"])
+    }
+
     // MARK: - Fixture
 
     private func makeHuggingFaceFixture(at root: URL, using fm: FileManager) throws {
