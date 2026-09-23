@@ -23,6 +23,7 @@ struct ExperienceDashboardView: View {
                         messageKey: "adaptive.protected.body"
                     )
                     developerInventory
+                    modelInventory
                 }
                 section(titleKey: "adaptive.section.memory", identifier: "adaptive.section.memory") {
                     memoryCard
@@ -106,6 +107,59 @@ struct ExperienceDashboardView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("developer.card.\(fact.opaqueID).protected")
             }
+        }
+    }
+
+    @ViewBuilder
+    private var modelInventory: some View {
+        let stores = viewModel.source?.modelInventory ?? []
+        if !stores.isEmpty {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text(L("adaptive.modelInventory.title"))
+                    .font(Theme.Typography.subheadline)
+                    .accessibilityIdentifier("adaptive.modelInventory")
+                ForEach(Array(stores.enumerated()), id: \.offset) { index, store in
+                    modelStoreRow(store, index: index)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func modelStoreRow(_ store: ModelStoreProjection, index: Int) -> some View {
+        let accounting = store.accounting
+        VStack(alignment: .leading, spacing: 2) {
+            Text(L(storeLabelKey(for: store)))
+                .font(Theme.Typography.subheadline)
+                .accessibilityIdentifier("adaptive.modelInventory.store.\(index)")
+            Text("\(L("adaptive.modelInventory.logical")): \(formattedBytes(accounting.logicalReferencedBytes))")
+            Text("\(L("adaptive.modelInventory.unique")): \(formattedBytes(accounting.uniquePhysicalBytes))")
+            Text("\(L("adaptive.modelInventory.shared")): \(formattedBytes(accounting.sharedBytesIncludedInUniquePhysical))")
+            Text("\(L("adaptive.modelInventory.incomplete")): \(formattedBytes(accounting.locallyObservedIncompleteBytes))")
+        }
+        .font(Theme.Typography.subheadline)
+        .foregroundStyle(.secondary)
+    }
+
+    private func storeLabelKey(for store: ModelStoreProjection) -> String {
+        switch store.entries.first?.layout {
+        case .huggingFaceCacheV1?:
+            return "adaptive.modelInventory.huggingface"
+        case .ollamaV1?:
+            return "adaptive.modelInventory.ollama"
+        case .selectedRootV1?:
+            return "adaptive.modelInventory.selected"
+        case nil:
+            return "adaptive.modelInventory.title"
+        }
+    }
+
+    private func formattedBytes(_ value: EvidenceValue<Int>) -> String {
+        switch value {
+        case .observed(let bytes):
+            return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+        case .unknown, .unavailable:
+            return L("adaptive.modelInventory.unavailable")
         }
     }
 
