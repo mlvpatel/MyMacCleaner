@@ -42,6 +42,55 @@ struct CleanerCoreLiveScan: Sendable {
         )
     }
 
+    /// The two model-store roots a live scan inspects: the default Hugging Face
+    /// cache and Ollama models directory under the user's home.
+    static func defaultModelStoreRoots() -> [DeclaredRootID: URL] {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        return [
+            ModelStoreRoot.huggingFaceDefaultRootID:
+                home.appendingPathComponent(".cache/huggingface/hub", isDirectory: true),
+            ModelStoreRoot.ollamaDefaultRootID:
+                home.appendingPathComponent(".ollama/models", isDirectory: true)
+        ]
+    }
+
+    /// Read-only inventory of the Hugging Face and Ollama model stores.
+    ///
+    /// The CleanerCore engine only enumerates the store's directory graph and
+    /// reads tiny ref/manifest pointer files — never model weights — and never
+    /// mutates anything (`ProjectedModelStoreEntry.operation` is `Never?`).
+    /// Roots that are absent or empty contribute nothing. `rootURLs` is
+    /// injectable so tests can point it at a synthetic fixture.
+    func modelInventory(
+        rootURLs: [DeclaredRootID: URL] = CleanerCoreLiveScan.defaultModelStoreRoots()
+    ) async -> [ModelStoreProjection] {
+        let adapter: ModelStoreFilesystemAdapter
+        do {
+            adapter = try ModelStoreFilesystemAdapter(rootURLs: rootURLs, fileManager: .default)
+        } catch {
+            return []
+        }
+        let cancellation = TaskModelStoreCancel()
+        let huggingFace = HuggingFaceCacheParser(
+            detector: .huggingFaceV1,
+            limits: .default,
+            port: adapter,
+            cancellation: cancellation
+        )
+        let ollama = OllamaStoreParser(limits: .default, port: adapter, cancellation: cancellation)
+        let results = [
+            await huggingFace.parse(root: .defaultHuggingFaceCache()),
+            await ollama.parse(root: .defaultOllamaModels())
+        ]
+        return results.map(ModelStoreProjection.init(result:)).filter(Self.hasObservedInventory)
+    }
+
+    private static func hasObservedInventory(_ projection: ModelStoreProjection) -> Bool {
+        !projection.repositories.isEmpty
+            || !projection.blobs.isEmpty
+            || !projection.incompleteBlobs.isEmpty
+    }
+
     func scanAllCategories(
         progress: @escaping @MainActor @Sendable (Double, ScanCategory?) -> Void
     ) async throws -> [ScanResult] {
@@ -94,6 +143,12 @@ struct AppAdaptiveClock: AdaptiveClocking {
 }
 
 struct TaskAdaptiveCancel: AdaptiveCancelling {
+    func isCancellationRequested() async -> Bool {
+        Task.isCancelled
+    }
+}
+
+struct TaskModelStoreCancel: ModelStoreCancellation {
     func isCancellationRequested() async -> Bool {
         Task.isCancelled
     }
