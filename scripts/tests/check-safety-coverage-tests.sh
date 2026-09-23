@@ -116,7 +116,7 @@ for required_artifact in "$workflow" "$documentation"; do
     fi
 done
 
-for required_workflow_line in 'contents: read' 'persist-credentials: false' 'uses: actions/checkout@v4' 'runs-on: macos-26'; do
+for required_workflow_line in 'contents: read' 'persist-credentials: false' 'uses: actions/checkout@' 'runs-on: macos-26'; do
     if ! /usr/bin/grep -Fq "$required_workflow_line" "$workflow"; then
         echo "Safety workflow is missing: $required_workflow_line" >&2
         exit 1
@@ -129,7 +129,7 @@ if [[ $(/usr/bin/grep -Fxc '        run: bash scripts/verify-safety-contract.sh'
 fi
 
 if [[ $(/usr/bin/grep -Ec '^[[:space:]]*-[[:space:]]+uses:' "$workflow") -ne 1 ]] \
-    || ! /usr/bin/grep -Eq '^[[:space:]]*-[[:space:]]+uses:[[:space:]]+actions/checkout@v4[[:space:]]*$' "$workflow"; then
+    || ! /usr/bin/grep -Eq '^[[:space:]]*-[[:space:]]+uses:[[:space:]]+actions/checkout@[0-9a-f]{40}[[:space:]]+#[[:space:]]*v4[[:space:]]*$' "$workflow"; then
     echo "Safety workflow must use only official checkout." >&2
     exit 1
 fi
