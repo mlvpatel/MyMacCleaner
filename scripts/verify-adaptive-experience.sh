@@ -63,6 +63,7 @@ for key in \
     adaptive.explain.technical.receipt \
     receipt.recovery.mayBeAvailable \
     adaptive.developer.cursor.present \
+    adaptive.modelInventory.title \
     adaptive.refresh.hint \
     adaptive.mode.hint \
     adaptive.receipts.close.hint \
@@ -89,6 +90,7 @@ required_ids=(
     'adaptive.approval.invalid'
     'adaptive.approval.confirm'
     'developer.inventory'
+    'adaptive.modelInventory'
 )
 
 for view in "${views[@]}"; do
