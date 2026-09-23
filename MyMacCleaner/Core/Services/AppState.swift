@@ -53,7 +53,9 @@ class AppState: ObservableObject {
             loadSource: { await trustSession.makeSource() },
             executeDisplayedPlan: { digest, cancellation in
                 await trustSession.executeDisplayedPlan(approvedDigestHex: digest, cancellation: cancellation)
-            }
+            },
+            scanSelectedRoot: { directory in await liveScan.selectedModelInventory(directory: directory) },
+            environmentModelPrompts: liveScan.environmentModelRootPrompts()
         )
     }
 
