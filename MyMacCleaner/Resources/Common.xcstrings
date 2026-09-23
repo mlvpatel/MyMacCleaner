@@ -2431,6 +2431,336 @@
           }
         }
       }
+    },
+    "adaptive.developer.zed.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zed detected"
+          }
+        }
+      }
+    },
+    "adaptive.developer.zed.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zed not found"
+          }
+        }
+      }
+    },
+    "adaptive.developer.zed.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zed status unavailable"
+          }
+        }
+      }
+    },
+    "adaptive.developer.windsurf.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Windsurf detected"
+          }
+        }
+      }
+    },
+    "adaptive.developer.windsurf.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Windsurf not found"
+          }
+        }
+      }
+    },
+    "adaptive.developer.windsurf.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Windsurf status unavailable"
+          }
+        }
+      }
+    },
+    "adaptive.developer.chatgpt.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ChatGPT detected"
+          }
+        }
+      }
+    },
+    "adaptive.developer.chatgpt.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ChatGPT not found"
+          }
+        }
+      }
+    },
+    "adaptive.developer.chatgpt.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ChatGPT status unavailable"
+          }
+        }
+      }
+    },
+    "adaptive.developer.ollama.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ollama detected"
+          }
+        }
+      }
+    },
+    "adaptive.developer.ollama.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ollama not found"
+          }
+        }
+      }
+    },
+    "adaptive.developer.ollama.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ollama status unavailable"
+          }
+        }
+      }
+    },
+    "adaptive.developer.lmStudio.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LM Studio detected"
+          }
+        }
+      }
+    },
+    "adaptive.developer.lmStudio.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LM Studio not found"
+          }
+        }
+      }
+    },
+    "adaptive.developer.lmStudio.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LM Studio status unavailable"
+          }
+        }
+      }
+    },
+    "adaptive.developer.claudeConfig.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.claude detected"
+          }
+        }
+      }
+    },
+    "adaptive.developer.claudeConfig.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.claude not found"
+          }
+        }
+      }
+    },
+    "adaptive.developer.claudeConfig.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.claude status unavailable"
+          }
+        }
+      }
+    },
+    "adaptive.developer.codex.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.codex detected"
+          }
+        }
+      }
+    },
+    "adaptive.developer.codex.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.codex not found"
+          }
+        }
+      }
+    },
+    "adaptive.developer.codex.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.codex status unavailable"
+          }
+        }
+      }
+    },
+    "adaptive.developer.gemini.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.gemini detected"
+          }
+        }
+      }
+    },
+    "adaptive.developer.gemini.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.gemini not found"
+          }
+        }
+      }
+    },
+    "adaptive.developer.gemini.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.gemini status unavailable"
+          }
+        }
+      }
+    },
+    "adaptive.developer.continueConfig.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.continue detected"
+          }
+        }
+      }
+    },
+    "adaptive.developer.continueConfig.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.continue not found"
+          }
+        }
+      }
+    },
+    "adaptive.developer.continueConfig.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.continue status unavailable"
+          }
+        }
+      }
+    },
+    "adaptive.developer.cursorConfig.present": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.cursor detected"
+          }
+        }
+      }
+    },
+    "adaptive.developer.cursorConfig.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.cursor not found"
+          }
+        }
+      }
+    },
+    "adaptive.developer.cursorConfig.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.cursor status unavailable"
+          }
+        }
+      }
     }
   },
   "version": "1.1"
