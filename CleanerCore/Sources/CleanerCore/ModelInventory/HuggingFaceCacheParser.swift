@@ -149,6 +149,25 @@ public struct ModelStoreParserLimits: Equatable, Sendable {
 
     public static let fixture = trustedFixture()
 
+    /// Production limits for a live scan: the package-owned maxima. Callers use
+    /// this instead of hardcoding caps, so a raised ceiling changes in one place.
+    public static let `default` = trustedDefault()
+
+    private static func trustedDefault() -> ModelStoreParserLimits {
+        do {
+            return try ModelStoreParserLimits(
+                maximumEntries: maximumAllowedEntries,
+                maximumRefBytes: maximumAllowedRefBytes,
+                maximumGraphNodes: maximumAllowedGraphNodes,
+                maximumGraphEdges: maximumAllowedGraphEdges,
+                maximumDepth: maximumAllowedDepth,
+                maximumObservedBytes: maximumAllowedObservedBytes
+            )
+        } catch {
+            preconditionFailure("invalid package-owned default model-store parser limits")
+        }
+    }
+
     private static func trustedFixture() -> ModelStoreParserLimits {
         do {
             return try ModelStoreParserLimits(
