@@ -140,7 +140,43 @@ actor DuplicateScanner {
         "tmp", "temp", "swp", "swo", "lock", "pid"
     ]
 
+    /// Files larger than this are skipped: rehashing multi-gigabyte media wastes
+    /// time and duplicate large media is rarely the reclaim target.
+    static let defaultMaximumFileSize: Int64 = 5_000_000_000
+
+    /// AI model-store roots are never treated as duplicates — they are
+    /// inventory-only and must never be offered for deletion here.
+    private let modelStoreRoots: [String] = {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        return [
+            home.appendingPathComponent(".cache/huggingface", isDirectory: true),
+            home.appendingPathComponent(".ollama", isDirectory: true)
+        ].map { $0.standardizedFileURL.path }
+    }()
+
     private init() {}
+
+    private func isUnderModelStore(_ url: URL) -> Bool {
+        let path = url.standardizedFileURL.path
+        return modelStoreRoots.contains { path == $0 || path.hasPrefix($0 + "/") }
+    }
+
+    /// Drops hardlinks to the same physical file (same identity) so shared
+    /// storage is not mistaken for reclaimable duplicates and not hashed twice.
+    private func dedupedByIdentity(_ urls: [URL]) -> [URL] {
+        var seen: [any NSObjectProtocol] = []
+        var result: [URL] = []
+        for url in urls {
+            let identity = (try? url.resourceValues(forKeys: [.fileResourceIdentifierKey]))?
+                .fileResourceIdentifier
+            if let identity {
+                if seen.contains(where: { $0.isEqual(identity) }) { continue }
+                seen.append(identity)
+            }
+            result.append(url)
+        }
+        return result
+    }
 
     // MARK: - Main Scan
 
@@ -153,6 +189,7 @@ actor DuplicateScanner {
     func scan(
         at path: URL,
         minSize: Int64 = 1024,
+        maxSize: Int64 = DuplicateScanner.defaultMaximumFileSize,
         progress: @escaping (Double, String) -> Void
     ) async -> [DuplicateGroup] {
         var duplicateGroups: [DuplicateGroup] = []
@@ -223,9 +260,15 @@ actor DuplicateScanner {
                 continue
             }
 
-            // Check file size
+            // Never treat AI model stores as duplicates (inventory-only).
+            if isUnderModelStore(fileURL) {
+                continue
+            }
+
+            // Check file size against both the floor and the cap.
             guard let fileSize = resourceValues.fileSize,
-                  Int64(fileSize) >= minSize else {
+                  Int64(fileSize) >= minSize,
+                  Int64(fileSize) <= maxSize else {
                 continue
             }
 
@@ -264,7 +307,7 @@ actor DuplicateScanner {
         }
 
         // Step 2: For each size group, calculate partial hashes
-        for (_, files) in potentialDuplicates {
+        for (_, sizeGroup) in potentialDuplicates {
             // Check for cancellation
             if isCancelled {
                 await MainActor.run { progress(1.0, L("duplicates.scan.cancelled")) }
@@ -281,6 +324,11 @@ actor DuplicateScanner {
                     progress(baseProgress, LFormat("duplicates.scan.comparingFiles %lld %lld", Int64(capturedProcessedGroups), Int64(totalGroupsToProcess)))
                 }
             }
+
+            // Collapse hardlinks to the same inode before hashing: they share
+            // storage, so they are neither reclaimable nor worth hashing twice.
+            let files = dedupedByIdentity(sizeGroup)
+            if files.count < 2 { continue }
 
             // Calculate partial hash for all files in this size group
             var partialHashGroups: [String: [URL]] = [:]
