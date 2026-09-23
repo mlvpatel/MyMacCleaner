@@ -4,7 +4,13 @@ public struct PolicyEvaluator: Sendable {
     /// The public entry point derives all positive facts from immutable scanner
     /// evidence. Callers cannot supply a hand-written activity or scope proof.
     public func evaluate(_ finding: GeneralMacFinding) -> PolicyEvaluation {
-        evaluate(.observed(from: finding))
+        evaluate(finding, processActive: false)
+    }
+
+    /// Evaluates a finding with an external process-activity observation (C5). A
+    /// file a running process holds open is forced to in-use and never eligible.
+    public func evaluate(_ finding: GeneralMacFinding, processActive: Bool) -> PolicyEvaluation {
+        evaluate(.observed(from: finding, processActive: processActive))
     }
 
     func evaluate(_ evidence: GeneralMacPolicyEvidence) -> PolicyEvaluation {
@@ -193,6 +199,12 @@ public struct PolicyEvaluator: Sendable {
     }
 
     private func semanticOwner(for finding: GeneralMacFinding) -> PolicySemanticOwner {
+        // A credential-named locator is always a protected credential owner,
+        // even when its category would otherwise be eligible. This only ever
+        // narrows eligibility — `.credential` routes to `protected`.
+        if Self.isCredentialLocator(finding.finding.locator.components) {
+            return .credential
+        }
         switch finding.category {
         case .cache: return finding.source == .userLibraryCaches ? .generalRebuildableCache : .unknown
         case .log: return .generalLog
@@ -201,6 +213,16 @@ public struct PolicyEvaluator: Sendable {
         case .largeFile: return .personalLargeFile
         case .duplicate: return .duplicateEvidence
         }
+    }
+
+    /// Fixed credential locators that must never become a cleanup candidate.
+    static let credentialExactNames: Set<String> = ["mcp.json", ".claude.json", "auth.json", ".env"]
+    static let credentialNamePrefixes: [String] = ["credentials", ".env."]
+
+    static func isCredentialLocator(_ components: [String]) -> Bool {
+        guard let name = components.last?.lowercased() else { return false }
+        if credentialExactNames.contains(name) { return true }
+        return credentialNamePrefixes.contains { name.hasPrefix($0) }
     }
 
     private func hasVerifiedScannerShape(_ finding: GeneralMacFinding) -> Bool {
