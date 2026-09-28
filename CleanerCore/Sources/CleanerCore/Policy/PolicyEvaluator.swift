@@ -1,5 +1,13 @@
 public struct PolicyEvaluator: Sendable {
-    public init() {}
+    private let cacheOwners: GeneralMacCacheOwnerCatalog
+
+    public init() {
+        self.init(cacheOwners: .current)
+    }
+
+    init(cacheOwners: GeneralMacCacheOwnerCatalog) {
+        self.cacheOwners = cacheOwners
+    }
 
     /// The public entry point derives all positive facts from immutable scanner
     /// evidence. Callers cannot supply a hand-written activity or scope proof.
@@ -111,6 +119,11 @@ public struct PolicyEvaluator: Sendable {
         detector: DetectorSelection
     ) -> PolicyEvaluation {
         let finding = evidence.finding
+        // Checked before the eligible path and always ineligible, so a catalog
+        // entry can relabel or narrow a cache but never make it a candidate.
+        if let ownerClass = cacheOwners.ownerClass(for: finding.finding.locator.components) {
+            return ownerReview(ownerClass, detector: detector, confidence: finding.confidence)
+        }
         guard finding.source == .userLibraryCaches,
               finding.category == .cache,
               evidence.scopeProof == .namedFixedScopeGeneralCacheV1,
@@ -154,6 +167,25 @@ public struct PolicyEvaluator: Sendable {
             confidence: finding.confidence,
             candidate: candidate
         )
+    }
+
+    private func ownerReview(
+        _ ownerClass: GeneralMacCacheOwnerClass,
+        detector: DetectorSelection,
+        confidence: EvidenceConfidence
+    ) -> PolicyEvaluation {
+        switch ownerClass {
+        case .redownloadRequired:
+            return ineligible(detector: detector, owner: .generalRebuildableCache, disposition: .redownloadRequired,
+                              rule: .generalCacheOwnerReviewV1, rationale: .namedReviewRule,
+                              recovery: .redownloadRequired, confidence: confidence)
+        case .mayAffectWorkflow:
+            return ineligible(detector: detector, owner: .generalRebuildableCache, disposition: .mayAffectWorkflow,
+                              rule: .generalCacheOwnerReviewV1, rationale: .namedReviewRule,
+                              recovery: .inspectBeforeAction, confidence: confidence)
+        case .developerToolState:
+            return protected(detector: detector, owner: .developerToolState, confidence: confidence)
+        }
     }
 
     private func protected(
@@ -206,7 +238,13 @@ public struct PolicyEvaluator: Sendable {
             return .credential
         }
         switch finding.category {
-        case .cache: return finding.source == .userLibraryCaches ? .generalRebuildableCache : .unknown
+        case .cache:
+            guard finding.source == .userLibraryCaches else { return .unknown }
+            // Protected tool state is labelled as such on every path, not only the eligible one.
+            if cacheOwners.ownerClass(for: finding.finding.locator.components) == .developerToolState {
+                return .developerToolState
+            }
+            return .generalRebuildableCache
         case .log: return .generalLog
         case .crashReport: return .generalCrashReport
         case .temporary: return .generalTemporaryData
