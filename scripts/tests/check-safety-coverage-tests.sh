@@ -128,8 +128,31 @@ if [[ $(/usr/bin/grep -Fxc '        run: bash scripts/verify-safety-contract.sh'
     exit 1
 fi
 
+# Official checkout, pinned to a full 40-hex commit SHA, followed by its version comment.
+readonly checkout_pin_pattern='^[[:space:]]*-[[:space:]]+uses:[[:space:]]+actions/checkout@[0-9a-f]{40}[[:space:]]+#[[:space:]]*v[0-9]+([.][0-9]+){0,2}[[:space:]]*$'
+readonly sample_sha='3d3c42e5aac5ba805825da76410c181273ba90b1'
+
+expect_checkout_pin() {
+    local expected="$1" line="$2" actual=fail
+    if /usr/bin/grep -Eq "$checkout_pin_pattern" <<<"$line"; then
+        actual=pass
+    fi
+    if [[ "$actual" != "$expected" ]]; then
+        echo "Checkout pin rule: expected $expected for: $line" >&2
+        exit 1
+    fi
+}
+
+expect_checkout_pin pass "      - uses: actions/checkout@$sample_sha # v4"
+expect_checkout_pin pass "      - uses: actions/checkout@$sample_sha # v7.0.1"
+expect_checkout_pin fail "      - uses: actions/checkout@v4"
+expect_checkout_pin fail "      - uses: actions/checkout@$sample_sha"
+expect_checkout_pin fail "      - uses: actions/checkout@${sample_sha:1} # v4"
+expect_checkout_pin fail "      - uses: actions/checkout@$sample_sha # latest"
+expect_checkout_pin fail "      - uses: other/checkout@$sample_sha # v4"
+
 if [[ $(/usr/bin/grep -Ec '^[[:space:]]*-[[:space:]]+uses:' "$workflow") -ne 1 ]] \
-    || ! /usr/bin/grep -Eq '^[[:space:]]*-[[:space:]]+uses:[[:space:]]+actions/checkout@[0-9a-f]{40}[[:space:]]+#[[:space:]]*v4[[:space:]]*$' "$workflow"; then
+    || ! /usr/bin/grep -Eq "$checkout_pin_pattern" "$workflow"; then
     echo "Safety workflow must use only official checkout." >&2
     exit 1
 fi
