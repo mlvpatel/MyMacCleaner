@@ -111,6 +111,7 @@ public struct PolicyRuleReference: Equatable, Sendable {
     public static let generalLogReviewV1 = Self(identifier: "general-log-review", version: "1")
     public static let generalCrashReviewV1 = Self(identifier: "general-crash-review", version: "1")
     public static let generalTemporaryReviewV1 = Self(identifier: "general-temporary-review", version: "1")
+    public static let generalCacheOwnerReviewV1 = Self(identifier: "general-cache-owner-review", version: "1")
     public static let protectedOwnerV1 = Self(identifier: "protected-owner", version: "1")
     public static let unknownEvidenceV1 = Self(identifier: "unknown-evidence", version: "1")
 }
