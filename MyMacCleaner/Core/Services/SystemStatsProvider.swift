@@ -79,12 +79,6 @@ class SystemStatsProvider: ObservableObject {
         isMonitoring = false
     }
 
-    func setUpdateInterval(_ interval: TimeInterval) {
-        guard isMonitoring else { return }
-        stopMonitoring()
-        startMonitoring(interval: interval)
-    }
-
     // MARK: - Stats Update
 
     private func updateStats() {
