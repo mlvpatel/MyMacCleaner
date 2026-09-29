@@ -381,63 +381,6 @@ struct ScanFileItemRow: View {
     }
 }
 
-// MARK: - Compact Scan Summary
-
-struct CompactScanSummary: View {
-    let summary: ScanSummary
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.lg) {
-            // Total reviewable
-            VStack(spacing: Theme.Spacing.xxs) {
-                Text(summary.formattedTotalSize)
-                    .font(Theme.Typography.title2)
-                    .foregroundStyle(.orange)
-
-                Text(L("safety.notice.reviewable"))
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Divider()
-                .frame(height: 40)
-
-            // Item count
-            VStack(spacing: Theme.Spacing.xxs) {
-                Text("\(summary.itemCount)")
-                    .font(Theme.Typography.title2)
-
-                Text(L("scanResults.files"))
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Divider()
-                .frame(height: 40)
-
-            // Largest category
-            if let largest = summary.largestCategory {
-                VStack(spacing: Theme.Spacing.xxs) {
-                    HStack(spacing: Theme.Spacing.xxs) {
-                        Image(systemName: largest.icon)
-                            .foregroundStyle(largest.color)
-                        Text(largest.localizedName)
-                    }
-                    .font(Theme.Typography.subheadline)
-
-                    Text(L("scanResults.largest"))
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-        }
-        .padding(Theme.Spacing.md)
-        .glassCard()
-    }
-}
-
 // MARK: - Preview
 
 #Preview {
