@@ -120,22 +120,6 @@ struct GlassActionButton: View {
     }
 }
 
-// MARK: - Glass Toolbar (Backward Compatible)
-
-struct GlassToolbar<Content: View>: View {
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.xs) {
-            content()
-        }
-        .padding(.horizontal, Theme.Spacing.md)
-        .padding(.vertical, 10)
-        .modifier(GlassCapsuleModifier())
-        .shadow(color: .black.opacity(0.15), radius: 20, y: 8)
-    }
-}
-
 // MARK: - Glass Segmented Control (Backward Compatible)
 
 struct GlassSegmentedControl<T: Hashable>: View {
