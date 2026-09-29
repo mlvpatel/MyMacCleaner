@@ -5,10 +5,9 @@ import Testing
 @Suite("CleanerCore Capability Isolation")
 struct CapabilityIsolationTests {
     @Test(arguments: isolatedTerminalOutcomes)
-    func evidenceScanRecordsNoPolicyExecutionOrReceiptEffects(_ terminalOutcome: ScanOutcome)
+    func evidenceScanUsesOnlyItsInjectedScanPorts(_ terminalOutcome: ScanOutcome)
         async throws
     {
-        let effectRecorder = EffectCapabilityRecorder()
         let scanPorts = IsolatedScanPorts(terminalOutcome: terminalOutcome)
         let detector = IsolationDetector()
         let coordinator = try ScanCoordinator(
@@ -23,26 +22,10 @@ struct CapabilityIsolationTests {
                 budget: .init(maximumFindings: 1)
             ))
 
-        #expect(effectRecorder.policy.calls.isEmpty)
-        #expect(effectRecorder.execution.calls.isEmpty)
-        #expect(effectRecorder.receipt.calls.isEmpty)
         #expect(scanPorts.cancellation.calls == 1)
         #expect(scanPorts.fileSystem.calls == 1)
         #expect(scanPorts.diagnostics.events == [.terminal(.init(terminalOutcome))])
         #expect(scanPorts.metrics.events == [.stepDelivered])
-    }
-
-    @Test
-    func capabilityPortsAreInjectedAndRecorderVisible() async {
-        let recorder = EffectCapabilityRecorder()
-
-        _ = await recorder.policy.evaluate(PolicyInput(id: "policy"))
-        _ = await recorder.execution.execute(ExecutionInput(id: "execution"))
-        _ = await recorder.receipt.record(ReceiptInput(id: "receipt"))
-
-        #expect(recorder.policy.calls == [.init(id: "policy")])
-        #expect(recorder.execution.calls == [.init(id: "execution")])
-        #expect(recorder.receipt.calls == [.init(id: "receipt")])
     }
 
     @Test
@@ -63,63 +46,6 @@ private let isolatedTerminalOutcomes: [ScanOutcome] = [
     .corruptMetadata,
     .cancelled,
 ]
-
-private struct PolicyInput: Equatable, Sendable {
-    let id: String
-}
-
-private struct PolicyOutput: Equatable, Sendable {
-    let accepted: Bool
-}
-
-private struct ExecutionInput: Equatable, Sendable {
-    let id: String
-}
-
-private struct ExecutionOutput: Equatable, Sendable {
-    let moved: Bool
-}
-
-private struct ReceiptInput: Equatable, Sendable {
-    let id: String
-}
-
-private struct ReceiptOutput: Equatable, Sendable {
-    let durable: Bool
-}
-
-private final class EffectCapabilityRecorder: @unchecked Sendable {
-    let policy = PolicyRecorder()
-    let execution = ExecutionRecorder()
-    let receipt = ReceiptRecorder()
-}
-
-private final class PolicyRecorder: PolicyPort, @unchecked Sendable {
-    private(set) var calls: [PolicyInput] = []
-
-    func evaluate(_ input: PolicyInput) async -> PolicyOutput {
-        calls.append(input)
-        return .init(accepted: false)
-    }
-}
-
-private final class ExecutionRecorder: ExecutionPort, @unchecked Sendable {
-    private(set) var calls: [ExecutionInput] = []
-
-    func execute(_ input: ExecutionInput) async -> ExecutionOutput {
-        calls.append(input)
-        return .init(moved: false)
-    }
-}
-
-private final class ReceiptRecorder: ReceiptPort, @unchecked Sendable {
-    private(set) var calls: [ReceiptInput] = []
-
-    func record(_ input: ReceiptInput) async -> ReceiptOutput {
-        calls.append(input)
-        return .init(durable: false)
-    }
-}
 
 private final class IsolatedScanPorts: @unchecked Sendable {
     let fileSystem: IsolatedFileSystem
