@@ -48,7 +48,6 @@ private struct ProductionScope {
 // LLVM omits files that contain declarations but no executable regions. Keep
 // this list exact and validate the file grammar so executable drift cannot hide.
 private let declarationOnlySources: Set<String> = [
-    "CleanerCore/Ports/CapabilityPorts.swift",
     "CleanerCoreDarwin/DarwinMemorySystem.swift",
 ]
 
