@@ -6,6 +6,11 @@ public struct DeveloperInventoryAdapter: Sendable {
     private let homeDirectory: URL
     private let fileExists: @Sendable (URL) -> Bool
     private let directoryAllocatedBytes: @Sendable (URL) -> Int?
+    private let fileAllocatedBytes: @Sendable (URL) -> Int?
+
+    /// Docker Desktop's VM disk image, relative to the home directory. It is a sparse
+    /// file, so only its allocated bytes (not its logical size) say how much disk it uses.
+    static let dockerDiskImagePath = "Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
 
     private static let applications: [(DeveloperToolID, String)] = [
         (.cursor, "Cursor.app"),
@@ -31,12 +36,14 @@ public struct DeveloperInventoryAdapter: Sendable {
         additionalApplicationDirectories: [URL] = [],
         homeDirectory: URL,
         fileExists: @escaping @Sendable (URL) -> Bool,
-        directoryAllocatedBytes: @escaping @Sendable (URL) -> Int? = { _ in nil }
+        directoryAllocatedBytes: @escaping @Sendable (URL) -> Int? = { _ in nil },
+        fileAllocatedBytes: @escaping @Sendable (URL) -> Int? = { _ in nil }
     ) {
         applicationDirectories = [applicationsDirectory] + additionalApplicationDirectories
         self.homeDirectory = homeDirectory
         self.fileExists = fileExists
         self.directoryAllocatedBytes = directoryAllocatedBytes
+        self.fileAllocatedBytes = fileAllocatedBytes
     }
 
     public func observe() -> [DeveloperInventoryRecord] {
@@ -47,6 +54,12 @@ public struct DeveloperInventoryAdapter: Sendable {
             presence[tool] = appPresence(bundleName)
         }
         presence[.homebrew] = .unavailable
+
+        // Only look inside Docker's container when Docker is installed.
+        if presence[.docker] == .present,
+           let bytes = fileAllocatedBytes(homeDirectory.appendingPathComponent(Self.dockerDiskImagePath)) {
+            sizes[.docker] = bytes
+        }
 
         for (tool, dotfileName) in Self.dotfileRoots {
             let url = homeDirectory.appendingPathComponent(dotfileName, isDirectory: true)
