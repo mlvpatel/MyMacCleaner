@@ -160,16 +160,4 @@ extension ModelStoreFilesystemAdapter {
             return nil
         }
     }
-
-    func currentIdentityMatchesExpected(
-        url: URL,
-        expectedIdentity: EvidenceValue<FileIdentityEvidence>
-    ) -> Bool {
-        guard let currentIdentity = observedIdentity(for: url),
-              case .observed(let expectedIdentity) = expectedIdentity
-        else {
-            return false
-        }
-        return currentIdentity == expectedIdentity
-    }
 }
