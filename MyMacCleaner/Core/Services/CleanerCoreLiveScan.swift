@@ -43,9 +43,22 @@ struct CleanerCoreLiveScan: Sendable {
             additionalApplicationDirectories: [home.appendingPathComponent("Applications", isDirectory: true)],
             homeDirectory: home,
             fileExists: { FileManager.default.fileExists(atPath: $0.path) },
-            directoryAllocatedBytes: Self.allocatedBytes(of:)
+            directoryAllocatedBytes: Self.allocatedBytes(of:),
+            fileAllocatedBytes: Self.fileAllocatedBytes(of:)
         )
         return adapter.observe().compactMap(\.inventoryFact)
+    }
+
+    /// Content-blind allocated bytes of one regular file (a sparse disk image reports what
+    /// it really occupies, not its logical size). Symlinks and missing or unreadable items
+    /// yield nil; the file is never opened. Internal for tests.
+    static func fileAllocatedBytes(of file: URL) -> Int? {
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
+        guard let values = try? file.resourceValues(forKeys: keys),
+              values.isRegularFile == true else {
+            return nil
+        }
+        return values.totalFileAllocatedSize ?? values.fileAllocatedSize
     }
 
     /// Content-blind allocated-byte total for a directory: sums filesystem
