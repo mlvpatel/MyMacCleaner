@@ -40,28 +40,6 @@ extension View {
     }
 }
 
-// MARK: - Glass Picker (Native Picker with Glass Styling)
-
-struct GlassPicker<T: Hashable, Content: View>: View {
-    let icon: String
-    @Binding var selection: T
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        Picker(selection: $selection) {
-            content()
-        } label: {
-            Image(systemName: icon)
-                .font(.system(size: Theme.ControlSize.controlIconSize, weight: .medium))
-        }
-        .pickerStyle(.menu)
-        .labelsHidden()
-        .font(Theme.ControlSize.controlFont)
-        .foregroundStyle(.secondary)
-        .glassControlStyle()
-    }
-}
-
 // MARK: - Glass Toggle (Native Toggle with Glass Styling)
 
 struct GlassToggle: View {
@@ -143,22 +121,4 @@ struct GlassMenuModifier: ViewModifier {
                     .strokeBorder(.white.opacity(isHovered ? 0.15 : 0.1), lineWidth: 1)
             )
     }
-}
-
-// MARK: - Glass Effect Container Compatibility Wrapper
-
-/// Wrapper that provides GlassEffectContainer on macOS 26+, passthrough on older versions
-@ViewBuilder
-func glassEffectContainerCompat<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-    #if !CI_BUILD
-    if #available(macOS 26, *) {
-        GlassEffectContainer {
-            content()
-        }
-    } else {
-        content()
-    }
-    #else
-    content()
-    #endif
 }
