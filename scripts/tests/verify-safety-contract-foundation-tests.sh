@@ -268,6 +268,7 @@ printf '%s\n' \
     'startup.launchctl.list|/bin/launchctl|list|MyMacCleaner/Core/Services/StartupItemsService.swift|parseLaunchctlItems|Fixed local read-only inventory; no network access.' \
     'ports.lsof.tcp-list|/usr/sbin/lsof|-iTCP,-sTCP:LISTEN,ESTABLISHED,-n,-P|MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift|parsePorts|Fixed local read-only inventory; no network access.' \
     'health.diskutil.root-info|/usr/sbin/diskutil|info,/|MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift|parseDiskInfo|Fixed local read-only inventory; no network access.' \
+    'activity.lsof.open-files|/usr/sbin/lsof|-Fn,-n,-P,-w,-b|MyMacCleaner/Core/Services/OpenFileActivityObserver.swift|parseOpenFilePaths|Fixed local read-only inventory; no network access.' \
     > "$temporary_directory/identity-mismatch.txt"
 expect_manifest_failure "fixed identity mismatch" "SC-MANIFEST-IDENTITY" "$temporary_directory/identity-mismatch.txt"
 
