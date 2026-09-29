@@ -169,17 +169,7 @@ public struct StableFindingIdentity: Equatable, Sendable {
     public let utf8Bytes: [UInt8]
 
     public var hex: String {
-        let nibbles: [Character] = [
-            "0", "1", "2", "3", "4", "5", "6", "7",
-            "8", "9", "a", "b", "c", "d", "e", "f"
-        ]
-        var characters: [Character] = []
-        characters.reserveCapacity(utf8Bytes.count * 2)
-        for byte in utf8Bytes {
-            characters.append(nibbles[Int(byte >> 4)])
-            characters.append(nibbles[Int(byte & 0x0F)])
-        }
-        return String(characters)
+        utf8Bytes.map { ($0 < 16 ? "0" : "") + String($0, radix: 16) }.joined()
     }
 
     init(finding: Finding) {
