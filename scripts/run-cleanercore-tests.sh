@@ -94,7 +94,6 @@ suite_title_for_filter() {
         *AdaptiveExperienceProjectionTests*) printf '%s\n' 'Adaptive Experience Projection' ;;
         *DeveloperInventoryContractTests*) printf '%s\n' 'Developer Inventory Contract' ;;
         *DeveloperInventoryAdapterTests*) printf '%s\n' 'Developer Inventory Adapter' ;;
-        *DockerDiskUsageAdapterTests*) printf '%s\n' 'Docker Disk Usage Adapter' ;;
         *) printf '%s\n' '' ;;
     esac
 }
