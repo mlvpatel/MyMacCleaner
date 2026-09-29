@@ -60,19 +60,6 @@ actor HomebrewService {
         }
     }
 
-    /// Reads installed formula directory names as local filesystem evidence only.
-    func listInstalledFormulas() async throws -> [HomebrewFormula] {
-        try localDirectoryNames(in: formulaDirectories).map { name in
-            HomebrewFormula(
-                id: name,
-                name: name,
-                version: "",
-                description: nil,
-                hasUpdate: false
-            )
-        }
-    }
-
     /// Unique, case-insensitively sorted entry names across directories. Internal for tests.
     nonisolated func localDirectoryNames(in directories: [String]) throws -> [String] {
         let fileManager = FileManager.default
