@@ -1,7 +1,7 @@
 /// How a known owner's `~/Library/Caches` entry is explained. A class never grants
 /// eligibility: only the named fixed-scope proof can, and a catalog entry always
 /// yields an ineligible evaluation — so the catalog can only relabel or narrow.
-public enum GeneralMacCacheOwnerClass: String, CaseIterable, Equatable, Sendable {
+public enum GeneralMacCacheOwnerClass: Equatable, Sendable {
     /// Package downloads the owning tool fetches again on demand.
     case redownloadRequired
     /// Build products, indexes, or compiled models whose loss costs the user time.
@@ -10,11 +10,10 @@ public enum GeneralMacCacheOwnerClass: String, CaseIterable, Equatable, Sendable
     case developerToolState
 }
 
-/// Versioned owners for `~/Library/Caches`, keyed on the first one or two locator
+/// Known owners for `~/Library/Caches`, keyed on the first one or two locator
 /// components (lowercase). A two-component key wins over its one-component prefix.
 public struct GeneralMacCacheOwnerCatalog: Sendable {
     public static let current = GeneralMacCacheOwnerCatalog(
-        version: "1.0.0",
         entries: [
             ["pip"]: .redownloadRequired,
             ["homebrew"]: .redownloadRequired,
@@ -28,11 +27,9 @@ public struct GeneralMacCacheOwnerCatalog: Sendable {
         ]
     )
 
-    public let version: String
     private let entries: [[String]: GeneralMacCacheOwnerClass]
 
-    init(version: String, entries: [[String]: GeneralMacCacheOwnerClass]) {
-        self.version = version
+    init(entries: [[String]: GeneralMacCacheOwnerClass]) {
         self.entries = entries
     }
 
