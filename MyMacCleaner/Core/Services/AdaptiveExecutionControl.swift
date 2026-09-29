@@ -11,29 +11,12 @@ enum AdaptiveApprovalBinding {
     /// Decodes lowercase hex as produced by the Adaptive Experience projection.
     static func digest(fromHex hex: String) -> PlanDigest? {
         let characters = Array(hex.utf8)
-        guard characters.count == digestByteCount * 2 else { return nil }
-
-        var bytes: [UInt8] = []
-        bytes.reserveCapacity(digestByteCount)
-        for index in stride(from: 0, to: characters.count, by: 2) {
-            guard let high = nibble(characters[index]),
-                  let low = nibble(characters[index + 1]) else {
-                return nil
-            }
-            bytes.append(high << 4 | low)
+        guard characters.count == digestByteCount * 2,
+              hex.allSatisfy("0123456789abcdef".contains) else { return nil }
+        let bytes = stride(from: 0, to: characters.count, by: 2).compactMap {
+            UInt8(String(decoding: characters[$0..<$0 + 2], as: UTF8.self), radix: 16)
         }
         return try? PlanDigest(bytes: bytes)
-    }
-
-    private static func nibble(_ character: UInt8) -> UInt8? {
-        switch character {
-        case UInt8(ascii: "0")...UInt8(ascii: "9"):
-            return character - UInt8(ascii: "0")
-        case UInt8(ascii: "a")...UInt8(ascii: "f"):
-            return character - UInt8(ascii: "a") + 10
-        default:
-            return nil
-        }
     }
 }
 
