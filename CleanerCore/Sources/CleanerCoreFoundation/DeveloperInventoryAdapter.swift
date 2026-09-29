@@ -85,19 +85,3 @@ public struct DeveloperInventoryAdapter: Sendable {
         return .absent
     }
 }
-
-public struct DockerDiskUsageAdapter: Sendable {
-    public enum Mode: Equatable, Sendable {
-        case presenceOnly
-    }
-
-    public let mode: Mode
-
-    public init() {
-        mode = .presenceOnly
-    }
-
-    public func snapshot(presence: DeveloperPresence) -> DeveloperInventoryRecord {
-        DeveloperInventoryRecord(tool: .docker, presence: presence)
-    }
-}
