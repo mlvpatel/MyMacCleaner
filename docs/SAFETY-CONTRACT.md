@@ -22,7 +22,7 @@ The command runs the source/process audit, fixture verifier, complete SafetyCont
 | Startup-item, application, and developer-tool mutation | Unavailable; inventory and system guidance remain read-only. |
 | Disabled-operation networking | Unavailable; denied routes have no network capability and their recorder remains at zero requests. |
 
-## Four fixed read-only process adapters
+## Five fixed read-only process adapters
 
 Only these local inventory commands are permitted by the source contract. Their executable paths and arguments are fixed in code; no caller supplies a command or shell string.
 
@@ -32,6 +32,7 @@ Only these local inventory commands are permitted by the source contract. Their 
 | Startup inventory | `/bin/launchctl list` | Read launch-service inventory. |
 | Port inventory | `/usr/sbin/lsof -iTCP -sTCP:LISTEN,ESTABLISHED -n -P` | Read listening and established TCP ports. |
 | System health | `/usr/sbin/diskutil info /` | Read root-volume metadata. |
+| Open-file activity | `/usr/sbin/lsof -Fn -n -P -w -b` | Mark scanned files a running process holds open as in-use, so they are never cleanup candidates. A failed listing marks nothing open. |
 
 ## Privacy and diagnostics
 
