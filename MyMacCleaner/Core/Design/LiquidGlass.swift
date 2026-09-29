@@ -114,27 +114,6 @@ extension View {
             .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 1))
     }
 
-    /// Circle glass effect
-    @ViewBuilder
-    func glassCircle() -> some View {
-        #if !CI_BUILD
-        if #available(macOS 26, *) {
-            self.glassEffect(.regular, in: .circle)
-        } else {
-            glassCircleFallback()
-        }
-        #else
-        glassCircleFallback()
-        #endif
-    }
-
-    private func glassCircleFallback() -> some View {
-        self
-            .background(.ultraThinMaterial)
-            .clipShape(.circle)
-            .overlay(Circle().strokeBorder(.white.opacity(0.15), lineWidth: 1))
-    }
-
     /// Glass effect with tint color
     @ViewBuilder
     func glassCard(tint: Color, cornerRadius: CGFloat = 16) -> some View {
@@ -168,26 +147,6 @@ extension View {
     func hoverEffect(isHovered: Bool, scale: CGFloat = 1.02) -> some View {
         self
             .scaleEffect(isHovered ? scale : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-    }
-
-    /// Applies press effect
-    func pressEffect(isPressed: Bool) -> some View {
-        self
-            .scaleEffect(isPressed ? 0.96 : 1.0)
-            .opacity(isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
-    }
-
-    /// Floating effect with shadow on hover
-    func floatingEffect(isHovered: Bool) -> some View {
-        self
-            .scaleEffect(isHovered ? 1.02 : 1.0)
-            .shadow(
-                color: .black.opacity(isHovered ? 0.2 : 0.1),
-                radius: isHovered ? 20 : 10,
-                y: isHovered ? 8 : 4
-            )
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
     }
 }
