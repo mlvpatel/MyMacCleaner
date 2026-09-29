@@ -397,17 +397,6 @@
         }
       }
     },
-    "permissions.status.denied": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Denied"
-          }
-        }
-      }
-    },
     "permissions.status.granted": {
       "extractionState": "manual",
       "localizations": {
@@ -430,17 +419,6 @@
         }
       }
     },
-    "permissions.status.notDetermined": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not Determined"
-          }
-        }
-      }
-    },
     "permissions.status.required": {
       "extractionState": "manual",
       "localizations": {
@@ -448,17 +426,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Required"
-          }
-        }
-      }
-    },
-    "permissions.status.restricted": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restricted"
           }
         }
       }
