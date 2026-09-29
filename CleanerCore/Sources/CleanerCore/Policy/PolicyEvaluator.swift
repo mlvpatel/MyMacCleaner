@@ -238,13 +238,7 @@ public struct PolicyEvaluator: Sendable {
             return .credential
         }
         switch finding.category {
-        case .cache:
-            guard finding.source == .userLibraryCaches else { return .unknown }
-            // Protected tool state is labelled as such on every path, not only the eligible one.
-            if cacheOwners.ownerClass(for: finding.finding.locator.components) == .developerToolState {
-                return .developerToolState
-            }
-            return .generalRebuildableCache
+        case .cache: return finding.source == .userLibraryCaches ? .generalRebuildableCache : .unknown
         case .log: return .generalLog
         case .crashReport: return .generalCrashReport
         case .temporary: return .generalTemporaryData
