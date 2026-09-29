@@ -386,17 +386,7 @@ enum AdaptiveExperienceIdentity {
     }
 
     static func hex(_ bytes: [UInt8]) -> String {
-        let nibbles: [Character] = [
-            "0", "1", "2", "3", "4", "5", "6", "7",
-            "8", "9", "a", "b", "c", "d", "e", "f"
-        ]
-        var characters: [Character] = []
-        characters.reserveCapacity(bytes.count * 2)
-        for byte in bytes {
-            characters.append(nibbles[Int(byte >> 4)])
-            characters.append(nibbles[Int(byte & 0x0F)])
-        }
-        return String(characters)
+        bytes.map { ($0 < 16 ? "0" : "") + String($0, radix: 16) }.joined()
     }
 
     private static func flag(_ value: EvidenceValue<Bool>) -> AdaptiveBoundaryFlag {
