@@ -177,7 +177,7 @@ fi
 
 for required_documentation_text in \
     'Disabled capability matrix' \
-    'Four fixed read-only process adapters' \
+    'Five fixed read-only process adapters' \
     'Redacted diagnostics' \
     'No-network disabled routes' \
     'bash scripts/verify-safety-contract.sh' \
