@@ -199,28 +199,6 @@ struct PermissionBanner: View {
     }
 }
 
-// MARK: - Permission Status View
-
-struct PermissionStatusView: View {
-    let hasFullDiskAccess: Bool
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Circle()
-                .fill(hasFullDiskAccess ? Color.green : Color.orange)
-                .frame(width: 8, height: 8)
-                .shadow(color: (hasFullDiskAccess ? Color.green : Color.orange).opacity(0.5), radius: 4)
-
-            Text(hasFullDiskAccess ? L("permissions.status.granted") : L("permissions.status.limited"))
-                .font(Theme.Typography.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, Theme.Spacing.sm)
-        .padding(.vertical, Theme.Spacing.xs)
-        .glassPill()
-    }
-}
-
 // MARK: - Preview
 
 #Preview("Permission Prompt") {
