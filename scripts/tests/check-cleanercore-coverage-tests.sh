@@ -158,19 +158,19 @@ expect_fail_with_rule "missing-cryptokit-plan-digest-adapter" "CC-COVERAGE-MISSI
     --minimum 80
 rm -f "$foundation_root/CryptoKitPlanDigestAdapter.swift"
 
-declaration_fixture="$pure_root/Ports/CapabilityPorts.swift"
+declaration_fixture="$darwin_root/DarwinMemorySystem.swift"
 mkdir -p "$(dirname "$declaration_fixture")"
-cp "$repository_root/CleanerCore/Sources/CleanerCore/Ports/CapabilityPorts.swift" "$declaration_fixture"
+cp "$repository_root/CleanerCore/Sources/CleanerCoreDarwin/DarwinMemorySystem.swift" "$declaration_fixture"
 expect_pass "known-declaration-only-source" \
     --input "$exact" \
     --source-root "$source_root" \
     --minimum 80
 printf '%s\n' 'struct ExecutableDrift {' '    func run() { }' '}' > "$declaration_fixture"
-expect_fail_with_rule "declaration-only-executable-drift" "CC-COVERAGE-DECLARATION-DRIFT: CleanerCore" \
+expect_fail_with_rule "declaration-only-executable-drift" "CC-COVERAGE-DECLARATION-DRIFT: CleanerCoreDarwin" \
     --input "$exact" \
     --source-root "$source_root" \
     --minimum 80
-rm -rf "$pure_root/Ports"
+rm -f "$declaration_fixture"
 
 write_four_target_report "$temporary_root/pure-below-target.json" 100 79 100 100 100 100 100 100
 expect_fail_with_rule "pure-target-below-threshold" "CC-COVERAGE-BELOW-MINIMUM: CleanerCore" \
