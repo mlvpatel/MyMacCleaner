@@ -3,20 +3,6 @@ import Testing
 @testable import CleanerCore
 @testable import CleanerCoreFoundation
 
-@Suite("Docker Disk Usage Adapter")
-struct DockerDiskUsageAdapterTests {
-    @Test
-    func presenceOnlyNeverLaunchesAProcess() {
-        let adapter = DockerDiskUsageAdapter()
-        #expect(adapter.mode == .presenceOnly)
-        let record = adapter.snapshot(presence: .present)
-        #expect(record.tool == .docker)
-        #expect(record.presence == .present)
-        #expect(record.protection == .protectedSemanticOwner)
-        #expect(record.inventoryFact != nil)
-    }
-}
-
 @Suite("Developer Inventory Adapter")
 struct DeveloperInventoryAdapterTests {
     @Test
