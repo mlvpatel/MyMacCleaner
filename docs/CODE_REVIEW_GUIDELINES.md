@@ -413,8 +413,6 @@ VStack { }
 // ✅ GOOD: Interactive effects
 Button { }
     .hoverEffect()         // Hover state
-    .pressEffect()         // Press state
-    .floatingEffect()      // Floating animation
 ```
 
 #### Creating New Glass Effects
