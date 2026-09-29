@@ -242,6 +242,7 @@ validate_manifest() {
         'startup.launchctl.list|/bin/launchctl|list|MyMacCleaner/Core/Services/StartupItemsService.swift|parseLaunchctlItems|Fixed local read-only inventory; no network access.'
         'ports.lsof.tcp-list|/usr/sbin/lsof|-iTCP,-sTCP:LISTEN,ESTABLISHED,-n,-P|MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift|parsePorts|Fixed local read-only inventory; no network access.'
         'health.diskutil.root-info|/usr/sbin/diskutil|info,/|MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift|parseDiskInfo|Fixed local read-only inventory; no network access.'
+        'activity.lsof.open-files|/usr/sbin/lsof|-Fn,-n,-P,-w,-b|MyMacCleaner/Core/Services/OpenFileActivityObserver.swift|parseOpenFilePaths|Fixed local read-only inventory; no network access.'
     )
     local entries=()
     local line identifier executable arguments owner parser rationale extra prior_entry entry index
@@ -301,9 +302,9 @@ validate_manifest() {
         entries+=("$entry")
     done < "$manifest_path"
 
-    [[ ${#entries[@]} -eq 4 ]] || fail "SC-MANIFEST-COUNT"
+    [[ ${#entries[@]} -eq 5 ]] || fail "SC-MANIFEST-COUNT"
 
-    for index in 0 1 2 3; do
+    for index in 0 1 2 3 4; do
         [[ "${entries[$index]}" == "${expected_entries[$index]}" ]] || fail "SC-MANIFEST-IDENTITY"
     done
 }
@@ -316,7 +317,7 @@ mode_targets() {
             printf '%s\0' 'MyMacCleaner/Core/Services/BrowserCleanerService.swift' 'MyMacCleaner/Core/Services/DuplicateScanner.swift' 'MyMacCleaner/Core/Services/OrphanedFilesScanner.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensViewModel.swift'
             ;;
         --system-process-only)
-            printf '%s\0' 'MyMacCleaner/Core/Services/HomebrewService.swift' 'MyMacCleaner/Core/Services/StartupItemsService.swift' 'MyMacCleaner/Features/Performance/PerformanceViewModel.swift' 'MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift' 'MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift'
+            printf '%s\0' 'MyMacCleaner/Core/Services/HomebrewService.swift' 'MyMacCleaner/Core/Services/StartupItemsService.swift' 'MyMacCleaner/Features/Performance/PerformanceViewModel.swift' 'MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift' 'MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift' 'MyMacCleaner/Core/Services/OpenFileActivityObserver.swift'
             ;;
         --storage-ui-home-only)
             printf '%s\0' 'MyMacCleaner/Core/Design/SafetyNoticePresenter.swift' 'MyMacCleaner/Features/Home/HomeViewModel.swift' 'MyMacCleaner/Features/Home/HomeView.swift' 'MyMacCleaner/Features/Home/Components/ScanResultsCard.swift'
@@ -343,7 +344,7 @@ mode_targets() {
             printf '%s\0' 'MyMacCleaner/Core/Services/StartupItemsService.swift' 'MyMacCleaner/Core/Models/UpdateCapability.swift'
             ;;
         --source-only)
-            printf '%s\0' 'MyMacCleaner/Core/Design/SafetyNoticePresenter.swift' 'MyMacCleaner/Core/Design/UpdateCapabilityView.swift' 'MyMacCleaner/Core/Services/AppState.swift' 'MyMacCleaner/Core/Services/LocalizationManager.swift' 'MyMacCleaner/Core/Services/BrowserCleanerService.swift' 'MyMacCleaner/Core/Services/DuplicateScanner.swift' 'MyMacCleaner/Core/Services/OrphanedFilesScanner.swift' 'MyMacCleaner/Core/Services/HomebrewService.swift' 'MyMacCleaner/Core/Services/StartupItemsService.swift' 'MyMacCleaner/Features/Performance/PerformanceViewModel.swift' 'MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift' 'MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift' 'MyMacCleaner/Features/Home/HomeViewModel.swift' 'MyMacCleaner/Features/Home/HomeView.swift' 'MyMacCleaner/Features/Home/Components/ScanResultsCard.swift' 'MyMacCleaner/Features/DiskCleaner/DiskCleanerViewModel.swift' 'MyMacCleaner/Features/DiskCleaner/DiskCleanerView.swift' 'MyMacCleaner/Features/DiskCleaner/BrowserPrivacyView.swift' 'MyMacCleaner/Features/DiskCleaner/Components/CleanupCategoryCard.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensViewModel.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensView.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensSectionView.swift' 'MyMacCleaner/Features/SpaceLens/Components/SidebarFileRow.swift' 'MyMacCleaner/Features/SpaceLens/Components/BubblePackingView.swift' 'MyMacCleaner/Features/SpaceLens/Components/SingleBubbleView.swift' 'MyMacCleaner/Features/Duplicates/DuplicatesViewModel.swift' 'MyMacCleaner/Features/Duplicates/DuplicatesView.swift' 'MyMacCleaner/Features/OrphanedFiles/OrphanedFilesViewModel.swift' 'MyMacCleaner/Features/OrphanedFiles/OrphanedFilesView.swift' 'MyMacCleaner/Features/Applications/ApplicationsViewModel.swift' 'MyMacCleaner/Features/Applications/ApplicationsView.swift' 'MyMacCleaner/Features/Applications/Components/AppCard.swift' 'MyMacCleaner/Features/Applications/Components/HomebrewCaskRow.swift' 'MyMacCleaner/Features/Performance/PerformanceView.swift' 'MyMacCleaner/Features/Performance/Components/ProcessRow.swift' 'MyMacCleaner/Features/StartupItems/StartupItemsViewModel.swift' 'MyMacCleaner/Features/StartupItems/StartupItemsView.swift' 'MyMacCleaner/Features/PortManagement/PortManagementView.swift' 'MyMacCleaner/Core/Models/UpdateCapability.swift'
+            printf '%s\0' 'MyMacCleaner/Core/Design/SafetyNoticePresenter.swift' 'MyMacCleaner/Core/Design/UpdateCapabilityView.swift' 'MyMacCleaner/Core/Services/AppState.swift' 'MyMacCleaner/Core/Services/LocalizationManager.swift' 'MyMacCleaner/Core/Services/BrowserCleanerService.swift' 'MyMacCleaner/Core/Services/DuplicateScanner.swift' 'MyMacCleaner/Core/Services/OrphanedFilesScanner.swift' 'MyMacCleaner/Core/Services/HomebrewService.swift' 'MyMacCleaner/Core/Services/StartupItemsService.swift' 'MyMacCleaner/Features/Performance/PerformanceViewModel.swift' 'MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift' 'MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift' 'MyMacCleaner/Features/Home/HomeViewModel.swift' 'MyMacCleaner/Features/Home/HomeView.swift' 'MyMacCleaner/Features/Home/Components/ScanResultsCard.swift' 'MyMacCleaner/Features/DiskCleaner/DiskCleanerViewModel.swift' 'MyMacCleaner/Features/DiskCleaner/DiskCleanerView.swift' 'MyMacCleaner/Features/DiskCleaner/BrowserPrivacyView.swift' 'MyMacCleaner/Features/DiskCleaner/Components/CleanupCategoryCard.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensViewModel.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensView.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensSectionView.swift' 'MyMacCleaner/Features/SpaceLens/Components/SidebarFileRow.swift' 'MyMacCleaner/Features/SpaceLens/Components/BubblePackingView.swift' 'MyMacCleaner/Features/SpaceLens/Components/SingleBubbleView.swift' 'MyMacCleaner/Features/Duplicates/DuplicatesViewModel.swift' 'MyMacCleaner/Features/Duplicates/DuplicatesView.swift' 'MyMacCleaner/Features/OrphanedFiles/OrphanedFilesViewModel.swift' 'MyMacCleaner/Features/OrphanedFiles/OrphanedFilesView.swift' 'MyMacCleaner/Features/Applications/ApplicationsViewModel.swift' 'MyMacCleaner/Features/Applications/ApplicationsView.swift' 'MyMacCleaner/Features/Applications/Components/AppCard.swift' 'MyMacCleaner/Features/Applications/Components/HomebrewCaskRow.swift' 'MyMacCleaner/Features/Performance/PerformanceView.swift' 'MyMacCleaner/Features/Performance/Components/ProcessRow.swift' 'MyMacCleaner/Features/StartupItems/StartupItemsViewModel.swift' 'MyMacCleaner/Features/StartupItems/StartupItemsView.swift' 'MyMacCleaner/Features/PortManagement/PortManagementView.swift' 'MyMacCleaner/Core/Models/UpdateCapability.swift' 'MyMacCleaner/Core/Services/OpenFileActivityObserver.swift'
             ;;
         *)
             return 1
@@ -431,7 +432,7 @@ process_policy_for_target() {
     local target="$1"
 
     case "$target" in
-        MyMacCleaner/Core/Services/StartupItemsService.swift|MyMacCleaner/Core/Services/HomebrewService.swift|MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift|MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift|MyMacCleaner/Features/Performance/PerformanceViewModel.swift)
+        MyMacCleaner/Core/Services/StartupItemsService.swift|MyMacCleaner/Core/Services/HomebrewService.swift|MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift|MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift|MyMacCleaner/Features/Performance/PerformanceViewModel.swift|MyMacCleaner/Core/Services/OpenFileActivityObserver.swift)
             printf '%s\n' 'allow'
             ;;
         *)
@@ -798,9 +799,10 @@ validate_fixed_process_adapters() {
     local health="$repository_root/MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift"
     local homebrew="$repository_root/MyMacCleaner/Core/Services/HomebrewService.swift"
     local performance="$repository_root/MyMacCleaner/Features/Performance/PerformanceViewModel.swift"
+    local activity="$repository_root/MyMacCleaner/Core/Services/OpenFileActivityObserver.swift"
     local file expected count
 
-    for file in "$startup" "$ports" "$health" "$homebrew" "$performance"; do
+    for file in "$startup" "$ports" "$health" "$homebrew" "$performance" "$activity"; do
         [[ -f "$file" && -r "$file" ]] || fail "SC-MISSING-TARGET" "$(location_for "$file")"
     done
 
@@ -811,6 +813,8 @@ validate_fixed_process_adapters() {
     [[ "$count" -eq 1 ]] || fail "SC-PROCESS-COUNT" "$(location_for "$ports")"
     count=$(/usr/bin/grep -Ec 'Process[[:space:]]*\(' "$health" || true)
     [[ "$count" -eq 1 ]] || fail "SC-PROCESS-COUNT" "$(location_for "$health")"
+    count=$(/usr/bin/grep -Ec 'Process[[:space:]]*\(' "$activity" || true)
+    [[ "$count" -eq 1 ]] || fail "SC-PROCESS-COUNT" "$(location_for "$activity")"
     count=$((
         $(/usr/bin/grep -Ec 'Process[[:space:]]*\(' "$homebrew" || true) +
         $(/usr/bin/grep -Ec 'Process[[:space:]]*\(' "$performance" || true)
@@ -826,6 +830,9 @@ validate_fixed_process_adapters() {
     /usr/bin/grep -Fq 'URL(fileURLWithPath: "/usr/sbin/diskutil")' "$health" || fail "SC-PROCESS-IDENTITY" "$(location_for "$health")"
     /usr/bin/grep -Fq 'process.arguments = ["info", "/"]' "$health" || fail "SC-PROCESS-IDENTITY" "$(location_for "$health")"
     /usr/bin/grep -Eq 'func[[:space:]]+parseDiskInfo' "$health" || fail "SC-PROCESS-IDENTITY" "$(location_for "$health")"
+    /usr/bin/grep -Fq 'URL(fileURLWithPath: "/usr/sbin/lsof")' "$activity" || fail "SC-PROCESS-IDENTITY" "$(location_for "$activity")"
+    /usr/bin/grep -Fq 'process.arguments = ["-Fn", "-n", "-P", "-w", "-b"]' "$activity" || fail "SC-PROCESS-IDENTITY" "$(location_for "$activity")"
+    /usr/bin/grep -Eq 'func[[:space:]]+parseOpenFilePaths' "$activity" || fail "SC-PROCESS-IDENTITY" "$(location_for "$activity")"
 }
 
 validate_foundation_contract() {
