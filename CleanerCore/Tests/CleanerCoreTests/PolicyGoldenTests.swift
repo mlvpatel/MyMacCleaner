@@ -148,7 +148,6 @@ struct PolicyGoldenTests {
         #expect(browser.rationale == .unsupportedEvidence)
         #expect(browser.candidate == nil)
         #expect(named.eligibility == .eligible)
-        #expect(GeneralMacCacheOwnerCatalog.current.version == "1.0.0")
     }
 
     @Test
@@ -158,7 +157,7 @@ struct PolicyGoldenTests {
             ["Google", "Chrome", "Default", "Cache", "f_000001"],
             ["other.cache", "file.bin"],
         ]
-        let without = PolicyEvaluator(cacheOwners: GeneralMacCacheOwnerCatalog(version: "none", entries: [:]))
+        let without = PolicyEvaluator(cacheOwners: GeneralMacCacheOwnerCatalog(entries: [:]))
         for components in samples {
             let finding = try PolicyPlanFixtureFactory.finding(components: components)
             if PolicyEvaluator().evaluate(finding).eligibility == .eligible {
@@ -167,7 +166,6 @@ struct PolicyGoldenTests {
         }
         // Even an entry for the one named eligible cache can only narrow it.
         let hostile = PolicyEvaluator(cacheOwners: GeneralMacCacheOwnerCatalog(
-            version: "hostile",
             entries: [["com.apple.iconservices.store"]: .mayAffectWorkflow]
         ))
         let narrowed = hostile.evaluate(
