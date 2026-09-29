@@ -20,11 +20,9 @@ enum OpenFileActivityReader {
     /// Resolves the scanned roots to the real paths `lsof` reports, then reads one listing.
     static func snapshot(for kinds: [GeneralMacRootKind]) async -> OpenFileActivitySnapshot {
         let catalog = GeneralMacScopeCatalog.current
-        var roots: [DeclaredRootID: String] = [:]
-        for kind in kinds {
-            guard let root = try? catalog.declaredRoot(for: kind) else { continue }
-            roots[root.id] = canonicalPath(AppAdaptiveRoots.url(for: kind))
-        }
+        let roots = Dictionary(kinds.compactMap { kind in
+            (try? catalog.declaredRoot(for: kind)).map { ($0.id, canonicalPath(AppAdaptiveRoots.url(for: kind))) }
+        }, uniquingKeysWith: { first, _ in first })
         return snapshot(roots: roots, listing: await readOpenFileListing())
     }
 
@@ -93,9 +91,8 @@ enum OpenFileActivityReader {
             if index + 3 < bytes.count,
                bytes[index] == UInt8(ascii: "\\"),
                bytes[index + 1] == UInt8(ascii: "x"),
-               let high = hexValue(bytes[index + 2]),
-               let low = hexValue(bytes[index + 3]) {
-                decoded.append(high << 4 | low)
+               let byte = UInt8(String(decoding: bytes[index + 2...index + 3], as: UTF8.self), radix: 16) {
+                decoded.append(byte)
                 index += 4
             } else {
                 decoded.append(bytes[index])
@@ -107,26 +104,8 @@ enum OpenFileActivityReader {
 
     /// The real path `lsof` reports for a root (`/tmp` -> `/private/tmp`), without a trailing slash.
     static func canonicalPath(_ url: URL) -> String {
-        let path = url.path
-        guard let resolved = realpath(path, nil) else { return withoutTrailingSlash(path) }
+        guard let resolved = realpath(url.path, nil) else { return url.path }
         defer { free(resolved) }
-        return withoutTrailingSlash(String(cString: resolved))
-    }
-
-    private static func withoutTrailingSlash(_ path: String) -> String {
-        var trimmed = path
-        while trimmed.count > 1, trimmed.hasSuffix("/") {
-            trimmed.removeLast()
-        }
-        return trimmed
-    }
-
-    private static func hexValue(_ byte: UInt8) -> UInt8? {
-        switch byte {
-        case UInt8(ascii: "0")...UInt8(ascii: "9"): return byte - UInt8(ascii: "0")
-        case UInt8(ascii: "a")...UInt8(ascii: "f"): return byte - UInt8(ascii: "a") + 10
-        case UInt8(ascii: "A")...UInt8(ascii: "F"): return byte - UInt8(ascii: "A") + 10
-        default: return nil
-        }
+        return String(cString: resolved)
     }
 }
