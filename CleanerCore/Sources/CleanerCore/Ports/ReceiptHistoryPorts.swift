@@ -85,13 +85,3 @@ public struct RedactedReceiptSummary: Equatable, Sendable {
         )
     }
 }
-
-public struct OpaqueReceiptRequest: Equatable, Sendable {
-    public let receipt: ReceiptID
-    public let item: ReceiptItemID?
-
-    public init(receipt: ReceiptID, item: ReceiptItemID? = nil) {
-        self.receipt = receipt
-        self.item = item
-    }
-}
