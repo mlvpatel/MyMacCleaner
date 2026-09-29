@@ -26,7 +26,8 @@ struct CleanerCoreLiveScan: Sendable {
         let session = try AdaptiveScanSession(
             fileSystem: adapter,
             clock: AppAdaptiveClock(),
-            cancellation: TaskAdaptiveCancel()
+            cancellation: TaskAdaptiveCancel(),
+            processActivity: await OpenFileActivityReader.snapshot(for: kinds)
         )
         return await session.collect(request: try catalog.scanRequest(for: kinds))
     }
