@@ -70,39 +70,3 @@ class PermissionsService: ObservableObject {
         ]
     )
 }
-
-// MARK: - Permission Status
-
-enum PermissionStatus {
-    case granted
-    case denied
-    case notDetermined
-    case restricted
-
-    var color: Color {
-        switch self {
-        case .granted: return .green
-        case .denied: return .red
-        case .notDetermined: return .orange
-        case .restricted: return .gray
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .granted: return "checkmark.circle.fill"
-        case .denied: return "xmark.circle.fill"
-        case .notDetermined: return "questionmark.circle.fill"
-        case .restricted: return "lock.circle.fill"
-        }
-    }
-
-    var label: String {
-        switch self {
-        case .granted: return L("permissions.status.granted")
-        case .denied: return L("permissions.status.denied")
-        case .notDetermined: return L("permissions.status.notDetermined")
-        case .restricted: return L("permissions.status.restricted")
-        }
-    }
-}
