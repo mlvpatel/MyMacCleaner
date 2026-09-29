@@ -269,14 +269,6 @@ struct ShadowStyle {
     let y: CGFloat
 }
 
-// MARK: - View Extensions
-
-extension View {
-    func themeShadow(_ style: ShadowStyle) -> some View {
-        self.shadow(color: style.color, radius: style.radius, x: 0, y: style.y)
-    }
-}
-
 // MARK: - Color Extensions
 
 extension Color {
