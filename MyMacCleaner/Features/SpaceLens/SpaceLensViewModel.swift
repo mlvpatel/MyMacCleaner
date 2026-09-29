@@ -213,10 +213,6 @@ class SpaceLensViewModel: ObservableObject {
         }
     }
 
-    func selectNode(_ node: FileNode) {
-        selectedNode = node
-    }
-
     func hoverNode(_ node: FileNode?) {
         hoveredNode = node
     }
