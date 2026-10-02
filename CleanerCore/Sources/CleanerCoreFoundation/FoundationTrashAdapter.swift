@@ -135,8 +135,10 @@ public struct FoundationTrashAdapter: TrashExecutionPort, @unchecked Sendable {
         } catch {
             return .unavailable
         }
+        // A link added since the scan keeps inode, size and mtime, so the link count is checked too.
         guard let device = numericValue(attributes[.systemNumber]),
-              let node = numericValue(attributes[.systemFileNumber]) else {
+              let node = numericValue(attributes[.systemFileNumber]),
+              numericValue(attributes[.referenceCount]) == 1 else {
             return .unavailable
         }
         let values: URLResourceValues
