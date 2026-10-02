@@ -46,10 +46,10 @@ struct GeneralMacHostileFixtureTests {
     }
 
     @Test
-    func laterFaultRetainsEarlierEvidenceAndDoesNotEnterAnotherRoot() async throws {
+    func laterFaultRetainsEarlierEvidenceAndStillScansTheNextRoot() async throws {
         let completedRoot = try DeclaredRootID("hostile-completed-root")
         let failedRoot = try DeclaredRootID("hostile-failed-root")
-        let unopenedRoot = try DeclaredRootID("hostile-unopened-root")
+        let laterRoot = try DeclaredRootID("hostile-later-root")
         let fileSystem = ScriptedFileSystem(stepsByRoot: [
             completedRoot: [
                 .observation(try hostileObservation(
@@ -59,11 +59,12 @@ struct GeneralMacHostileFixtureTests {
                 .terminal(.complete),
             ],
             failedRoot: [.terminal(.permissionDenied)],
-            unopenedRoot: [
+            laterRoot: [
                 .observation(try hostileObservation(
-                    rootID: unopenedRoot,
-                    components: ["must-not-open.bin"]
+                    rootID: laterRoot,
+                    components: ["next.bin"]
                 )),
+                .terminal(.complete),
             ],
         ])
         let coordinator = try hostileCoordinator(fileSystem: fileSystem)
@@ -71,7 +72,7 @@ struct GeneralMacHostileFixtureTests {
             declaredRoots: [
                 .init(id: completedRoot),
                 .init(id: failedRoot),
-                .init(id: unopenedRoot),
+                .init(id: laterRoot),
             ],
             budget: .init(
                 maximumFindings: 4,
@@ -85,7 +86,7 @@ struct GeneralMacHostileFixtureTests {
             return
         }
 
-        #expect(batch.findings.map(\.locator.components) == [["kept.bin"]])
+        #expect(batch.findings.map(\.locator.components) == [["kept.bin"], ["next.bin"]])
         #expect(batch.terminalOutcome == .partial(issues: [
             .init(
                 rootID: failedRoot,
@@ -93,7 +94,9 @@ struct GeneralMacHostileFixtureTests {
                 cause: .permissionDenied
             ),
         ]))
-        #expect(fileSystem.calls.map(\.rootID) == [completedRoot, completedRoot, failedRoot])
+        #expect(fileSystem.calls.map(\.rootID) == [
+            completedRoot, completedRoot, failedRoot, laterRoot, laterRoot,
+        ])
     }
 
     @Test
