@@ -280,6 +280,32 @@ struct FoundationTrashAdapterTests {
         #expect(calls.count == 0)
     }
 
+    @Test
+    func realFileHardLinkedAfterApprovalSkipsViaDefaultProbe() throws {
+        let fixture = try RealTrashFixture(component: "real-link.bin", node: 603)
+        defer { fixture.cleanup() }
+        // Same inode, size and mtime as approved, but its bytes are now shared with another link.
+        try FileManager.default.linkItem(
+            at: fixture.leaf,
+            to: fixture.leaf.deletingLastPathComponent().appendingPathComponent("second-link.bin")
+        )
+        let calls = NativeCallRecorder()
+        let adapter = FoundationTrashAdapter(
+            nativeTrash: { _ in
+                calls.count += 1
+                return URL(fileURLWithPath: "/tmp/Trash/unused")
+            },
+            resolveRoot: { id in id == fixture.operation.declaredRootID ? fixture.root : nil }
+        )
+        #expect(
+            adapter.revalidateAndMove(
+                fixture.operation,
+                fresh: FreshTargetEvidence.matching(fixture.plan.targets[0])
+            ) == .skippedStale(.identityChanged)
+        )
+        #expect(calls.count == 0)
+    }
+
     // MARK: - Helpers
 
     private func assertProbeSkips(
