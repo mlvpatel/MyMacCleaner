@@ -141,7 +141,7 @@ struct ScanCoordinatorTests {
         }
         #expect(batch.findings.count == 1)
         #expect(batch.continuationCursor == nil)
-        #expect(batch.terminalOutcome == .corruptMetadata)
+        #expect(batch.terminalOutcome == .partial(issues: [.init(rootID: rootID, detectorID: try DetectorID("fixture.budget"), cause: .corruptMetadata)]))
         #expect(fileSystem.calls == 1)
     }
 }
