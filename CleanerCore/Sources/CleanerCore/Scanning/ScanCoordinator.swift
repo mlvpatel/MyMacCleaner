@@ -335,7 +335,9 @@ actor ScanCoordinator {
     private var terminalOutcome: ScanOutcome?
     private var requestFingerprint: ScanRequest?
     private var activeRootIndex = 0
-    private var completedRootCount = 0
+    /// Roots that completed or delivered findings; any of them turns issues into `.partial`.
+    private var scannedRootCount = 0
+    private var issues: [ScanIssue] = []
     private var perRootEntriesRead = 0
     private var perRootFindingsRead = 0
     private var perRootObservedBytesRead: Int64 = 0
@@ -374,67 +376,48 @@ actor ScanCoordinator {
         var observationsProcessed = 0
         while findings.count < request.budget.maximumFindings,
             observationsProcessed < request.budget.maximumObservations,
-            perRootEntriesRead < request.budget.maximumEntriesPerRoot,
-            perRootFindingsRead < request.budget.maximumFindingsPerRoot,
-            perRootObservedBytesRead < request.budget.maximumObservedBytesPerRoot,
             totalEntriesRead < request.budget.maximumTotalEntries,
             totalFindingsRead < request.budget.maximumTotalFindings,
             totalObservedBytesRead < request.budget.maximumTotalObservedBytes
         {
             if await dependencies.cancellation.isCancellationRequested() {
-                await dependencies.diagnostics.record(.cancelled)
-                await dependencies.metrics.record(.stepDelivered)
-                return finish(
-                    findings: findings,
-                    outcome: aggregate(
-                        terminal: .cancelled,
-                        activeRoot: activeRoot(for: request)
-                    )
-                )
+                return await end(findings: findings, charging: .cancelled, request: request)
             }
             if deliveredBatchCount >= request.budget.maximumBatches {
-                let outcome = aggregate(
-                    terminal: .corruptMetadata,
-                    activeRoot: activeRoot(for: request)
-                )
-                await dependencies.diagnostics.record(.terminal(.init(outcome)))
-                await dependencies.metrics.record(.stepDelivered)
-                return finish(findings: findings, outcome: outcome)
+                return await end(findings: findings, charging: .corruptMetadata, request: request)
             }
 
+            // Per-root problems are recorded and the scan moves to the next root; only the
+            // request-wide budgets and cancellation end the whole request.
             let root = activeRoot(for: request)
-            let fileSystemStep = await dependencies.fileSystem.nextObservation(
-                after: cursor,
-                in: root
-            )
+            if isPerRootBudgetExhausted(request.budget) {
+                if let final = await leaveRoot(charging: .corruptMetadata, findings: findings, request: request) {
+                    return final
+                }
+                continue
+            }
 
-            switch fileSystemStep {
+            switch await dependencies.fileSystem.nextObservation(after: cursor, in: root) {
             case .observation(let observation):
-                if !isWithinDepthBudget(observation, budget: request.budget) {
-                    let outcome = ScanOutcome.aggregate(
-                        completedRootCount: completedRootCount,
-                        issues: [
-                            .init(
-                                rootID: root.id,
-                                detectorID: detector.identifier,
-                                cause: .unsupportedLayout
-                            )
-                        ]
-                    )
-                    await dependencies.diagnostics.record(.terminal(.init(outcome)))
-                    await dependencies.metrics.record(.stepDelivered)
-                    return finish(findings: findings, outcome: outcome)
+                guard isWithinDepthBudget(observation, budget: request.budget) else {
+                    if let final = await leaveRoot(charging: .unsupportedLayout, findings: findings, request: request) {
+                        return final
+                    }
+                    continue
                 }
                 let observedBytes = observedLogicalBytes(in: observation)
-                guard perRootObservedBytesRead
-                    <= request.budget.maximumObservedBytesPerRoot - observedBytes,
-                    totalObservedBytesRead
-                        <= request.budget.maximumTotalObservedBytes - observedBytes
+                guard totalObservedBytesRead
+                    <= request.budget.maximumTotalObservedBytes - observedBytes
                 else {
-                    let outcome = aggregate(terminal: .corruptMetadata, activeRoot: root)
-                    await dependencies.diagnostics.record(.terminal(.init(outcome)))
-                    await dependencies.metrics.record(.stepDelivered)
-                    return finish(findings: findings, outcome: outcome)
+                    return await end(findings: findings, charging: .corruptMetadata, request: request)
+                }
+                guard perRootObservedBytesRead
+                    <= request.budget.maximumObservedBytesPerRoot - observedBytes
+                else {
+                    if let final = await leaveRoot(charging: .corruptMetadata, findings: findings, request: request) {
+                        return final
+                    }
+                    continue
                 }
                 observationsProcessed += 1
                 perRootEntriesRead += 1
@@ -456,72 +439,91 @@ actor ScanCoordinator {
                 case .success(nil):
                     continue
                 case .failure(let cause):
-                    let outcome = ScanOutcome.aggregate(
-                        completedRootCount: completedRootCount,
-                        issues: [
-                            .init(
-                                rootID: root.id,
-                                detectorID: detector.identifier,
-                                cause: cause.coreErrorCause
-                            )
-                        ]
-                    )
-                    await dependencies.diagnostics.record(.terminal(.init(outcome)))
-                    await dependencies.metrics.record(.stepDelivered)
-                    return finish(findings: findings, outcome: outcome)
-                }
-            case .terminal(let outcome):
-                if outcome == .complete {
-                    completedRootCount += 1
-                    activeRootIndex += 1
-                    cursor = nil
-                    perRootEntriesRead = 0
-                    perRootFindingsRead = 0
-                    perRootObservedBytesRead = 0
-                    if activeRootIndex < request.declaredRoots.count {
-                        continue
+                    if let final = await leaveRoot(
+                        charging: cause.coreErrorCause,
+                        findings: findings,
+                        request: request
+                    ) {
+                        return final
                     }
                 }
-                await dependencies.diagnostics.record(.terminal(.init(outcome)))
-                await dependencies.metrics.record(.stepDelivered)
-                return finish(
+            case .terminal(let outcome):
+                recordIssues(from: outcome, for: root)
+                if outcome == .cancelled {
+                    return await end(findings: findings, charging: nil, request: request)
+                }
+                if let final = await leaveRoot(
+                    charging: nil,
+                    completed: outcome == .complete,
                     findings: findings,
-                    outcome: aggregate(terminal: outcome, activeRoot: root)
-                )
+                    request: request
+                ) {
+                    return final
+                }
             }
         }
 
-        if perRootEntriesRead >= request.budget.maximumEntriesPerRoot
-            || perRootFindingsRead >= request.budget.maximumFindingsPerRoot
-            || perRootObservedBytesRead >= request.budget.maximumObservedBytesPerRoot
-            || totalEntriesRead >= request.budget.maximumTotalEntries
+        if totalEntriesRead >= request.budget.maximumTotalEntries
             || totalFindingsRead >= request.budget.maximumTotalFindings
             || totalObservedBytesRead >= request.budget.maximumTotalObservedBytes
         {
-            let outcome = aggregate(
-                terminal: .corruptMetadata,
-                activeRoot: activeRoot(for: request)
-            )
-            await dependencies.diagnostics.record(.terminal(.init(outcome)))
-            await dependencies.metrics.record(.stepDelivered)
-            return finish(findings: findings, outcome: outcome)
+            return await end(findings: findings, charging: .corruptMetadata, request: request)
         }
 
         if await dependencies.cancellation.isCancellationRequested() {
-            await dependencies.diagnostics.record(.cancelled)
-            await dependencies.metrics.record(.stepDelivered)
-            return finish(
-                findings: findings,
-                outcome: aggregate(
-                    terminal: .cancelled,
-                    activeRoot: activeRoot(for: request)
-                )
-            )
+            return await end(findings: findings, charging: .cancelled, request: request)
         }
 
         await dependencies.metrics.record(.stepDelivered)
         deliveredBatchCount += 1
         return .batch(.init(findings: findings, continuationCursor: cursor))
+    }
+
+    /// Ends the whole request, charging an optional cause to the active root first.
+    private func end(
+        findings: [Finding],
+        charging cause: CoreErrorCause?,
+        request: ScanRequest
+    ) async -> ScanStep {
+        if let cause {
+            record(cause, for: activeRoot(for: request))
+        }
+        let outcome = ScanOutcome.aggregate(completedRootCount: scannedRootCount, issues: issues)
+        if cause == .cancelled {
+            await dependencies.diagnostics.record(.cancelled)
+        } else {
+            await dependencies.diagnostics.record(.terminal(.init(outcome)))
+        }
+        await dependencies.metrics.record(.stepDelivered)
+        return finish(findings: findings, outcome: outcome)
+    }
+
+    /// Moves to the next root with fresh per-root budgets; ends the request after the last root.
+    private func leaveRoot(
+        charging cause: CoreErrorCause?,
+        completed: Bool = false,
+        findings: [Finding],
+        request: ScanRequest
+    ) async -> ScanStep? {
+        if let cause {
+            record(cause, for: activeRoot(for: request))
+        }
+        if completed || perRootFindingsRead > 0 {
+            scannedRootCount += 1
+        }
+        activeRootIndex += 1
+        cursor = nil
+        perRootEntriesRead = 0
+        perRootFindingsRead = 0
+        perRootObservedBytesRead = 0
+        guard activeRootIndex >= request.declaredRoots.count else { return nil }
+        return await end(findings: findings, charging: nil, request: request)
+    }
+
+    private func isPerRootBudgetExhausted(_ budget: ScanBudget) -> Bool {
+        perRootEntriesRead >= budget.maximumEntriesPerRoot
+            || perRootFindingsRead >= budget.maximumFindingsPerRoot
+            || perRootObservedBytesRead >= budget.maximumObservedBytesPerRoot
     }
 
     private func bind(_ request: ScanRequest) -> Bool {
@@ -564,26 +566,27 @@ actor ScanCoordinator {
         request.declaredRoots[activeRootIndex]
     }
 
-    private func aggregate(terminal: ScanOutcome, activeRoot: DeclaredRoot) -> ScanOutcome {
-        guard terminal != .complete else { return .complete }
-        guard completedRootCount > 0 else { return terminal }
-
-        let cause: CoreErrorCause
-        switch terminal {
-        case .permissionDenied:
-            cause = .permissionDenied
-        case .cancelled:
-            cause = .cancelled
-        case .corruptMetadata:
-            cause = .corruptMetadata
-        case .unsupportedLayout:
-            cause = .unsupportedLayout
-        case .complete, .partial:
-            return terminal
+    private func record(_ cause: CoreErrorCause, for root: DeclaredRoot) {
+        let issue = ScanIssue(rootID: root.id, detectorID: detector.identifier, cause: cause)
+        if !issues.contains(issue) {
+            issues.append(issue)
         }
-        return ScanOutcome.aggregate(
-            completedRootCount: completedRootCount,
-            issues: [.init(rootID: activeRoot.id, detectorID: detector.identifier, cause: cause)]
-        )
+    }
+
+    private func recordIssues(from outcome: ScanOutcome, for root: DeclaredRoot) {
+        switch outcome {
+        case .complete:
+            return
+        case .partial(let rootIssues):
+            issues += rootIssues.filter { !issues.contains($0) }
+        case .permissionDenied:
+            record(.permissionDenied, for: root)
+        case .cancelled:
+            record(.cancelled, for: root)
+        case .corruptMetadata:
+            record(.corruptMetadata, for: root)
+        case .unsupportedLayout:
+            record(.unsupportedLayout, for: root)
+        }
     }
 }
