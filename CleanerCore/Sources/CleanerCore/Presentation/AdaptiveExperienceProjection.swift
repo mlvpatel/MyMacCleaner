@@ -185,8 +185,7 @@ public struct AdaptiveExperienceProjector: Sendable {
         let authority = AdaptiveExperienceAuthority(
             scanState: source.scanState,
             evidenceIdentities: identities,
-            boundarySummaries: source.findings
-                .sorted { AdaptiveExperienceIdentity.key(from: $0) < AdaptiveExperienceIdentity.key(from: $1) }
+            boundarySummaries: AdaptiveExperienceIdentity.sortedByKey(source.findings)
                 .map(AdaptiveExperienceIdentity.boundary(from:)),
             dispositions: source.evaluations.map(\.disposition),
             eligibilities: source.evaluations.map(\.eligibility),
@@ -234,12 +233,12 @@ public protocol AdaptiveCancelling: Sendable {
 public struct AdaptiveScanCollection: Equatable, Sendable {
     public let scanState: ProjectedScanState
     public let findings: [ProjectedFinding]
-    public let generalMacFindings: [GeneralMacFinding]
     public let evaluations: [PolicyEvaluation]
 }
 
 public actor AdaptiveScanSession {
     private let coordinator: ScanCoordinator
+    private let clock: any AdaptiveClocking
     private let processActivity: any ProcessActivityObserving
 
     public init(
@@ -248,6 +247,7 @@ public actor AdaptiveScanSession {
         cancellation: any AdaptiveCancelling,
         processActivity: any ProcessActivityObserving = NoProcessActivity()
     ) throws {
+        self.clock = clock
         self.processActivity = processActivity
         coordinator = try ScanCoordinator(
             dependencies: ScanDependencies(
@@ -262,6 +262,9 @@ public actor AdaptiveScanSession {
     }
 
     public func collect(request: ScanRequest) async -> AdaptiveScanCollection {
+        // Ages are measured from scan start: never later than any observation, so this can
+        // only understate how long a file has been inactive.
+        let scanStart = await clock.now().wallClockInstant
         var findings: [Finding] = []
         var terminalState: ProjectedScanState = .complete
         while true {
@@ -271,22 +274,23 @@ public actor AdaptiveScanSession {
                 findings.append(contentsOf: batch.findings)
                 if let outcome = batch.terminalOutcome {
                     terminalState = ProjectedScanState(outcome)
-                    return classify(findings: findings, state: terminalState)
+                    return classify(findings: findings, state: terminalState, scanStart: scanStart)
                 }
             case let .terminal(outcome):
                 terminalState = ProjectedScanState(outcome)
-                return classify(findings: findings, state: terminalState)
+                return classify(findings: findings, state: terminalState, scanStart: scanStart)
             }
         }
     }
 
-    private func classify(findings: [Finding], state: ProjectedScanState) -> AdaptiveScanCollection {
-        let projected = findings
-            .map(ProjectedFinding.init)
-            .sorted { AdaptiveExperienceIdentity.key(from: $0) < AdaptiveExperienceIdentity.key(from: $1) }
+    private func classify(
+        findings: [Finding],
+        state: ProjectedScanState,
+        scanStart: WallClockInstant
+    ) -> AdaptiveScanCollection {
+        let projected = AdaptiveExperienceIdentity.sortedByKey(findings.map(ProjectedFinding.init))
         let catalog = GeneralMacScopeCatalog.current
         let evaluator = PolicyEvaluator()
-        var general: [GeneralMacFinding] = []
         var evaluations: [PolicyEvaluation] = []
         for finding in findings {
             let kind: GeneralMacRootKind
@@ -317,12 +321,11 @@ public actor AdaptiveScanSession {
                 request: request,
                 clockReading: ClockReading(
                     observationInstant: finding.observationInstant,
-                    wallClockInstant: .init(unixNanoseconds: 1)
+                    wallClockInstant: scanStart
                 )
             ) {
             case let .success(maybeFinding):
                 if let macFinding = maybeFinding {
-                    general.append(macFinding)
                     let processActive = processActivity.isFileOpen(
                         rootID: finding.locator.rootID,
                         components: finding.locator.components
@@ -336,7 +339,6 @@ public actor AdaptiveScanSession {
         return AdaptiveScanCollection(
             scanState: state,
             findings: projected,
-            generalMacFindings: general,
             evaluations: evaluations
         )
     }
@@ -345,6 +347,11 @@ public actor AdaptiveScanSession {
 enum AdaptiveExperienceIdentity {
     static func key(from finding: ProjectedFinding) -> String {
         hex(utf8Bytes(from: finding))
+    }
+
+    /// Keys are computed once per finding; computing them inside the comparator cost ~30x.
+    static func sortedByKey(_ findings: [ProjectedFinding]) -> [ProjectedFinding] {
+        findings.map { (key(from: $0), $0) }.sorted { $0.0 < $1.0 }.map(\.1)
     }
 
     static func uniqueSorted(from findings: [ProjectedFinding]) throws -> [String] {
