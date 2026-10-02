@@ -41,8 +41,33 @@ enum PolicyPlanFixtureFactory {
         node: UInt64 = 42
     ) throws -> GeneralMacFinding {
         let catalog = GeneralMacScopeCatalog.current
-        let root = try catalog.declaredRoot(for: scope)
-        let observation = try FileObservation(
+        let observation = try observation(
+            scope: scope,
+            components: components,
+            bytes: bytes,
+            complete: complete,
+            symlink: symlink,
+            node: node
+        )
+        return try #require(try GeneralMacEvidenceDetector(scope: scope)
+            .makeFinding(
+                from: observation,
+                request: catalog.scanRequest(for: [scope]),
+                clockReading: clockReading()
+            )
+            .get())
+    }
+
+    static func observation(
+        scope: GeneralMacRootKind = .userLibraryCaches,
+        components: [String],
+        bytes: Int64 = 4_096,
+        complete: Bool = true,
+        symlink: Bool = false,
+        node: UInt64 = 42
+    ) throws -> FileObservation {
+        let root = try GeneralMacScopeCatalog.current.declaredRoot(for: scope)
+        return try FileObservation(
             rootID: root.id,
             locator: .init(rootID: root.id, components: components),
             resourceIdentity: complete ? .observed(.init(device: 7, node: node)) : .unavailable,
@@ -61,13 +86,6 @@ enum PolicyPlanFixtureFactory {
                 externalVolume: .observed(false)
             )
         )
-        return try #require(try GeneralMacEvidenceDetector(scope: scope)
-            .makeFinding(
-                from: observation,
-                request: catalog.scanRequest(for: [scope]),
-                clockReading: clockReading()
-            )
-            .get())
     }
 
     static func eligibleCache(component: String, bytes: Int64, node: UInt64) throws -> EligibleCandidate {
