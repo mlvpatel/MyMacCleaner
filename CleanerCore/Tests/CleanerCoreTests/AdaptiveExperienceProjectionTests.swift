@@ -161,6 +161,31 @@ struct AdaptiveExperienceProjectionTests {
         #expect(collected.findings.isEmpty)
         #expect(collected.evaluations.isEmpty)
     }
+
+    @Test
+    func liveScanUsesTheRealWallClockSoAnInactiveNamedCacheIsEligible() async throws {
+        let catalog = GeneralMacScopeCatalog.current
+        let root = try catalog.declaredRoot(for: .userLibraryCaches)
+        let fileSystem = ScriptedFileSystem(
+            steps: [
+                .observation(try PolicyPlanFixtureFactory.observation(
+                    components: ["com.apple.iconservices.store", "inactive.bin"]
+                )),
+                .terminal(.complete),
+            ],
+            rootID: root.id
+        )
+        let session = try AdaptiveScanSession(
+            fileSystem: fileSystem,
+            clock: AdaptiveTestClock(),
+            cancellation: AdaptiveNeverCancel()
+        )
+
+        let collected = await session.collect(request: try catalog.scanRequest(for: [.userLibraryCaches]))
+
+        // Modified at 1 ns, scanned at the test clock's 900 s: inactive for the full 15 minutes.
+        #expect(collected.evaluations.compactMap(\.candidate).count == 1)
+    }
 }
 
 private let explicitScanStates: [ProjectedScanState] = {
