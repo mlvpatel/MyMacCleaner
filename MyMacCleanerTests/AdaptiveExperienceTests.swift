@@ -156,6 +156,36 @@ struct AdaptiveExperienceBridgeTests {
         #expect(AdaptiveTrustSession.revalidationRootKinds(forRootIDs: []).isEmpty)
     }
 
+    @Test("Acknowledging onboarding only records the acknowledgement")
+    @MainActor
+    func acknowledgingOnboardingHasNoSideEffects() {
+        let key = "adaptive.experience.onboarding.acknowledged"
+        let previous = UserDefaults.standard.object(forKey: key)
+        UserDefaults.standard.removeObject(forKey: key)
+        defer { UserDefaults.standard.set(previous, forKey: key) }
+        let calls = ExecutionProbe()
+        let viewModel = AdaptiveExperienceViewModel(
+            loadSource: {
+                calls.recordLoad()
+                return .failure(.scanFailed)
+            },
+            executeDisplayedPlan: { digest, _ in
+                calls.record(digest: digest)
+                return .failure(.scanFailed)
+            }
+        )
+        #expect(viewModel.showOnboarding)
+
+        viewModel.dispatch(.acknowledgeOnboarding)
+
+        #expect(viewModel.showOnboarding == false)
+        #expect(viewModel.sheet == nil)
+        #expect(viewModel.isRefreshing == false)
+        #expect(calls.loadCount == 0)
+        #expect(calls.digests.isEmpty)
+        #expect(AdaptiveOnboardingStore().hasAcknowledged)
+    }
+
     private static let sampleDigestHex = String(repeating: "0a", count: 32)
 
     @MainActor
