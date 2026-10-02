@@ -100,14 +100,16 @@ public actor GeneralMacFilesystemAdapter: FileSystemPort {
     private struct State {
         let root: URL
         let snapshot: RootSnapshot
-        let enumerator: FileManager.DirectoryEnumerator
+        let walk: BreadthFirstWalk
         let faultState: EnumerationFaultState
         var position: UInt
+        var visited: UInt = 0
     }
 
     private let roots: [DeclaredRootID: URL]
     private let fileManager: FileManager
     private let resourceValues: @Sendable (URL) throws -> GeneralMacResourceValues
+    private let maximumEntriesPerRoot: UInt
     private var states: [DeclaredRootID: State] = [:]
 
     public init(catalog: GeneralMacScopeCatalog) throws {
@@ -125,7 +127,8 @@ public actor GeneralMacFilesystemAdapter: FileSystemPort {
         fileManager: FileManager,
         resourceValues: @escaping @Sendable (URL) throws -> GeneralMacResourceValues = {
             try GeneralMacResourceValues(url: $0)
-        }
+        },
+        maximumEntriesPerRoot: Int = GeneralMacScanLimits.current.maximumEntriesPerRoot
     ) throws {
         guard isValidAnchor(anchors.homeDirectory, manager: fileManager),
               isValidAnchor(anchors.temporaryDirectory, manager: fileManager) else {
@@ -139,6 +142,7 @@ public actor GeneralMacFilesystemAdapter: FileSystemPort {
         roots = mapped
         self.fileManager = fileManager
         self.resourceValues = resourceValues
+        self.maximumEntriesPerRoot = UInt(maximumEntriesPerRoot)
     }
 
     public func nextObservation(after cursor: ScanCursor?, in root: DeclaredRoot) async -> FileSystemStep {
@@ -150,28 +154,34 @@ public actor GeneralMacFilesystemAdapter: FileSystemPort {
             guard try isSafeDerivedRoot(state.root) else {
                 return .terminal(.unsupportedLayout)
             }
-            if let fault = state.faultState.value {
-                states.removeValue(forKey: root.id)
-                return .terminal(fault.outcome)
-            }
             guard cursorIsValid(cursor, state: state) else {
                 return .terminal(.corruptMetadata)
             }
-            guard state.position < UInt(GeneralMacScanLimits.current.maximumEntriesPerRoot) else {
-                return .terminal(.corruptMetadata)
-            }
-            guard let url = state.enumerator.nextObject() as? URL else {
-                if let fault = state.faultState.value {
-                    states.removeValue(forKey: root.id)
-                    return .terminal(fault.outcome)
+            // Skipped entries count too, so an unreadable or over-deep subtree cannot stall the walk.
+            while state.visited < maximumEntriesPerRoot {
+                guard !Task.isCancelled else {
+                    states[root.id] = state
+                    return .terminal(.cancelled)
                 }
-                states.removeValue(forKey: root.id)
-                return .terminal(.complete)
+                guard let url = state.walk.nextObject() else {
+                    states.removeValue(forKey: root.id)
+                    return .terminal(state.faultState.value?.outcome ?? .complete)
+                }
+                state.visited += 1
+                do {
+                    let observation = try observe(url.standardizedFileURL, root: root, state: state)
+                    state.position += 1
+                    states[root.id] = state
+                    return .observation(observation)
+                } catch {
+                    // Skip and continue: an unobservable entry and its subtree yield no evidence,
+                    // but the first fault still keeps the root from reading as complete.
+                    state.walk.skipDescendants()
+                    state.faultState.record(error as? Fault ?? Fault(error: error as NSError))
+                }
             }
-            let observation = try observe(url.standardizedFileURL, root: root, state: state)
-            state.position += 1
             states[root.id] = state
-            return .observation(observation)
+            return .terminal(.corruptMetadata)
         } catch let fault as Fault {
             return .terminal(fault.outcome)
         } catch let error as NSError {
@@ -187,22 +197,13 @@ public actor GeneralMacFilesystemAdapter: FileSystemPort {
         guard let url = roots[root.id],
               let snapshot = try rootSnapshot(at: url),
               snapshot.isDirectory,
-              try isSafeDerivedRoot(url),
-              let enumerator = fileManager.enumerator(
-                  at: url,
-                  includingPropertiesForKeys: Array(resourceKeys),
-                  options: [.skipsPackageDescendants],
-                  errorHandler: { _, error in
-                      faultState.record(Fault(error: error as NSError))
-                      return false
-                  }
-              ) else {
+              try isSafeDerivedRoot(url) else {
             throw Fault.unsupported
         }
         let state = State(
             root: url,
             snapshot: snapshot,
-            enumerator: enumerator,
+            walk: BreadthFirstWalk(root: url, fileManager: fileManager, faultState: faultState),
             faultState: faultState,
             position: 0
         )
@@ -221,7 +222,7 @@ public actor GeneralMacFilesystemAdapter: FileSystemPort {
         }
         let boundaries = boundaryEvidence(url: url, values: values, itemDevice: itemDevice, state: state)
         if stopsDescent(boundaries) || boundaries.protectedRoot != .observed(false) {
-            state.enumerator.skipDescendants()
+            state.walk.skipDescendants()
         }
         return try observation(
             for: url,
@@ -448,6 +449,69 @@ private enum Fault: Error {
             return .permissionDenied
         case .unsupported:
             return .unsupportedLayout
+        }
+    }
+}
+
+/// Breadth-first replacement for `FileManager.DirectoryEnumerator`: every entry at one depth comes
+/// before any deeper one, so under the per-root caps a large deep subtree cannot starve shallow
+/// entries (or the one named cache scope policy can clean). It never follows symlinks or enters
+/// packages, and a directory it cannot list records a fault and is skipped.
+/// ponytail: a directory is listed whole, so one with millions of entries costs that many URLs.
+private final class BreadthFirstWalk {
+    private let fileManager: FileManager
+    private let faultState: EnumerationFaultState
+    private var directories: [URL]
+    private var nextDirectory = 0
+    private var entries: [URL] = []
+    private var nextEntry = 0
+    private var lastReturned: URL?
+
+    init(root: URL, fileManager: FileManager, faultState: EnumerationFaultState) {
+        self.fileManager = fileManager
+        self.faultState = faultState
+        directories = [root]
+    }
+
+    /// The most recently returned entry is never listed.
+    func skipDescendants() {
+        lastReturned = nil
+    }
+
+    func nextObject() -> URL? {
+        queueLastReturnedDirectory()
+        while nextEntry == entries.count {
+            guard nextDirectory < directories.count else { return nil }
+            let directory = directories[nextDirectory]
+            nextDirectory += 1
+            nextEntry = 0
+            do {
+                entries = try fileManager.contentsOfDirectory(
+                    at: directory,
+                    includingPropertiesForKeys: Array(resourceKeys),
+                    options: []
+                )
+            } catch {
+                entries = []
+                faultState.record(Fault(error: error as NSError))
+            }
+        }
+        let url = entries[nextEntry]
+        nextEntry += 1
+        lastReturned = url
+        return url
+    }
+
+    private func queueLastReturnedDirectory() {
+        guard let url = lastReturned else { return }
+        lastReturned = nil
+        do {
+            let values = try url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isPackageKey])
+            if values.isDirectory == true, values.isSymbolicLink == false, values.isPackage == false {
+                directories.append(url)
+            }
+        } catch {
+            faultState.record(Fault(error: error as NSError))
         }
     }
 }
