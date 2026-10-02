@@ -184,7 +184,7 @@ struct PerRootBudgetTests {
             return
         }
         #expect(batch.findings.count == 1)
-        #expect(batch.terminalOutcome == .corruptMetadata)
+        #expect(batch.terminalOutcome == .partial(issues: [.init(rootID: rootID, detectorID: try DetectorID("fixture.per-root"), cause: .corruptMetadata)]))
         #expect(batch.continuationCursor == nil)
         #expect(fileSystem.calls.count == 1)
     }
@@ -215,7 +215,7 @@ struct PerRootBudgetTests {
             return
         }
         #expect(batch.findings.count == 1)
-        #expect(batch.terminalOutcome == .corruptMetadata)
+        #expect(batch.terminalOutcome == .partial(issues: [.init(rootID: rootID, detectorID: try DetectorID("fixture.per-root"), cause: .corruptMetadata)]))
         #expect(batch.continuationCursor == nil)
         #expect(fileSystem.calls.count == 1)
     }
@@ -268,6 +268,81 @@ struct PerRootBudgetTests {
     }
 
     @Test
+    func earlierRootCapStillScansTheNextRootWithAFreshBudget() async throws {
+        let cappedRoot = try DeclaredRootID("fixture-cap-first-root")
+        let laterRoot = try DeclaredRootID("fixture-cap-next-root")
+        let fileSystem = PerRootScriptedFileSystem(stepsByRoot: [
+            cappedRoot: [
+                .observation(try perRootObservation(rootID: cappedRoot, name: "kept-a")),
+                .observation(try perRootObservation(rootID: cappedRoot, name: "kept-b")),
+                .observation(try perRootObservation(rootID: cappedRoot, name: "must-not-open")),
+            ],
+            laterRoot: [
+                .observation(try perRootObservation(rootID: laterRoot, name: "next")),
+                .terminal(.complete),
+            ],
+        ])
+        let coordinator = try makePerRootCoordinator(fileSystem: fileSystem)
+        let request = try ScanRequest(
+            declaredRoots: [.init(id: cappedRoot), .init(id: laterRoot)],
+            budget: .init(
+                maximumFindings: 128,
+                maximumObservations: 128,
+                maximumEntries: 2,
+                maximumBatches: 1_200,
+                maximumFindingsPerRoot: 10_000,
+                maximumRootsPerRequest: 2
+            )
+        )
+
+        guard case let .batch(batch) = await coordinator.nextBatch(for: request) else {
+            Issue.record("Expected evidence from both roots.")
+            return
+        }
+        #expect(batch.findings.map(\.declaredRoot.id) == [cappedRoot, cappedRoot, laterRoot])
+        #expect(batch.terminalOutcome == .partial(issues: [
+            .init(
+                rootID: cappedRoot,
+                detectorID: try DetectorID("fixture.per-root"),
+                cause: .corruptMetadata
+            )
+        ]))
+        #expect(fileSystem.calls.map(\.rootID) == [cappedRoot, cappedRoot, laterRoot, laterRoot])
+    }
+
+    @Test
+    func rootsThatFaultAfterDeliveringEvidenceStillReadAsPartial() async throws {
+        let firstRoot = try DeclaredRootID("fixture-fault-first-root")
+        let secondRoot = try DeclaredRootID("fixture-fault-second-root")
+        let fileSystem = PerRootScriptedFileSystem(stepsByRoot: [
+            firstRoot: [
+                .observation(try perRootObservation(rootID: firstRoot, name: "kept")),
+                .terminal(.permissionDenied),
+            ],
+            secondRoot: [
+                .observation(try perRootObservation(rootID: secondRoot, name: "kept")),
+                .terminal(.unsupportedLayout),
+            ],
+        ])
+        let coordinator = try makePerRootCoordinator(fileSystem: fileSystem)
+        let request = try ScanRequest(
+            declaredRoots: [.init(id: firstRoot), .init(id: secondRoot)],
+            budget: .init(maximumFindings: 128, maximumRootsPerRequest: 2)
+        )
+
+        guard case let .batch(batch) = await coordinator.nextBatch(for: request) else {
+            Issue.record("Expected evidence from both roots.")
+            return
+        }
+        let detectorID = try DetectorID("fixture.per-root")
+        #expect(batch.findings.map(\.declaredRoot.id) == [firstRoot, secondRoot])
+        #expect(batch.terminalOutcome == .partial(issues: [
+            .init(rootID: firstRoot, detectorID: detectorID, cause: .permissionDenied),
+            .init(rootID: secondRoot, detectorID: detectorID, cause: .unsupportedLayout),
+        ]))
+    }
+
+    @Test
     func perRootByteCapAndOversizedObservationNeverPullAnotherEntry() async throws {
         let exactRoot = try DeclaredRootID("fixture-byte-capped-root")
         let exactFileSystem = PerRootScriptedFileSystem(stepsByRoot: [
@@ -294,7 +369,7 @@ struct PerRootBudgetTests {
             return
         }
         #expect(exactBatch.findings.count == 1)
-        #expect(exactBatch.terminalOutcome == .corruptMetadata)
+        #expect(exactBatch.terminalOutcome == .partial(issues: [.init(rootID: exactRoot, detectorID: try DetectorID("fixture.per-root"), cause: .corruptMetadata)]))
         #expect(exactFileSystem.calls.count == 1)
 
         let oversizedRoot = try DeclaredRootID("fixture-byte-overflow-root")
@@ -381,10 +456,10 @@ struct PerRootBudgetTests {
     }
 
     @Test
-    func incompleteRootNeverAdvancesOrResetsIntoAnotherRoot() async throws {
+    func failedRootIsRecordedAndLaterRootsAreStillScanned() async throws {
         let completedRoot = try DeclaredRootID("fixture-completed-root")
         let failedRoot = try DeclaredRootID("fixture-failed-root")
-        let unopenedRoot = try DeclaredRootID("fixture-unopened-root")
+        let laterRoot = try DeclaredRootID("fixture-later-root")
         let fileSystem = PerRootScriptedFileSystem(stepsByRoot: [
             completedRoot: [
                 .observation(try perRootObservation(rootID: completedRoot, name: "complete")),
@@ -394,8 +469,9 @@ struct PerRootBudgetTests {
                 .observation(try perRootObservation(rootID: failedRoot, name: "retained")),
                 .terminal(.permissionDenied),
             ],
-            unopenedRoot: [
-                .observation(try perRootObservation(rootID: unopenedRoot, name: "must-not-open"))
+            laterRoot: [
+                .observation(try perRootObservation(rootID: laterRoot, name: "still-scanned")),
+                .terminal(.complete),
             ],
         ])
         let coordinator = try makePerRootCoordinator(fileSystem: fileSystem)
@@ -403,7 +479,7 @@ struct PerRootBudgetTests {
             declaredRoots: [
                 .init(id: completedRoot),
                 .init(id: failedRoot),
-                .init(id: unopenedRoot),
+                .init(id: laterRoot),
             ],
             budget: .init(
                 maximumFindings: 128,
@@ -419,7 +495,7 @@ struct PerRootBudgetTests {
         let repeatedTerminal = await coordinator.nextBatch(for: request)
 
         guard case let .batch(batch) = firstStep else {
-            Issue.record("Expected retained evidence from the completed and failed roots.")
+            Issue.record("Expected retained evidence from every root.")
             return
         }
         let expectedOutcome = ScanOutcome.partial(issues: [
@@ -429,11 +505,16 @@ struct PerRootBudgetTests {
                 cause: .permissionDenied
             )
         ])
-        #expect(batch.findings.map(\.declaredRoot.id) == [completedRoot, failedRoot])
+        #expect(batch.findings.map(\.declaredRoot.id) == [completedRoot, failedRoot, laterRoot])
         #expect(batch.terminalOutcome == expectedOutcome)
         #expect(repeatedTerminal == .terminal(expectedOutcome))
-        #expect(fileSystem.calls.map(\.rootID) == [
-            completedRoot, completedRoot, failedRoot, failedRoot,
+        #expect(fileSystem.calls == [
+            .init(rootID: completedRoot, cursor: nil),
+            .init(rootID: completedRoot, cursor: .init(position: 1)),
+            .init(rootID: failedRoot, cursor: nil),
+            .init(rootID: failedRoot, cursor: .init(position: 1)),
+            .init(rootID: laterRoot, cursor: nil),
+            .init(rootID: laterRoot, cursor: .init(position: 1)),
         ])
     }
 
