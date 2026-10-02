@@ -66,6 +66,23 @@ struct DisplayedPlanFactoryTests {
     }
 
     @Test
+    func executeTimeEvidenceComesOnlyFromFindingsTheFreshPolicyStillAllows() throws {
+        let finding = try PolicyPlanFixtureFactory.finding(
+            components: ["com.apple.iconservices.store", "opened-later.bin"],
+            bytes: 4_096,
+            node: 805
+        )
+        let candidate = try #require(PolicyEvaluator().evaluate(finding).candidate)
+        let target = try PolicyPlanFixtureFactory.reviewPlan(candidates: [candidate]).targets[0]
+        let stillEligible = PolicyEvaluator().evaluate(finding, processActive: false)
+        let openedAfterReview = PolicyEvaluator().evaluate(finding, processActive: true)
+
+        #expect(FreshTargetEvidence.observing(target: target, eligibleIn: [stillEligible]) != nil)
+        // The rescan still sees the file, but a process now holds it open, so it must not move.
+        #expect(FreshTargetEvidence.observing(target: target, eligibleIn: [openedAfterReview]) == nil)
+    }
+
+    @Test
     func oneShotApprovalProducesOperationsWithoutACachedFlag() throws {
         let plan = try PolicyPlanFixtureFactory.reviewPlan(candidates: [
             try PolicyPlanFixtureFactory.eligibleCache(component: "once.bin", bytes: 4_096, node: 804)
