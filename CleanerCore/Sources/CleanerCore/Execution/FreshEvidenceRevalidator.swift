@@ -96,6 +96,15 @@ public struct FreshTargetEvidence: Equatable, Sendable {
         return nil
     }
 
+    /// Execute-time observer: only findings the fresh policy pass still makes eligible count, so a
+    /// file a process opened after review (or one a newer owner rule narrows) yields no evidence.
+    public static func observing(
+        target: ReviewPlanTarget,
+        eligibleIn evaluations: [PolicyEvaluation]
+    ) -> FreshTargetEvidence? {
+        observing(target: target, in: evaluations.compactMap(\.candidate).map(\.evidence.finding))
+    }
+
     private static func observing(
         finding: GeneralMacFinding,
         semanticOwner: PolicySemanticOwner
