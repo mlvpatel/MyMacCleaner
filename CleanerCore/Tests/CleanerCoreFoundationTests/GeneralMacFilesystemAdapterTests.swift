@@ -236,6 +236,136 @@ struct GeneralMacFilesystemAdapterTests {
     }
 
     @Test
+    func unreadableSubfolderIsSkippedAndSiblingsAreStillObserved() async throws {
+        let fixture = try GeneralMacTemporaryFixture()
+        for index in 0..<30 {
+            let folder = fixture.root.appendingPathComponent("visible-\(index)", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data([1]).write(to: folder.appendingPathComponent("file.bin"))
+        }
+        let denied = fixture.root.appendingPathComponent("denied", isDirectory: true)
+        try FileManager.default.createDirectory(at: denied, withIntermediateDirectories: true)
+        try Data([1]).write(to: denied.appendingPathComponent("hidden.bin"))
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: denied.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: denied.path) }
+        let catalog = GeneralMacScopeCatalog.current
+        let adapter = try GeneralMacFilesystemAdapter(
+            catalog: catalog,
+            anchors: fixture.anchors,
+            fileManager: FileManager()
+        )
+        let root = try catalog.declaredRoot(for: .userLibraryCaches)
+
+        let (observed, terminal) = await walk(adapter, root: root)
+
+        // Every readable sibling is still observed; nothing inside the denied folder is.
+        #expect(observed.filter { $0.hasSuffix("file.bin") }.count == 30)
+        #expect(!observed.contains { $0.hasPrefix("denied/") })
+        // The skipped subtree is still reported, so the root never reads as complete.
+        #expect(terminal == .permissionDenied)
+    }
+
+    @Test
+    func unreadableEntryMetadataIsSkippedAndCursorPositionsStayContiguous() async throws {
+        let fixture = try GeneralMacTemporaryFixture()
+        for name in ["a.bin", "bad.bin", "c.bin"] {
+            try Data([1]).write(to: fixture.root.appendingPathComponent(name))
+        }
+        let catalog = GeneralMacScopeCatalog.current
+        let adapter = try GeneralMacFilesystemAdapter(
+            catalog: catalog,
+            anchors: fixture.anchors,
+            fileManager: FileManager(),
+            resourceValues: { url in
+                guard url.lastPathComponent != "bad.bin" else {
+                    throw NSError(domain: NSPOSIXErrorDomain, code: Int(EACCES))
+                }
+                return try GeneralMacResourceValues(url: url)
+            }
+        )
+        let root = try catalog.declaredRoot(for: .userLibraryCaches)
+
+        // walk() advances the cursor by one per observation, so any position gap ends the walk early.
+        let (observed, terminal) = await walk(adapter, root: root)
+
+        #expect(observed.filter { $0.hasSuffix(".bin") }.sorted() == ["a.bin", "c.bin"])
+        #expect(terminal == .permissionDenied)
+    }
+
+    @Test
+    func skippedEntriesStillCountTowardTheEntryCap() async throws {
+        let fixture = try GeneralMacTemporaryFixture()
+        for index in 0..<6 {
+            try Data([1]).write(to: fixture.root.appendingPathComponent("unreadable-\(index).bin"))
+        }
+        let calls = LockedCounter()
+        let catalog = GeneralMacScopeCatalog.current
+        let adapter = try GeneralMacFilesystemAdapter(
+            catalog: catalog,
+            anchors: fixture.anchors,
+            fileManager: FileManager(),
+            resourceValues: { url in
+                guard !url.lastPathComponent.hasPrefix("unreadable-") else {
+                    calls.increment()
+                    throw NSError(domain: NSPOSIXErrorDomain, code: Int(EACCES))
+                }
+                return try GeneralMacResourceValues(url: url)
+            },
+            maximumEntriesPerRoot: 3
+        )
+        let root = try catalog.declaredRoot(for: .userLibraryCaches)
+
+        let step = await adapter.nextObservation(after: nil, in: root)
+
+        #expect(step == .terminal(.corruptMetadata))
+        #expect(calls.value <= 3)
+    }
+
+    @Test
+    func cancelledTaskStopsTheWalkBeforeAnotherEntry() async throws {
+        let fixture = try GeneralMacTemporaryFixture()
+        try Data([1]).write(to: fixture.root.appendingPathComponent("never.bin"))
+        let catalog = GeneralMacScopeCatalog.current
+        let adapter = try GeneralMacFilesystemAdapter(
+            catalog: catalog,
+            anchors: fixture.anchors,
+            fileManager: FileManager()
+        )
+        let root = try catalog.declaredRoot(for: .userLibraryCaches)
+
+        let step = await Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await adapter.nextObservation(after: nil, in: root)
+        }.value
+
+        #expect(step == .terminal(.cancelled))
+    }
+
+    @Test
+    func shallowerEntriesAreObservedBeforeDeeperOnes() async throws {
+        let fixture = try GeneralMacTemporaryFixture()
+        for top in ["first", "second"] {
+            let deep = fixture.root.appendingPathComponent("\(top)/a/b", isDirectory: true)
+            try FileManager.default.createDirectory(at: deep, withIntermediateDirectories: true)
+            try Data([1]).write(to: deep.appendingPathComponent("leaf.bin"))
+        }
+        let catalog = GeneralMacScopeCatalog.current
+        let adapter = try GeneralMacFilesystemAdapter(
+            catalog: catalog,
+            anchors: fixture.anchors,
+            fileManager: FileManager()
+        )
+
+        let (observed, terminal) = await walk(adapter, root: try catalog.declaredRoot(for: .userLibraryCaches))
+
+        // Breadth-first, so under the per-root caps a deep subtree cannot starve shallow entries.
+        let depths = observed.map { $0.split(separator: "/").count }
+        #expect(depths == depths.sorted())
+        #expect(observed.contains("first/a/b/leaf.bin") && observed.contains("second/a/b/leaf.bin"))
+        #expect(terminal == .complete)
+    }
+
+    @Test
     func laterMetadataDenialPreservesPriorEvidenceAndNeverCompletes() async throws {
         let fixture = try GeneralMacTemporaryFixture()
         try Data([1]).write(to: fixture.root.appendingPathComponent("first.bin"))
@@ -390,5 +520,39 @@ private final class LaterDeniedAttributesFileManager: FileManager, @unchecked Se
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(POSIXErrorCode.EACCES.rawValue))
         }
         return try super.attributesOfItem(atPath: path)
+    }
+}
+
+private func walk(
+    _ adapter: GeneralMacFilesystemAdapter,
+    root: DeclaredRoot
+) async -> (observed: [String], terminal: ScanOutcome) {
+    var observed: [String] = []
+    var cursor: ScanCursor?
+    while true {
+        switch await adapter.nextObservation(after: cursor, in: root) {
+        case .observation(let observation):
+            observed.append(observation.locator.components.joined(separator: "/"))
+            cursor = ScanCursor(position: (cursor?.position ?? 0) + 1)
+        case .terminal(let outcome):
+            return (observed, outcome)
+        }
+    }
+}
+
+private final class LockedCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func increment() {
+        lock.lock()
+        defer { lock.unlock() }
+        count += 1
     }
 }
