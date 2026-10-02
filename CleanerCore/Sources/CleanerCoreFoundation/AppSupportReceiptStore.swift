@@ -54,7 +54,13 @@ public struct AppSupportReceiptStore: ReceiptStorePort, @unchecked Sendable {
             return .failure(error)
         case let .success(directory):
             let dto = ReceiptTransitionDTO(transition)
-            return publish(dto, directory: directory, fileName: dto.fileName)
+            let fileName: String
+            do {
+                fileName = try dto.fileName()
+            } catch {
+                return .failure(.encodeFailed)
+            }
+            return publish(dto, directory: directory, fileName: fileName)
         }
     }
 
@@ -472,8 +478,13 @@ private struct ReceiptTransitionDTO: Codable {
         }
     }
 
-    var fileName: String {
-        "\(at)-\(kind)-\(itemID).json"
+    /// Item IDs hex-encode the target path and can exceed NAME_MAX, so the name carries a
+    /// fixed-length digest instead; the ID itself lives in the file body.
+    func fileName() throws -> String {
+        let digest = try CryptoKitPlanDigestAdapter().digest(canonicalBytes: Array(itemID.utf8)).bytes
+            .map { ($0 < 16 ? "0" : "") + String($0, radix: 16) }
+            .joined()
+        return "\(at)-\(kind)-\(digest).json"
     }
 
     func coreValue() throws -> ReceiptItemTransition {
