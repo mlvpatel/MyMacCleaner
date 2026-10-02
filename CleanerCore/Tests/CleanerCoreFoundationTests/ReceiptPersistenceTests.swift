@@ -117,6 +117,28 @@ struct ReceiptStoreAdapterTests {
         #expect(!display.tokens.joined().contains("file:///private/tmp/.Trash/cache.bin"))
         #expect(!display.tokens.joined().contains("cache.bin"))
     }
+
+    @Test
+    func longItemIDsPersistUnderBoundedFileNamesThatDoNotRevealThem() async throws {
+        let fixture = try SupportFixture()
+        defer { fixture.tearDown() }
+        let store = fixture.store()
+        // Live item IDs hex-encode the target's path, so they routinely exceed NAME_MAX (255).
+        let longID = String(repeating: "6a", count: 200)
+        let started = ReceiptItemTransition.started(itemID: try ReceiptItemID(longID), at: .init(unixNanoseconds: 2))
+        let intent = try persistenceIntent(itemID: longID)
+        #expect(await store.persistIntent(intent).isSuccess)
+
+        #expect(await store.persistTransition(receipt: intent.id, started).isSuccess)
+
+        guard case let .durable(_, transitions) = try #require(try await store.loadAll().get().first) else {
+            Issue.record("expected durable record")
+            return
+        }
+        #expect(transitions == [started])
+        let names = try FileManager.default.subpathsOfDirectory(atPath: fixture.support.path)
+        #expect(!names.contains { $0.contains(longID) })
+    }
 }
 
 @Suite("Receipt Coordinator Tests")
@@ -308,8 +330,8 @@ private func posixMode(_ url: URL) -> Int? {
     return (attrs?[.posixPermissions] as? NSNumber)?.intValue
 }
 
-func persistenceIntent() throws -> ReceiptIntent {
-    let item = try ReceiptItemID("item-a")
+func persistenceIntent(itemID: String = "item-a") throws -> ReceiptIntent {
+    let item = try ReceiptItemID(itemID)
     return try ReceiptIntent(
         id: ReceiptID("receipt-1"),
         schemaVersion: .v1,
