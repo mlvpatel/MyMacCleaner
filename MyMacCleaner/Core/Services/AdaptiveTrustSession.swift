@@ -169,7 +169,7 @@ actor AdaptiveTrustSession {
             }
             guard !cancellation.isCancelled else { return await stoppedBeforeRun() }
             let fresh = plan.targets.map {
-                FreshTargetEvidence.observing(target: $0, in: collected.generalMacFindings)
+                FreshTargetEvidence.observing(target: $0, eligibleIn: collected.evaluations)
             }
             guard let history = historyCoordinator() else {
                 return refusedRun(.receiptHistoryUnavailable)
