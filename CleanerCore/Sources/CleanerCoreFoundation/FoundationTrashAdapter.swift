@@ -2,10 +2,17 @@ import CleanerCore
 import Foundation
 
 public struct ReturnedTrashURL: Equatable, Sendable {
+    /// The move succeeded but macOS reported no Trash location; recovery lookups fail closed on it.
+    public static let unknownLocation = ReturnedTrashURL(absoluteString: "")
+
     public let absoluteString: String
 
     init(_ url: URL) {
         absoluteString = url.absoluteString
+    }
+
+    private init(absoluteString: String) {
+        self.absoluteString = absoluteString
     }
 }
 
@@ -75,10 +82,8 @@ public struct FoundationTrashAdapter: TrashExecutionPort, @unchecked Sendable {
         } catch {
             return .failed(.nativeMoveFailed)
         }
-        guard let returned else {
-            return .failed(.missingReturnedLocation)
-        }
-        return .moved(destination: ReturnedTrashURL(returned))
+        // The item is in the Trash either way; a missing location must not be reported as a failure.
+        return .moved(destination: returned.map(ReturnedTrashURL.init) ?? .unknownLocation)
     }
 
     private func finalIdentityMismatch(root: URL, operation: MoveToTrash) -> TrashStaleReason? {
