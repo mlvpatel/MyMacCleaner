@@ -67,6 +67,21 @@ actor AdaptiveTrustSession {
         return AppAdaptiveRoots.url(for: kind)
     }
 
+    /// Defense in depth behind policy: only a regular file under the one named cache scope in a
+    /// Trash-eligible root gets fresh evidence, so even a policy regression is skipped, never moved.
+    static func isWithinTrashScope(rootID: DeclaredRootID, components: [String], fileKind: FileKind) -> Bool {
+        guard let kind = try? GeneralMacScopeCatalog.current.rootKind(for: rootID) else { return false }
+        return trashEligibleRootKinds.contains(kind)
+            && components.first == GeneralMacScopeProof.namedCacheComponent
+            && fileKind == .regularFile
+    }
+
+    /// A history failure before any item was recorded (busy, review required, intent write failed)
+    /// means nothing ran; returns nil so the caller reports a refusal instead of a partial run.
+    static func runStateAfterFailure(recordedOutcomes: [AdaptiveExecutionOutcomeKind]) -> TrashRunState? {
+        recordedOutcomes.isEmpty ? nil : .partial
+    }
+
     /// Distinct root kinds the given targets live in, in first-seen order. Execute-time
     /// revalidation scans only these roots so a large unrelated root cannot consume the scan
     /// budget and truncate a still-present target into a false `skippedStale(.missing)`.
@@ -168,8 +183,12 @@ actor AdaptiveTrustSession {
                 return refusedRun(.scanFailed)
             }
             guard !cancellation.isCancelled else { return await stoppedBeforeRun() }
-            let fresh = plan.targets.map {
-                FreshTargetEvidence.observing(target: $0, eligibleIn: collected.evaluations)
+            let fresh = plan.targets.map { target in
+                Self.isWithinTrashScope(
+                    rootID: target.declaredRootID,
+                    components: target.locatorComponents,
+                    fileKind: target.fileKind
+                ) ? FreshTargetEvidence.observing(target: target, eligibleIn: collected.evaluations) : nil
             }
             guard let history = historyCoordinator() else {
                 return refusedRun(.receiptHistoryUnavailable)
@@ -188,8 +207,11 @@ actor AdaptiveTrustSession {
                 isCancelled: { cancellation.isCancelled }
             ) {
             case .failure:
+                guard let state = Self.runStateAfterFailure(recordedOutcomes: recorder.outcomes) else {
+                    return refusedRun(.receiptHistoryUnavailable)
+                }
                 lastOutcomes = recorder.outcomes
-                lastExecutionState = .partial
+                lastExecutionState = state
             case let .success(reconciled):
                 lastOutcomes = recorder.outcomes
                 lastExecutionState = runState(reconciled.aggregate)
