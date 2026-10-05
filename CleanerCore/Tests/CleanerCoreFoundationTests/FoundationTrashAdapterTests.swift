@@ -124,7 +124,7 @@ struct FoundationTrashAdapterTests {
     }
 
     @Test
-    func missingReturnedURLIsFailed() throws {
+    func movedItemWithoutAReturnedURLIsStillRecordedAsMoved() throws {
         let calls = NativeCallRecorder()
         let plan = try foundationPlan(component: "missing.bin", node: 405)
         let operations = try ApprovedTrashOperationFactory().makeOperations(
@@ -145,9 +145,11 @@ struct FoundationTrashAdapterTests {
             adapter.revalidateAndMove(
                 operation,
                 fresh: FreshTargetEvidence.matching(plan.targets[0])
-            ) == .failed(.missingReturnedLocation)
+            ) == .moved(destination: .unknownLocation)
         )
         #expect(calls.count == 1)
+        // The receipt keeps the item as moved; recovery lookups treat the empty token as unknown.
+        #expect(URL(string: ReturnedTrashURL.unknownLocation.absoluteString)?.isFileURL != true)
     }
 
     // MARK: - Final in-adapter identity check (B2)
