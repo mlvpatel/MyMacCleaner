@@ -136,6 +136,25 @@ struct AdaptiveExperienceBridgeTests {
         #expect(AdaptiveTrustSession.trashEligibleRootKinds == [.userLibraryCaches])
     }
 
+    @Test("Only regular files inside the named cache scope can reach the Trash")
+    func trashScopeBackstopAdmitsOnlyTheNamedCacheScope() throws {
+        let catalog = GeneralMacScopeCatalog.current
+        let caches = try catalog.declaredRoot(for: .userLibraryCaches).id
+        let downloads = try catalog.declaredRoot(for: .userDownloads).id
+        let scope = GeneralMacScopeProof.namedCacheComponent
+
+        #expect(AdaptiveTrustSession.isWithinTrashScope(rootID: caches, components: [scope, "a.bin"], fileKind: .regularFile))
+        #expect(!AdaptiveTrustSession.isWithinTrashScope(rootID: caches, components: ["com.other.cache", "a.bin"], fileKind: .regularFile))
+        #expect(!AdaptiveTrustSession.isWithinTrashScope(rootID: caches, components: [scope, "sub"], fileKind: .directory))
+        #expect(!AdaptiveTrustSession.isWithinTrashScope(rootID: downloads, components: [scope, "a.bin"], fileKind: .regularFile))
+    }
+
+    @Test("A failed run that recorded no item is refused, not shown as partial")
+    func failedRunWithoutRecordedOutcomesIsRefused() {
+        #expect(AdaptiveTrustSession.runStateAfterFailure(recordedOutcomes: []) == nil)
+        #expect(AdaptiveTrustSession.runStateAfterFailure(recordedOutcomes: [.moved]) == .partial)
+    }
+
     @Test("Revalidation scan is scoped to the plan targets' distinct root kinds")
     func revalidationRootsScopeToPlanTargets() throws {
         let catalog = GeneralMacScopeCatalog.current
