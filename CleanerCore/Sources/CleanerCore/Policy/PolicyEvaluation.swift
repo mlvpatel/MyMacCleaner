@@ -38,6 +38,9 @@ public enum PolicyActivityEvidence: Equatable, Sendable {
 public enum GeneralMacScopeProof: Equatable, Sendable {
     case namedFixedScopeGeneralCacheV1
     case unsupported
+
+    /// The one Caches child the v1 regeneration rule covers; the app's Trash backstop reuses it.
+    public static let namedCacheComponent = "com.apple.iconservices.store"
 }
 
 /// The policy boundary requires a positive observation that the cache is not
@@ -87,7 +90,7 @@ extension GeneralMacPolicyEvidence {
               finding.finding.detectorVersion == GeneralMacScopeCatalog.current.version,
               finding.source == .userLibraryCaches,
               finding.category == .cache,
-              finding.finding.locator.components.first == "com.apple.iconservices.store"
+              finding.finding.locator.components.first == GeneralMacScopeProof.namedCacheComponent
         else {
             return .unsupported
         }
