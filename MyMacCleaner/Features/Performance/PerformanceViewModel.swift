@@ -19,8 +19,9 @@ final class PerformanceViewModel: ObservableObject {
     private var refreshTask: Task<Void, Never>?
     private var refreshCancellation: RefreshCancellation?
     private var refreshGeneration: UInt64 = 0
-    private var monitorTimer: Timer?
-    private var previousCPUInfo: processor_info_array_t?
+    // nonisolated(unsafe): read only by deinit, when no other reference to the model remains.
+    private nonisolated(unsafe) var monitorTimer: Timer?
+    private nonisolated(unsafe) var previousCPUInfo: processor_info_array_t?
     private var previousCPUInfoCount: mach_msg_type_number_t = 0
     private var cpuCount: uint = 0
 
