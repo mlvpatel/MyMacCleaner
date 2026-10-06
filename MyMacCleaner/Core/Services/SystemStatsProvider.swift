@@ -29,8 +29,10 @@ struct SystemStats {
 
 // MARK: - System Stats Provider
 
-/// Thread-safe system stats provider for menu bar and other displays
-class SystemStatsProvider: ObservableObject {
+/// System stats provider for menu bar and other displays.
+/// ponytail: thread confinement instead of an actor: published state and the timer are touched
+/// only on the main thread, CPU sampling state only on `queue`. Make it an actor if that changes.
+final class SystemStatsProvider: ObservableObject, @unchecked Sendable {
     static let shared = SystemStatsProvider()
 
     @Published var stats = SystemStats()
@@ -152,7 +154,7 @@ class SystemStatsProvider: ObservableObject {
             return (0, ProcessInfo.processInfo.physicalMemory, 0)
         }
 
-        let pageSize = UInt64(vm_kernel_page_size)
+        let pageSize = UInt64(getpagesize())
 
         let active = UInt64(stats.active_count) * pageSize
         let wired = UInt64(stats.wire_count) * pageSize
