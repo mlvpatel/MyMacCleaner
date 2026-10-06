@@ -143,7 +143,7 @@ class SystemHealthViewModel: ObservableObject {
         }
 
         if result == KERN_SUCCESS {
-            let pageSize = UInt64(vm_page_size)
+            let pageSize = UInt64(getpagesize())
             let active = UInt64(stats.active_count) * pageSize
             // inactive is not used in calculation (excluded from "used" memory)
             _ = UInt64(stats.inactive_count) * pageSize
