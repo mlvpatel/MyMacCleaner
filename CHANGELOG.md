@@ -14,6 +14,7 @@ All notable changes to MyMacCleaner will be documented in this file.
 - [fixed] Receipt file names no longer exceed the macOS file-name limit for long item paths
 - [fixed] Execute re-checks policy on a fresh scan (including open files), refuses hardlinked files, and allows only regular files inside the named cache scope
 - [fixed] A Trash move without a returned location is recorded as moved; a run that never started is reported as refused
+- [fixed] The dashboard and review sheet show the first 50 evidence items plus a count of the rest, so large scans no longer stall the UI
 - [changed] Large scans finish about 3x faster (result sorting no longer re-encodes every item per comparison)
 - [removed] Obsolete Mac App Store submission guide (Developer ID distribution only)
 
