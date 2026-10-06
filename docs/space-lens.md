@@ -2,8 +2,6 @@
 
 Space Lens is an offline visual review of local storage usage.
 
-![Space Lens](/MyMacCleaner/screenshots/disk_cleaner/space_lens.png)
-
 ## What it shows
 
 The view helps identify large folders and files by presenting scan results as a storage map and list. The sizes are local observations and may depend on permissions, filesystem metadata, and the scan boundary.
