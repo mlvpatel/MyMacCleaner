@@ -2,8 +2,6 @@
 
 Orphaned Files is an offline review page for local app-leftover evidence.
 
-![Orphaned Files](/MyMacCleaner/screenshots/orphaned_files/orphaned_files_base.png)
-
 ## What it shows
 
 The scan looks for files that appear related to apps that may no longer be present. Evidence can include application support folders, preferences, logs, cache-like locations, and saved-state paths when they are readable.
