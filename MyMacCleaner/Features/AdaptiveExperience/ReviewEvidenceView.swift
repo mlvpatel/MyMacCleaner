@@ -21,12 +21,18 @@ struct ReviewEvidenceView: View {
                     Text(L(key))
                         .accessibilityIdentifier("adaptive.review.key")
                 }
-                ForEach(snapshot.authority.evidenceIdentities, id: \.self) { identity in
+                let (shown, hidden) = AdaptiveListLimit.split(snapshot.authority.evidenceIdentities)
+                ForEach(shown, id: \.self) { identity in
                     Text(identity)
                         .font(Theme.Typography.subheadline.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .accessibilityIdentifier("adaptive.review.item.\(identity)")
+                }
+                if hidden > 0 {
+                    Text(LFormat("adaptive.opportunities.more", hidden))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("adaptive.review.more")
                 }
                 ForEach(snapshot.authority.recoveryPaths.map(\.rawValue), id: \.self) { path in
                     Text(L("adaptive.review.recovery.\(path)"))
