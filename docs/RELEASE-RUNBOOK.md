@@ -9,17 +9,18 @@ than the row below.
 | Gate | Status | Evidence |
 |------|--------|----------|
 | SafetyContract local | **Locally verified** | `bash scripts/verify-safety-contract.sh` |
-| CleanerCore SwiftPM + coverage | **Locally verified** | `bash scripts/verify-cleanercore.sh` — 8042/9029 (89.07%), every production target at or above 80.00%. See [COVERAGE.md](COVERAGE.md) |
+| CleanerCore SwiftPM + coverage | **Locally verified** | `bash scripts/verify-cleanercore.sh` — 8417/9321 (90.30%), every production target at or above 80.00%. See [COVERAGE.md](COVERAGE.md) |
 | Adaptive catalog/IDs (CLT) | **Locally verified** | `bash scripts/verify-adaptive-experience.sh` |
-| Full-Xcode app build | **Pending** | `xcode-select -p` is `/Library/Developer/CommandLineTools`; no Xcode.app |
-| XCUITest / VoiceOver / keyboard / Reduce Motion / Increase Contrast | **Pending** | 08-04 `ui_proof: human_needed` |
-| Hosted safety-contract workflow | **Pending** | `.github/workflows/safety-contract.yml` exists; this session has no successful GitHub Actions run |
+| Full-Xcode app build | **Verified** | Local full Xcode; hosted PR Checks Build, Unit Tests and Archive Test green on public `a873d7d` (2026-10-06) |
+| XCUITest | **Hosted green (advisory)** | PR Checks UI Tests job green on `a873d7d` |
+| VoiceOver / keyboard / Reduce Motion / Increase Contrast | **Pending** | 08-04 `ui_proof: human_needed` |
+| Hosted safety-contract workflow | **Verified** | Safety Contract workflow green on `a873d7d` (2026-10-06) |
 | Developer ID signing | **Pending** | No signing identity in this environment; do not store secrets in the repo |
 | Notarization / stapling | **Pending** | Not run |
 | Gatekeeper assessment | **Pending** | Not run |
 | Clean-account offline launch | **Pending** | Requires a full-Xcode / isolated account |
-| Private GitHub push of a sanitized root | **Not done** | Explicitly skipped |
-| Website retirement | **Not done** | Explicitly skipped; website remains |
+| Public sanitized repository | **Done** | `mlvpatel/MyMacCleaner` is public; local planning files are excluded |
+| Website retirement | **Done** | `website/` and its deploy workflow deleted 2026-10-02 |
 
 ## Local commands (this environment)
 
