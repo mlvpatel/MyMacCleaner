@@ -190,7 +190,7 @@ actor DuplicateScanner {
         at path: URL,
         minSize: Int64 = 1024,
         maxSize: Int64 = DuplicateScanner.defaultMaximumFileSize,
-        progress: @escaping (Double, String) -> Void
+        progress: @escaping @Sendable @MainActor (Double, String) -> Void
     ) async -> [DuplicateGroup] {
         var duplicateGroups: [DuplicateGroup] = []
 
