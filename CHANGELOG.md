@@ -7,6 +7,22 @@ All notable changes to MyMacCleaner will be documented in this file.
 <!-- Add your changes here during development. This section will be used for the next release. -->
 <!-- Format: - [type] Description -->
 <!-- Types: added, changed, fixed, removed -->
+<!-- DRAFT for 1.0.0: summary of the rewrite since 0.1.3. Edit before release. -->
+
+### 1.0 rewrite (since 0.1.3)
+
+- [changed] Rebuilt as a safety-first app: privileged shell, `rm`, Empty Trash, memory purge, process termination, app uninstall and cleanup scripts are disabled behind a `SafetyContract` gateway
+- [added] `CleanerCore` package: local evidence, conservative policy, digest-bound review plans, a revalidated Trash executor and receipts
+- [added] General-Mac evidence for six locations: Library Caches, Logs, Temporary, Downloads, Desktop and Documents
+- [added] Adaptive Experience with Guided, Standard and Technical views and a review, approve, move-to-Trash, receipt flow
+- [added] Private local receipts with recovery guidance and bounded history (90 days, 500 receipts)
+- [added] Read-only AI/ML model inventory (Hugging Face, Ollama, LM Studio, MLX) and developer-tool presence (Cursor, VS Code, Docker, Homebrew)
+- [added] Read-only memory and workload coach
+- [changed] Disk Cleaner, Space Lens, Duplicates, Orphaned Files, Performance, Applications, Port Management, System Health and Startup Items are read-only inventories
+- [changed] English-only String Catalogs (Italian and Spanish removed, along with the language picker)
+- [removed] Sparkle auto-update and the appcast: the app has no `URLSession` and no update channel; install new versions from a reviewed release
+
+### Pre-release QA fixes
 
 - [fixed] Scans no longer stop at the first unreadable folder or drop the remaining locations when one fails; gaps are reported as a partial scan
 - [fixed] Scans walk each location shallow-first, so one large deep folder cannot hide the rest under the per-location cap
@@ -15,6 +31,8 @@ All notable changes to MyMacCleaner will be documented in this file.
 - [fixed] Execute re-checks policy on a fresh scan (including open files), refuses hardlinked files, and allows only regular files inside the named cache scope
 - [fixed] A Trash move without a returned location is recorded as moved; a run that never started is reported as refused
 - [fixed] The dashboard and review sheet show the first 50 evidence items plus a count of the rest, so large scans no longer stall the UI
+- [fixed] The loading-dots animation no longer leaks a repeating timer each time it appears
+- [changed] The app target builds with zero concurrency warnings (all 45 would be errors in Swift 6 mode)
 - [changed] Large scans finish about 3x faster (result sorting no longer re-encodes every item per comparison)
 - [removed] Obsolete Mac App Store submission guide (Developer ID distribution only)
 
