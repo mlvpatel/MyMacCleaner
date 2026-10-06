@@ -41,7 +41,7 @@ bash scripts/tests/verify-adaptive-bridge-tests.sh
 bash scripts/verify-adaptive-experience.sh
 ```
 
-The last canonical CleanerCore coverage result (2026-09-22, full Xcode 27) is aggregate **8042/9029 (89.07%)** with every production target at or above **80.00%**. Command: `CODEX_SANDBOX=1 bash scripts/verify-cleanercore.sh`. Details are in `docs/COVERAGE.md`.
+The last canonical CleanerCore coverage result (2026-10-06, full Xcode 27) is aggregate **8417/9321 (90.30%)** with every production target at or above **80.00%**. Command: `CODEX_SANDBOX=1 bash scripts/verify-cleanercore.sh`. Details are in `docs/COVERAGE.md`.
 
 Architecture, detector, recovery, and privacy contracts: `docs/C4.md`, `docs/THREAT-MODEL.md`, `docs/DETECTOR-CONTRACT.md`, `docs/RECOVERY.md`, `docs/PRIVACY.md`. Release claims belong only in `docs/RELEASE-RUNBOOK.md`. Conduct: `CODE_OF_CONDUCT.md`.
 
