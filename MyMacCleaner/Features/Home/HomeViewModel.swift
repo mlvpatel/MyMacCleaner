@@ -240,7 +240,7 @@ class HomeViewModel: ObservableObject {
         }
 
         if result == KERN_SUCCESS {
-            let pageSize = UInt64(vm_kernel_page_size)
+            let pageSize = UInt64(getpagesize())
             let free = UInt64(stats.free_count) * pageSize
             let active = UInt64(stats.active_count) * pageSize
             let inactive = UInt64(stats.inactive_count) * pageSize
