@@ -2,8 +2,6 @@
 
 Disk Cleaner and Browser Privacy are local review surfaces for storage categories and browser-data evidence.
 
-![Disk Cleaner](/MyMacCleaner/screenshots/disk_cleaner/disk_cleaner_base.png)
-
 ## What it shows
 
 The pages organize scan results by category, source path, size estimate, and local evidence. Browser Privacy can show browser-related categories when those locations are readable.
