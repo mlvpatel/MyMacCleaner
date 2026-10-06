@@ -2,8 +2,6 @@
 
 Startup Items is an offline, read-only inventory of login-related items and launch-agent evidence on your Mac.
 
-![Startup Items](/MyMacCleaner/screenshots/startup_items/startup_items_base.png)
-
 ## What it inventories
 
 The scan reports available background/login-item information, user and system launch-agent files, and running evidence where macOS exposes it. Each row can show a name, label, developer when available, type, status, and a Finder reveal action.
