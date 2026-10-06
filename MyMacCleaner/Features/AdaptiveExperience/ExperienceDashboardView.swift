@@ -67,7 +67,8 @@ struct ExperienceDashboardView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("adaptive.opportunities.empty")
             } else {
-                ForEach(identities, id: \.self) { identity in
+                let (shown, hidden) = AdaptiveListLimit.split(identities)
+                ForEach(shown, id: \.self) { identity in
                     Button {
                         viewModel.dispatch(.focus(opaqueID: identity))
                         viewModel.presentReview()
@@ -80,6 +81,11 @@ struct ExperienceDashboardView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint(L("adaptive.opportunity.open.hint"))
+                }
+                if hidden > 0 {
+                    Text(LFormat("adaptive.opportunities.more", hidden))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("adaptive.opportunities.more")
                 }
             }
         }
@@ -283,5 +289,15 @@ struct ExperienceDashboardView: View {
             break
         }
         return kinds
+    }
+}
+
+/// Large scans yield tens of thousands of findings; a row for each stalls SwiftUI and the
+/// accessibility tree, so evidence lists render a bounded prefix and summarize the rest.
+enum AdaptiveListLimit {
+    static let rows = 50
+
+    static func split(_ items: [String], limit: Int = rows) -> (shown: [String], hidden: Int) {
+        (Array(items.prefix(limit)), max(0, items.count - limit))
     }
 }
