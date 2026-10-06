@@ -149,6 +149,17 @@ struct AdaptiveExperienceBridgeTests {
         #expect(!AdaptiveTrustSession.isWithinTrashScope(rootID: downloads, components: [scope, "a.bin"], fileKind: .regularFile))
     }
 
+    @Test("Long evidence lists render a bounded prefix and summarize the rest")
+    func longEvidenceListsAreBounded() {
+        let many = (0..<120).map { "id-\($0)" }
+
+        let (shown, hidden) = AdaptiveListLimit.split(many)
+
+        #expect(shown == Array(many.prefix(AdaptiveListLimit.rows)))
+        #expect(hidden == 120 - AdaptiveListLimit.rows)
+        #expect(AdaptiveListLimit.split(["a", "b"]) == (["a", "b"], 0))
+    }
+
     @Test("A failed run that recorded no item is refused, not shown as partial")
     func failedRunWithoutRecordedOutcomesIsRefused() {
         #expect(AdaptiveTrustSession.runStateAfterFailure(recordedOutcomes: []) == nil)
