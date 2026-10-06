@@ -2,8 +2,6 @@
 
 System Health is a local inventory of selected macOS signals, presented as a convenient summary rather than a diagnostic verdict.
 
-![System Health](/MyMacCleaner/screenshots/system_health/system_health.png)
-
 ## What it checks
 
 The page refreshes a small set of local observations:
