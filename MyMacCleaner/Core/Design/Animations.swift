@@ -81,8 +81,9 @@ struct LoadingDotsView: View {
                     .opacity(activeIndex == index ? 1.0 : 0.5)
             }
         }
-        .onAppear {
-            Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { _ in
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(300))
                 withAnimation(Theme.Animation.spring) {
                     activeIndex = (activeIndex + 1) % dotCount
                 }
