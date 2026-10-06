@@ -2,8 +2,6 @@
 
 The Permissions page helps you review which local locations MyMacCleaner can currently read.
 
-![Permissions](/MyMacCleaner/screenshots/permissions/permissions.png)
-
 ## What the page checks
 
 The page groups local paths into Full Disk Access, user folders, system folders, application data, and startup paths. For each existing path, it shows whether a local read check succeeded, was denied, or could not be determined. It also records when the page was last checked.
