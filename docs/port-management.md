@@ -2,8 +2,6 @@
 
 Port Management is an offline, read-only inventory of TCP listening and established connections.
 
-![Port Management](/MyMacCleaner/screenshots/port_management/port_managment.png)
-
 ## What it shows
 
 Each row can include the process name and PID, local address and port, remote endpoint when present, TCP state, and protocol. The inventory is collected locally with a fixed system query and is not sent anywhere.
