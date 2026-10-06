@@ -30,14 +30,15 @@ purge are disabled at the architecture level — not merely hidden.
 - **Read-only inventory** — scans, groups, and visualizes storage and memory
   without changing anything.
 - **Trash-first execution** — the only mutation is an approved, digest-bound plan
-  moved to the Trash, re-validated item-by-item, and always recoverable.
+  moved to the Trash, re-validated item-by-item, and recoverable from the Trash
+  until it is emptied.
 - **Menu-bar monitor** — live CPU / RAM / Disk with four display modes.
 
 ## 🖥 Features
 
 | Surface | What it does |
 |---------|--------------|
-| Home / Smart Scan | Live storage scan through CleanerCore across six general-Mac roots |
+| Home / Smart Scan | Live storage scan through CleanerCore across six general-Mac roots; shallow folders first, unreadable folders skipped and reported as gaps |
 | Disk Cleaner | Category review of caches, logs, and temporary data |
 | Space Lens | Read-only storage map (sidebar and Disk Cleaner tab); cancellable, 500,000-entry cap |
 | Duplicates | Hash-based duplicate finder with cancellation |
@@ -47,7 +48,7 @@ purge are disabled at the architecture level — not merely hidden.
 | System Health | Review startup-item inventory and system stats |
 | Applications | Read-only app inventory with Homebrew cask listing |
 | AI/ML inventory | Local model-store parsers (Hugging Face, Ollama, LM Studio, MLX) |
-| Trash execute | Moves only the approved, digest-bound cache plan to Trash, re-validated per item, with a receipt |
+| Trash execute | Moves only approved files from one named rebuildable cache (`~/Library/Caches/com.apple.iconservices.store`, untouched for 15+ minutes), re-validated per item, with a receipt. Recent macOS versions rarely create that folder, so many Macs have nothing eligible |
 
 ## 🎨 Design & UI
 
@@ -56,7 +57,7 @@ purge are disabled at the architecture level — not merely hidden.
   clear review → approve → move-to-Trash → receipt flow.
 - **Sidebar navigation** across every surface, plus a real-time menu-bar item.
 - **Accessibility-minded:** honors Reduce Motion and Increase Contrast; keyboard
-  and VoiceOver friendly.
+  and VoiceOver support is built in, with a full manual audit still pending.
 - **Localization:** English (String Catalogs; more locales can be added later).
 
 ## 🔒 Safety model
