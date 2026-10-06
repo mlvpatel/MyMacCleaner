@@ -43,8 +43,8 @@ struct CleanerCoreLiveScan: Sendable {
             additionalApplicationDirectories: [home.appendingPathComponent("Applications", isDirectory: true)],
             homeDirectory: home,
             fileExists: { FileManager.default.fileExists(atPath: $0.path) },
-            directoryAllocatedBytes: Self.allocatedBytes(of:),
-            fileAllocatedBytes: Self.fileAllocatedBytes(of:)
+            directoryAllocatedBytes: { Self.allocatedBytes(of: $0) },
+            fileAllocatedBytes: { Self.fileAllocatedBytes(of: $0) }
         )
         return adapter.observe().compactMap(\.inventoryFact)
     }
