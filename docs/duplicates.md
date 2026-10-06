@@ -2,8 +2,6 @@
 
 Duplicate Finder is an offline review view for exact duplicate-file evidence.
 
-![Duplicates](/MyMacCleaner/screenshots/duplicates/duplicates_base.png)
-
 ## What it shows
 
 The scanner groups files that have matching content evidence. Each group is shown for review so you can understand where duplicate-looking files exist and how much apparent space they represent.
