@@ -881,6 +881,17 @@
         }
       }
     },
+    "adaptive.opportunities.more": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+%lld more items"
+          }
+        }
+      }
+    },
     "adaptive.opportunity.title": {
       "extractionState": "manual",
       "localizations": {
