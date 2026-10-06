@@ -2,8 +2,6 @@
 
 The Performance page is an offline, read-only view of current CPU and memory evidence.
 
-![Performance](/MyMacCleaner/screenshots/performance/performance.png)
-
 ## What it shows
 
 - Current CPU utilization, refreshed while the page is active.
