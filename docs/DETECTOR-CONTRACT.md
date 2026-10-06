@@ -26,8 +26,9 @@ presented as empty storage.
 
 | Class | Behavior |
 |-------|----------|
-| Complete | Eligible recommendations may be considered by policy |
-| Partial / denied / cancelled | Visible; cannot produce eligible cleanup from incomplete evidence |
+| Complete per-finding evidence | Policy may consider it, whatever the scan's overall outcome |
+| Incomplete per-finding evidence | Visible; never eligible |
+| Partial / denied / cancelled scan | Findings already observed are kept and judged one by one; the gap is reported |
 | Unsupported / unknown layout | Protected or inspect-only |
 | Changed identity between preview and execute | Per-item skipped-stale |
 
@@ -39,6 +40,14 @@ Six declared roots in the live Home/Disk path: user Library Caches, Logs,
 Temporary, Downloads, Desktop, Documents. Packages are leaves. Generic
 traversal does not cross symlink, alias, mount, volume, home, or protected-root
 boundaries unless a versioned detector owns that boundary.
+
+Traversal is breadth-first: every entry at one depth is observed before any
+deeper one. An entry or folder that cannot be read is skipped with its subtree,
+and the root reports the fault, so the scan reads as partial instead of
+stopping. Each root is capped at depth 8, 25,000 visited entries, and 10,000
+findings. A root that hits a cap or fails is recorded as an issue and the scan
+moves on to the next root; only request-wide budgets and cancellation end the
+whole scan.
 
 Large files and duplicates are triage-only: never preselected, never classified
 as disposable by size alone.
