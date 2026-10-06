@@ -2,8 +2,6 @@
 
 Applications is an offline, read-only inventory of installed apps and Homebrew casks.
 
-![Applications](/MyMacCleaner/screenshots/applications/applications_base.png)
-
 ## What it shows
 
 The page lists discovered applications with local metadata such as name, path, size when available, bundle identifier, version, source, and last-used evidence. It can also detect whether Homebrew is installed and list casks from the local caskroom.
