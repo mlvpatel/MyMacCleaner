@@ -91,7 +91,7 @@ actor OrphanedFilesScanner {
     // MARK: - Main Scan
 
     /// Scan for orphaned files from previously deleted applications
-    func scan(progress: @escaping (Double, String) -> Void) async -> [OrphanedFile] {
+    func scan(progress: @escaping @Sendable @MainActor (Double, String) -> Void) async -> [OrphanedFile] {
         var orphanedFiles: [OrphanedFile] = []
 
         // Step 1: Get all installed app bundle IDs
