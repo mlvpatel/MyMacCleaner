@@ -84,12 +84,15 @@ struct MemorySafetyTests {
             contentsOf: Self.repositoryRoot.appending(path: "MyMacCleaner/Core/Services/StartupItemsService.swift"),
             encoding: .utf8
         )
-        for fragment in forbiddenFragments.dropFirst() {
+        for fragment in forbiddenFragments {
             #expect(!startupContents.contains(fragment), "StartupItemsService still exposes \(fragment)")
         }
-        #expect(startupContents.components(separatedBy: "Process(").count - 1 == 2)
-        #expect(startupContents.contains("/usr/bin/sfltool"))
-        #expect(startupContents.contains("/bin/launchctl"))
+        #expect(startupContents.contains("ReadOnlyProcess.run(.backgroundItems)"))
+        #expect(startupContents.contains("ReadOnlyProcess.run(.launchServices)"))
+
+        let ownerContents = try Self.processOwnerContents()
+        #expect(ownerContents.contains("(\"/usr/bin/sfltool\", [\"dumpbtm\"])"))
+        #expect(ownerContents.contains("(\"/bin/launchctl\", [\"list\"])"))
     }
 
     @Test
@@ -98,9 +101,8 @@ struct MemorySafetyTests {
             contentsOf: Self.repositoryRoot.appending(path: "MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift"),
             encoding: .utf8
         )
-        #expect(portContents.components(separatedBy: "Process(").count - 1 == 1)
-        #expect(portContents.contains("/usr/sbin/lsof"))
-        #expect(portContents.contains("\"-iTCP\", \"-sTCP:LISTEN,ESTABLISHED\", \"-n\", \"-P\""))
+        #expect(!portContents.contains("Process("))
+        #expect(portContents.contains("ReadOnlyProcess.run(.tcpPorts)"))
         #expect(!portContents.contains("func prepareKill"))
         #expect(!portContents.contains("func confirmKill"))
         #expect(!portContents.contains("func killProcess"))
@@ -110,10 +112,22 @@ struct MemorySafetyTests {
             contentsOf: Self.repositoryRoot.appending(path: "MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift"),
             encoding: .utf8
         )
-        #expect(healthContents.components(separatedBy: "Process(").count - 1 == 1)
-        #expect(healthContents.contains("/usr/sbin/diskutil"))
-        #expect(healthContents.contains("\"info\", \"/\""))
+        #expect(!healthContents.contains("Process("))
+        #expect(healthContents.contains("ReadOnlyProcess.run(.rootDiskInfo)"))
         #expect(!healthContents.contains("func runCommand"))
+
+        let ownerContents = try Self.processOwnerContents()
+        #expect(ownerContents.components(separatedBy: "Process(").count - 1 == 1)
+        #expect(ownerContents.contains("(\"/usr/sbin/lsof\", [\"-iTCP\", \"-sTCP:LISTEN,ESTABLISHED\", \"-n\", \"-P\"])"))
+        #expect(ownerContents.contains("(\"/usr/sbin/diskutil\", [\"info\", \"/\"])"))
+    }
+
+    /// The only app file that builds a `Process`, from the closed `ReadOnlyCommand` set.
+    private static func processOwnerContents() throws -> String {
+        try String(
+            contentsOf: repositoryRoot.appending(path: "MyMacCleaner/Core/Services/ReadOnlyProcess.swift"),
+            encoding: .utf8
+        )
     }
 
     private static let repositoryRoot = URL(fileURLWithPath: #filePath)

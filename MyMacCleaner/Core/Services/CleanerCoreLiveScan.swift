@@ -21,20 +21,26 @@ struct CleanerCoreLiveScan: Sendable {
     /// plan targets' roots, so a large unrelated root cannot consume the scan budget and truncate
     /// a still-present target into a false `skippedStale(.missing)`.
     func collect(roots kinds: [GeneralMacRootKind]) async throws -> AdaptiveScanCollection {
+        try await collectCheckingOpenFiles(roots: kinds).collection
+    }
+
+    /// Also says whether the open-file listing ran. When it did not, every file in a Trash-eligible
+    /// root counted as open, so nothing there was eligible this time.
+    func collectCheckingOpenFiles(
+        roots kinds: [GeneralMacRootKind]
+    ) async throws -> (collection: AdaptiveScanCollection, openFilesChecked: Bool) {
         let catalog = GeneralMacScopeCatalog.current
         let adapter = try GeneralMacFilesystemAdapter(catalog: catalog)
+        let activity = await OpenFileActivityReader.snapshot(for: kinds)
         let session = try AdaptiveScanSession(
             fileSystem: adapter,
             clock: AppAdaptiveClock(),
             cancellation: TaskAdaptiveCancel(),
-            processActivity: await OpenFileActivityReader.snapshot(for: kinds)
+            processActivity: activity
         )
-        return await session.collect(request: try catalog.scanRequest(for: kinds))
+        let collection = await session.collect(request: try catalog.scanRequest(for: kinds))
+        return (collection, activity.isListingAvailable)
     }
-
-    /// Upper bound on entries walked while sizing a developer dotfile root, so a
-    /// pathologically large tree cannot stall the scan.
-    private static let maxSizingEntries = 500_000
 
     func developerInventory() -> [AdaptiveDeveloperInventoryFact] {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -43,7 +49,7 @@ struct CleanerCoreLiveScan: Sendable {
             additionalApplicationDirectories: [home.appendingPathComponent("Applications", isDirectory: true)],
             homeDirectory: home,
             fileExists: { FileManager.default.fileExists(atPath: $0.path) },
-            directoryAllocatedBytes: { Self.allocatedBytes(of: $0) },
+            directoryAllocatedBytes: { DirectorySize.allocatedBytes(at: $0).map(Int.init) },
             fileAllocatedBytes: { Self.fileAllocatedBytes(of: $0) }
         )
         return adapter.observe().compactMap(\.inventoryFact)
@@ -59,37 +65,6 @@ struct CleanerCoreLiveScan: Sendable {
             return nil
         }
         return values.totalFileAllocatedSize ?? values.fileAllocatedSize
-    }
-
-    /// Content-blind allocated-byte total for a directory: sums filesystem
-    /// allocation metadata for regular files only, skips symlinks (so a link
-    /// cannot escape the root), and never opens or reads a file's contents.
-    private static func allocatedBytes(of directory: URL) -> Int? {
-        let fileManager = FileManager.default
-        let keys: Set<URLResourceKey> = [
-            .isRegularFileKey, .isSymbolicLinkKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey
-        ]
-        guard let enumerator = fileManager.enumerator(
-            at: directory,
-            includingPropertiesForKeys: Array(keys),
-            options: []
-        ) else { return nil }
-
-        var total = 0
-        var visited = 0
-        for case let url as URL in enumerator {
-            visited += 1
-            if visited > maxSizingEntries { break }
-            guard let values = try? url.resourceValues(forKeys: keys) else { continue }
-            if values.isSymbolicLink == true {
-                enumerator.skipDescendants()
-                continue
-            }
-            if values.isRegularFile == true {
-                total += values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? 0
-            }
-        }
-        return total
     }
 
     /// The two model-store roots a live scan inspects: the default Hugging Face
@@ -174,24 +149,50 @@ struct CleanerCoreLiveScan: Sendable {
         ["HF_HOME", "OLLAMA_MODELS"].filter { environment[$0]?.isEmpty == false }
     }
 
-    func scanAllCategories(
-        progress: @escaping @MainActor @Sendable (Double, ScanCategory?) -> Void
-    ) async throws -> [ScanResult] {
-        let collected = try await collect()
-        await progress(1, nil)
-        return try snapshots(from: collected)
+    /// One scan of every root for display, with the Home and Disk Cleaner cards derived here, off
+    /// the main actor. `SharedScanStore` keeps it for every screen; a Trash run never uses it.
+    func sharedScan() async throws -> SharedScan {
+        let started = Date()
+        let scanned = try await collectCheckingOpenFiles(roots: Self.allRootKinds)
+        return SharedScan(
+            collection: scanned.collection,
+            openFilesChecked: scanned.openFilesChecked,
+            legacyReport: Self.legacyReport(from: scanned.collection),
+            takenAt: started
+        )
     }
 
-    private func snapshots(from collection: AdaptiveScanCollection) throws -> [ScanResult] {
+    /// The engine reports no per-root progress, so callers show an indeterminate indicator; the
+    /// report keeps every gap so an unreadable folder never looks empty.
+    static func legacyReport(from collected: AdaptiveScanCollection) -> LegacyScanReport {
+        let snapshot = snapshots(from: collected)
+        return LegacyScanReport(
+            results: snapshot.results,
+            coverage: LegacyScanCoverage(
+                state: collected.scanState,
+                droppedFrom: snapshot.dropped,
+                droppedFindings: snapshot.droppedCount
+            )
+        )
+    }
+
+    private static func snapshots(
+        from collection: AdaptiveScanCollection
+    ) -> (results: [ScanResult], dropped: Set<ScanCategory>, droppedCount: Int) {
         var grouped: [ScanCategory: [CleanableItem]] = [:]
+        var dropped = Set<ScanCategory>()
+        var droppedCount = 0
         for finding in collection.findings {
             let kind: GeneralMacRootKind
             do {
                 kind = try GeneralMacScopeCatalog.current.rootKind(for: finding.declaredRootID)
             } catch {
+                // A root outside the catalog cannot be named, so mark every folder as partly read.
+                dropped.formUnion(ScanCategory.allCases)
+                droppedCount += 1
                 continue
             }
-            let category = ScanCategory.forGeneralMac(kind)
+            let category = ScanCategory(kind)
             let projection = LegacyScanProjection(
                 state: collection.scanState,
                 findings: [finding]
@@ -205,13 +206,15 @@ struct CleanerCoreLiveScan: Sendable {
                 )
                 grouped[category, default: []].append(contentsOf: snapshot.result.items)
             } catch {
-                continue
+                dropped.insert(category)
+                droppedCount += 1
             }
         }
-        return ScanCategory.allCases.compactMap { category in
+        let results = ScanCategory.allCases.compactMap { category -> ScanResult? in
             guard let items = grouped[category], !items.isEmpty else { return nil }
-            return ScanResult(category: category, items: items, isSelected: false)
+            return ScanResult(category: category, items: items)
         }
+        return (results, dropped, droppedCount)
     }
 }
 
@@ -258,16 +261,14 @@ enum AppAdaptiveRoots {
 }
 
 extension ScanCategory {
-    static func forGeneralMac(_ kind: GeneralMacRootKind) -> ScanCategory {
+    init(_ kind: GeneralMacRootKind) {
         switch kind {
-        case .userLibraryCaches:
-            return .userCache
-        case .userLibraryLogs:
-            return .applicationLogs
-        case .userTemporary:
-            return .systemCache
-        case .userDownloads, .userDesktop, .userDocuments:
-            return .downloads
+        case .userLibraryCaches: self = .caches
+        case .userLibraryLogs: self = .logs
+        case .userTemporary: self = .temporaryFiles
+        case .userDownloads: self = .downloads
+        case .userDesktop: self = .desktop
+        case .userDocuments: self = .documents
         }
     }
 }

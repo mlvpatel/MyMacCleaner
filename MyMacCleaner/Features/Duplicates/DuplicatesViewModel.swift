@@ -9,18 +9,36 @@ class DuplicatesViewModel: ObservableObject {
     @Published var scanProgress: Double = 0
     @Published var currentScanStatus: String = ""
 
-    @Published var duplicateGroups: [DuplicateGroup] = []
+    @Published var duplicateGroups: [DuplicateGroup] = [] {
+        didSet { indexGroups() }
+    }
+    /// True when the last scan stopped at `DuplicateScanLimits.maxEntries`.
+    @Published private(set) var isTruncated = false
+    /// True when leaving the page stopped the last scan; cleared by the next scan or result.
+    @Published private(set) var scanStoppedByLeaving = false
+    /// Cloud-synced files the last scan left out because their contents are not on this Mac.
+    @Published private(set) var skippedCloudOnlyCount = 0
 
-    @Published var showToast = false
-    @Published var toastMessage = ""
-    @Published var toastType: ToastType = .success
-    @Published private(set) var latestSafetyNotice: SafetyNoticeState?
+    let toasts = ToastPresenter()
 
-    @Published var searchText = ""
-    @Published var filterType: FileType?
-    @Published var sortOrder: SortOrder = .wastedSizeDescending
+    @Published var searchText = "" {
+        didSet { scheduleSearch() }
+    }
+    @Published var filterType: FileType? {
+        didSet { refreshFilteredGroups() }
+    }
+    @Published var sortOrder: SortOrder = .wastedSizeDescending {
+        didSet { refreshFilteredGroups() }
+    }
 
-    @Published var scanPath: URL = FileManager.default.homeDirectoryForCurrentUser
+    /// Derived from the inputs above when they change, not on every render.
+    @Published private(set) var filteredGroups: [DuplicateGroup] = []
+    @Published private(set) var fileTypeStats: [(FileType, Int, Int64)] = []
+
+    /// Results belong to the folder that was scanned, so choosing another one clears them.
+    @Published var scanPath: URL = FileManager.default.homeDirectoryForCurrentUser {
+        didSet { if scanPath != oldValue { clearResults() } }
+    }
 
     // MARK: - Enums
 
@@ -42,19 +60,49 @@ class DuplicatesViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Computed Properties
+    // MARK: - Derived List
 
-    var filteredGroups: [DuplicateGroup] {
+    /// Lower-cased paths of each group's copies, built once per scan result. A path ends with
+    /// the file name, so it also covers a name match.
+    private var searchKeys: [UUID: [String]] = [:]
+    /// The query the list is filtered with; it trails `searchText` by `Theme.Timing.searchDebounce`.
+    private var appliedQuery = ""
+    /// Readable so tests can await the debounced search instead of sleeping.
+    private(set) var searchTask: Task<Void, Never>?
+
+    private func indexGroups() {
+        searchKeys = Dictionary(uniqueKeysWithValues: duplicateGroups.map { group in
+            (group.id, group.files.map { $0.url.path.lowercased() })
+        })
+        fileTypeStats = Self.typeStats(of: duplicateGroups)
+        refreshFilteredGroups()
+    }
+
+    /// Waits for typing to pause; clearing the field applies at once.
+    private func scheduleSearch() {
+        searchTask?.cancel()
+        let query = searchText.lowercased()
+        guard !query.isEmpty else {
+            searchTask = nil
+            appliedQuery = query
+            refreshFilteredGroups()
+            return
+        }
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Theme.Timing.searchDebounce)
+            guard !Task.isCancelled, let self else { return }
+            self.appliedQuery = query
+            self.refreshFilteredGroups()
+        }
+    }
+
+    private func refreshFilteredGroups() {
         var result = duplicateGroups
 
         // Apply search filter
-        if !searchText.isEmpty {
-            let query = searchText.lowercased()
+        if !appliedQuery.isEmpty {
             result = result.filter { group in
-                group.files.contains { file in
-                    file.name.lowercased().contains(query) ||
-                    file.url.path.lowercased().contains(query)
-                }
+                searchKeys[group.id]?.contains { $0.contains(appliedQuery) } ?? false
             }
         }
 
@@ -77,31 +125,13 @@ class DuplicatesViewModel: ObservableObject {
             result.sort { $0.files.count > $1.files.count }
         }
 
-        return result
+        filteredGroups = result
     }
+
+    // MARK: - Computed Properties
 
     var totalWastedSize: Int64 {
         duplicateGroups.reduce(0) { $0 + $1.wastedSize }
-    }
-
-    var selectedSize: Int64 {
-        var total: Int64 = 0
-        for group in duplicateGroups {
-            for file in group.files where file.isSelected && !file.isKept {
-                total += file.size
-            }
-        }
-        return total
-    }
-
-    var selectedCount: Int {
-        var count = 0
-        for group in duplicateGroups {
-            for file in group.files where file.isSelected && !file.isKept {
-                count += 1
-            }
-        }
-        return count
     }
 
     var totalGroupCount: Int {
@@ -116,14 +146,15 @@ class DuplicatesViewModel: ObservableObject {
         ByteCountFormatter.string(fromByteCount: totalWastedSize, countStyle: .file)
     }
 
-    var formattedSelectedSize: String {
-        ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)
+    /// True when there are results but the search or type filter hides all of them.
+    var hasNoSearchMatches: Bool {
+        !duplicateGroups.isEmpty && filteredGroups.isEmpty
     }
 
-    var fileTypeStats: [(FileType, Int, Int64)] {
+    private static func typeStats(of groups: [DuplicateGroup]) -> [(FileType, Int, Int64)] {
         var stats: [FileType: (count: Int, size: Int64)] = [:]
 
-        for group in duplicateGroups {
+        for group in groups {
             let type = group.fileType
             let existing = stats[type] ?? (0, 0)
             stats[type] = (existing.count + 1, existing.size + group.wastedSize)
@@ -135,11 +166,20 @@ class DuplicatesViewModel: ObservableObject {
 
     // MARK: - Scanner
 
-    private let scanner = DuplicateScanner.shared
-    private let safetyNoticePresenter = SafetyNoticePresenter()
-    private var toastPresentationID = UUID()
+    typealias Scan = @Sendable (
+        _ path: URL,
+        _ progress: @escaping @Sendable @MainActor (Double, String) -> Void
+    ) async -> DuplicateScanResult
+
+    private let scan: Scan
     /// Readable so tests can await a cancelled scan instead of sleeping.
     private(set) var scanTask: Task<Void, Never>?
+    /// Bumped by every start and cancel, so updates from an older scan are ignored.
+    private var scanGeneration: UInt64 = 0
+
+    init(scan: @escaping Scan = { await DuplicateScanner.shared.scan(at: $0, minSize: 1024, progress: $1) }) {
+        self.scan = scan
+    }
 
     // MARK: - Actions
 
@@ -159,41 +199,60 @@ class DuplicatesViewModel: ObservableObject {
     func startScan() {
         guard !isScanning else { return }
 
+        // The last results stay until this scan finishes, so leaving the page or Cancel keeps them.
         isScanning = true
-        hasScanned = false
         scanProgress = 0
-        duplicateGroups = []
+        scanStoppedByLeaving = false
+        scanGeneration &+= 1
+        let generation = scanGeneration
 
-        scanTask = Task { [scanner, scanPath] in
-            let results = await scanner.scan(at: scanPath, minSize: 1024) { progress, status in
+        scanTask = Task { [scan, scanPath] in
+            let result = await scan(scanPath) { progress, status in
                 Task { @MainActor in
-                    guard self.isScanning else { return }
+                    guard generation == self.scanGeneration else { return }
                     self.scanProgress = progress
                     self.currentScanStatus = status
                 }
             }
             // A cancelled scan must not overwrite the cancelled state or a newer scan.
-            guard !Task.isCancelled else { return }
+            guard generation == scanGeneration, !Task.isCancelled else { return }
 
-            duplicateGroups = results
+            duplicateGroups = result.groups
+            isTruncated = result.isTruncated
+            skippedCloudOnlyCount = result.skippedCloudOnlyCount
             hasScanned = true
             scanTask = nil
             isScanning = false
 
             // Show toast if no duplicates found
-            if results.isEmpty && scanProgress >= 1.0 {
+            if result.groups.isEmpty && scanProgress >= 1.0 {
                 showToastMessage(L("duplicates.noDuplicatesFound"), type: .info)
             }
         }
     }
 
+    private func clearResults() {
+        hasScanned = false
+        duplicateGroups = []
+        isTruncated = false
+        skippedCloudOnlyCount = 0
+        scanStoppedByLeaving = false
+    }
+
+    /// Leaving the page stops a running scan and remembers that it did, so the page can say so.
+    func leavePage() {
+        guard isScanning else { return }
+        cancelScan(announce: false)
+        scanStoppedByLeaving = true
+    }
+
     /// Stops an in-flight scan. `announce` is false when leaving the screen.
     func cancelScan(announce: Bool = true) {
         guard isScanning else { return }
+        scanGeneration &+= 1
         scanTask?.cancel()
         scanTask = nil
         isScanning = false
-        hasScanned = false
         scanProgress = 0
         currentScanStatus = ""
 
@@ -202,139 +261,8 @@ class DuplicatesViewModel: ObservableObject {
         }
     }
 
-    func toggleFileSelection(_ file: DuplicateFile, in group: DuplicateGroup) {
-        guard let groupIndex = duplicateGroups.firstIndex(where: { $0.id == group.id }),
-              let fileIndex = duplicateGroups[groupIndex].files.firstIndex(where: { $0.id == file.id }) else {
-            return
-        }
-
-        // Don't allow selecting the kept file
-        guard !duplicateGroups[groupIndex].files[fileIndex].isKept else { return }
-
-        // Create a mutable copy to ensure @Published triggers properly
-        var updatedGroups = duplicateGroups
-        updatedGroups[groupIndex].files[fileIndex].isSelected.toggle()
-        duplicateGroups = updatedGroups
-    }
-
-    func toggleAllInGroup(_ group: DuplicateGroup) {
-        guard let groupIndex = duplicateGroups.firstIndex(where: { $0.id == group.id }) else {
-            return
-        }
-
-        // Check if all selectable files are selected
-        let selectableFiles = duplicateGroups[groupIndex].files.filter { !$0.isKept }
-        let allSelected = selectableFiles.allSatisfy { $0.isSelected }
-
-        // Create a mutable copy to ensure @Published triggers properly
-        var updatedGroups = duplicateGroups
-
-        // Toggle: if all selected, deselect all; otherwise select all
-        for fileIndex in updatedGroups[groupIndex].files.indices {
-            if !updatedGroups[groupIndex].files[fileIndex].isKept {
-                updatedGroups[groupIndex].files[fileIndex].isSelected = !allSelected
-            }
-        }
-
-        duplicateGroups = updatedGroups
-    }
-
-    func setKeptFile(_ file: DuplicateFile, in group: DuplicateGroup) {
-        guard let groupIndex = duplicateGroups.firstIndex(where: { $0.id == group.id }),
-              let fileIndex = duplicateGroups[groupIndex].files.firstIndex(where: { $0.id == file.id }) else {
-            return
-        }
-
-        // Create a mutable copy to ensure @Published triggers properly
-        var updatedGroups = duplicateGroups
-
-        // Clear kept flag from all files in this group
-        for i in updatedGroups[groupIndex].files.indices {
-            if updatedGroups[groupIndex].files[i].isKept {
-                // The previously kept file becomes selected for review
-                updatedGroups[groupIndex].files[i].isKept = false
-                updatedGroups[groupIndex].files[i].isSelected = true
-            }
-        }
-
-        // Set the new kept file and remove it from review selection.
-        updatedGroups[groupIndex].files[fileIndex].isKept = true
-        updatedGroups[groupIndex].files[fileIndex].isSelected = false
-
-        // Assign back to trigger @Published change notification
-        duplicateGroups = updatedGroups
-    }
-
-    func selectAllDuplicates() {
-        // Create a mutable copy to ensure @Published triggers properly and avoid mutation during iteration
-        var updatedGroups = duplicateGroups
-        for groupIndex in updatedGroups.indices {
-            for fileIndex in updatedGroups[groupIndex].files.indices {
-                if !updatedGroups[groupIndex].files[fileIndex].isKept {
-                    updatedGroups[groupIndex].files[fileIndex].isSelected = true
-                }
-            }
-        }
-        duplicateGroups = updatedGroups
-    }
-
-    func deselectAll() {
-        // Create a mutable copy to ensure @Published triggers properly and avoid mutation during iteration
-        var updatedGroups = duplicateGroups
-        for groupIndex in updatedGroups.indices {
-            for fileIndex in updatedGroups[groupIndex].files.indices {
-                updatedGroups[groupIndex].files[fileIndex].isSelected = false
-            }
-        }
-        duplicateGroups = updatedGroups
-    }
-
-    func selectOldestInEachGroup() {
-        // Create a mutable copy to ensure @Published triggers properly and avoid mutation during iteration
-        var updatedGroups = duplicateGroups
-        for groupIndex in updatedGroups.indices {
-            // First, clear all selections and kept flags
-            for fileIndex in updatedGroups[groupIndex].files.indices {
-                updatedGroups[groupIndex].files[fileIndex].isSelected = false
-                updatedGroups[groupIndex].files[fileIndex].isKept = false
-            }
-
-            // Find the newest file and mark it as kept
-            if let newestIndex = updatedGroups[groupIndex].files.indices.max(by: {
-                (updatedGroups[groupIndex].files[$0].modificationDate ?? .distantPast) <
-                (updatedGroups[groupIndex].files[$1].modificationDate ?? .distantPast)
-            }) {
-                updatedGroups[groupIndex].files[newestIndex].isKept = true
-            }
-
-            // Select all others for review
-            for fileIndex in updatedGroups[groupIndex].files.indices {
-                if !updatedGroups[groupIndex].files[fileIndex].isKept {
-                    updatedGroups[groupIndex].files[fileIndex].isSelected = true
-                }
-            }
-        }
-        duplicateGroups = updatedGroups
-    }
-
-    func explainDuplicateReview() {
-        guard selectedCount > 0 else {
-            showToastMessage(L("safety.notice.noSelection"), type: .info)
-            return
-        }
-
-        publishSafetyNotice(
-            safetyNoticePresenter.duplicatesStorageReviewNotice()
-        )
-    }
-
     func revealInFinder(_ file: DuplicateFile) {
         NSWorkspace.shared.selectFile(file.url.path, inFileViewerRootedAtPath: file.url.deletingLastPathComponent().path)
-    }
-
-    func dismissToast() {
-        showToast = false
-        latestSafetyNotice = nil
     }
 
     func clearFilter() {
@@ -342,27 +270,7 @@ class DuplicatesViewModel: ObservableObject {
         searchText = ""
     }
 
-    private func publishSafetyNotice(_ notice: SafetyNoticeState) {
-        latestSafetyNotice = notice
-        presentToast(notice.message, type: .info)
-    }
-
     private func showToastMessage(_ message: String, type: ToastType) {
-        latestSafetyNotice = nil
-        presentToast(message, type: type)
-    }
-
-    private func presentToast(_ message: String, type: ToastType) {
-        let presentationID = UUID()
-        toastPresentationID = presentationID
-        toastMessage = message
-        toastType = type
-        showToast = true
-
-        Task {
-            try? await Task.sleep(for: .seconds(3))
-            guard toastPresentationID == presentationID else { return }
-            dismissToast()
-        }
+        toasts.show(message, type: type)
     }
 }

@@ -21,7 +21,9 @@ defaults:
     shell: bash
 
 env:
-  XCODE_MAJOR: '27'
+  # CI-tested Xcode (README > Requirements): the newest Xcode 26.x on the macos-26 image.
+  # Each Select Xcode step fails when no Xcode_26.x is installed instead of using another one.
+  XCODE_MAJOR: '26'
   APP_NAME: MyMacCleaner
   SCHEME: MyMacCleaner
   DESTINATION: 'platform=macOS'
@@ -43,8 +45,12 @@ jobs:
 
       - name: Select Xcode
         run: |
-          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1 || true); [[ -n "$xcode_app" ]] || xcode_app=$(ls -d /Applications/Xcode*.app | sort -V | tail -1 || true)
-          [[ -n "$xcode_app" ]] || { echo "::error::No Xcode ${XCODE_MAJOR}.x on runner"; exit 1; }
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}.*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -z "$xcode_app" ]]; then
+            echo "::error::Xcode ${XCODE_MAJOR}.x is not installed on this runner, and CI does not fall back to another version. Update XCODE_MAJOR or runs-on. Installed:"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
           sudo xcode-select -s "$xcode_app"
           xcodebuild -version
 
@@ -66,6 +72,29 @@ jobs:
             -configuration Release \
             2>&1 | tee build-release.log
 
+      # Test products for the advisory macOS 14 and 15 jobs below. Universal, because the
+      # macos-14 runner is Intel. Tarred so the executable bits and symlinks survive the artifact.
+      # Advisory like those jobs: a failure here does not fail Build.
+      - name: Build for testing (universal)
+        continue-on-error: true
+        run: |
+          xcodebuild build-for-testing \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$SCHEME" \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath build/DerivedData \
+            ONLY_ACTIVE_ARCH=NO \
+            2>&1 | tee build-for-testing.log
+          tar -czf test-products.tgz build/DerivedData/Build/Products
+
+      - name: Upload test products
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-products
+          path: test-products.tgz
+          retention-days: 3
+
   # ============================================
   # Unit Tests + Coverage Ratchet
   # ============================================
@@ -83,8 +112,14 @@ jobs:
 
       - name: Select Xcode
         run: |
-          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1 || true); [[ -n "$xcode_app" ]] || xcode_app=$(ls -d /Applications/Xcode*.app | sort -V | tail -1 || true)
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}.*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -z "$xcode_app" ]]; then
+            echo "::error::Xcode ${XCODE_MAJOR}.x is not installed on this runner, and CI does not fall back to another version. Update XCODE_MAJOR or runs-on. Installed:"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
           sudo xcode-select -s "$xcode_app"
+          xcodebuild -version
 
       - name: Run Unit Tests
         run: |
@@ -110,6 +145,48 @@ jobs:
             unit-tests.log
 
   # ============================================
+  # Unit Tests on macOS 14 and 15 (advisory)
+  # ============================================
+  older-macos-tests:
+    name: Unit Tests (${{ matrix.os }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    # The deployment target is macOS 14, so run the Build job's test products there.
+    # Advisory until these jobs have passed once; they are not part of PR Checks Complete.
+    continue-on-error: true
+
+    steps:
+      - name: Download test products
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: test-products
+
+      # These images may not carry the pinned Xcode (macos-14 has no Xcode 26), so this job
+      # runs the prebuilt products with the newest Xcode installed and prints which one.
+      - name: Select newest installed Xcode
+        run: |
+          xcode_app=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$xcode_app"
+          sw_vers
+          xcodebuild -version
+
+      - name: Run unit tests without building
+        run: |
+          tar -xzf test-products.tgz
+          xctestrun=$(find build/DerivedData/Build/Products -maxdepth 1 -name '*.xctestrun' -print -quit)
+          [[ -n "$xctestrun" ]] || { echo "::error::No .xctestrun file in the test products"; exit 1; }
+          xcodebuild test-without-building \
+            -xctestrun "$xctestrun" \
+            -destination "$DESTINATION" \
+            -only-testing:MyMacCleanerTests \
+            2>&1 | tee unit-tests.log
+
+  # ============================================
   # UI Tests (advisory: needs a logged-in GUI session)
   # ============================================
   ui-test:
@@ -128,8 +205,14 @@ jobs:
 
       - name: Select Xcode
         run: |
-          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1 || true); [[ -n "$xcode_app" ]] || xcode_app=$(ls -d /Applications/Xcode*.app | sort -V | tail -1 || true)
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}.*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -z "$xcode_app" ]]; then
+            echo "::error::Xcode ${XCODE_MAJOR}.x is not installed on this runner, and CI does not fall back to another version. Update XCODE_MAJOR or runs-on. Installed:"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
           sudo xcode-select -s "$xcode_app"
+          xcodebuild -version
 
       - name: Run UI Tests
         run: |
@@ -167,8 +250,14 @@ jobs:
 
       - name: Select Xcode
         run: |
-          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1 || true); [[ -n "$xcode_app" ]] || xcode_app=$(ls -d /Applications/Xcode*.app | sort -V | tail -1 || true)
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}.*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -z "$xcode_app" ]]; then
+            echo "::error::Xcode ${XCODE_MAJOR}.x is not installed on this runner, and CI does not fall back to another version. Update XCODE_MAJOR or runs-on. Installed:"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
           sudo xcode-select -s "$xcode_app"
+          xcodebuild -version
 
       - name: Archive Build (ad hoc signing from Config/Signing.xcconfig)
         run: |
@@ -186,6 +275,7 @@ jobs:
           [[ -d "$app" ]] || { echo "::error::App not found in archive"; exit 1; }
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign --display --entitlements - "$app"
+          bash scripts/check-signed-entitlements.sh "$app"
           if [[ -e "$app/Contents/Frameworks/Sparkle.framework" ]]; then
             echo "::error::Sparkle framework must not ship"
             exit 1

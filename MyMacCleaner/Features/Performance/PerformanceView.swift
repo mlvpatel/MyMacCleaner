@@ -8,7 +8,21 @@ struct PerformanceView: View {
     @ObservedObject var viewModel: PerformanceViewModel
     @State private var isVisible = false
 
+    private static let guidanceID = "performance.guidance"
+
     var body: some View {
+        ScrollViewReader { proxy in
+            pageContent
+                .onAppear {
+                    // Home's Memory Guide link opens the page at the guidance, its last section.
+                    if viewModel.consumeGuidanceRequest() {
+                        proxy.scrollTo(Self.guidanceID, anchor: .top)
+                    }
+                }
+        }
+    }
+
+    private var pageContent: some View {
         ScrollView {
             VStack(spacing: Theme.Spacing.lg) {
                 headerSection
@@ -20,6 +34,7 @@ struct PerformanceView: View {
                 processSection
                     .staggeredAnimation(index: 3, isActive: isVisible)
                 guidanceSection
+                    .id(Self.guidanceID)
                     .staggeredAnimation(index: 4, isActive: isVisible)
             }
             .padding(.horizontal, Theme.Spacing.lg)
@@ -168,7 +183,7 @@ struct PerformanceView: View {
     }
 
     private var cpuColor: Color {
-        viewModel.cpuUsage > 80 ? .red : viewModel.cpuUsage > 50 ? .orange : .green
+        StatusLevel.cpu(viewModel.cpuUsage / 100).color
     }
 
     private var pressureColor: Color {

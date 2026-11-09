@@ -14,6 +14,7 @@ fail() {
     else
         printf '%s\n' "$rule_id" >&2
     fi
+    printf '  see docs/VERIFIER-RULES.md#%s\n' "$(printf '%s' "$rule_id" | /usr/bin/tr '[:upper:]' '[:lower:]')" >&2
     exit 1
 }
 

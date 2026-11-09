@@ -128,18 +128,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scan all categories at once to find junk files"
-          }
-        }
-      }
-    },
-    "home.scan.scanningCategory %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scanning %@..."
+            "value": "Scan six common folders at once and see what they hold"
           }
         }
       }
@@ -228,17 +217,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "installed"
-          }
-        }
-      }
-    },
-    "home.stats.junkFiles": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Junk Files"
           }
         }
       }
@@ -485,39 +463,6 @@
         }
       }
     },
-    "scanResults.selectAll": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select All"
-          }
-        }
-      }
-    },
-    "scanResults.deselectAll": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Deselect All"
-          }
-        }
-      }
-    },
-    "scanResults.selectedCount %lld": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld selected"
-          }
-        }
-      }
-    },
     "scanResults.andMore %lld": {
       "extractionState": "manual",
       "localizations": {
@@ -536,6 +481,61 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scan failed: %@"
+          }
+        }
+      }
+    },
+    "scanResults.found": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total found"
+          }
+        }
+      }
+    },
+    "home.stats.cachesAndLogs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Caches, Logs & Temp"
+          }
+        }
+      }
+    },
+    "home.stats.excludesPersonal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not counting your personal folders"
+          }
+        }
+      }
+    },
+    "home.health.notScanned": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not scanned yet"
+          }
+        }
+      }
+    },
+    "home.health.basis": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disk and memory use when the last Smart Scan finished"
           }
         }
       }

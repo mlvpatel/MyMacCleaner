@@ -54,10 +54,13 @@ purge are disabled at the architecture level — not merely hidden.
 
 - **SwiftUI** throughout, MVVM with Swift actors for services.
 - **Adaptive Experience** screen presents evidence at three depths and walks a
-  clear review → approve → move-to-Trash → receipt flow.
+  clear review → approve → move-to-Trash → receipt flow
+  ([docs/adaptive-experience.md](docs/adaptive-experience.md)).
 - **Sidebar navigation** across every surface, plus a real-time menu-bar item.
-- **Accessibility-minded:** honors Reduce Motion and Increase Contrast; keyboard
-  and VoiceOver support is built in, with a full manual audit still pending.
+- **Accessibility-minded:** honors Reduce Motion, Increase Contrast and Reduce
+  Transparency in Light and Dark; the sidebar, a Go menu (Command-1 to Command-9)
+  and expandable rows work with the keyboard and VoiceOver, with a full manual
+  audit still pending.
 - **Localization:** English (String Catalogs; more locales can be added later).
 
 ## 🔒 Safety model
@@ -77,7 +80,11 @@ _Add screenshots under `docs/screenshots/` and link them here._
 ## Requirements
 
 - macOS 14.0 or later (Apple Silicon or Intel)
-- Xcode 26 or later to build the app, run UI tests, and archive
+- Xcode 26 or later to build the app, run UI tests, and archive. CI tests with
+  Xcode 26 (the newest 26.x on GitHub's `macos-26` runners).
+- The app target builds in Swift 5 language mode with complete strict concurrency
+  checking; the local `CleanerCore` and `SafetyContract` packages declare
+  `swift-tools-version: 6.0`.
 
 ## Build & run
 
@@ -90,11 +97,15 @@ Then build and run the `MyMacCleaner` scheme (⌘R).
 ## Testing
 
 ```bash
+bash scripts/verify-all.sh   # everything the Safety Contract workflow runs; --fast skips Swift tests and coverage
 xcodebuild test -project MyMacCleaner.xcodeproj -scheme MyMacCleaner \
-  -destination 'platform=macOS' -only-testing:MyMacCleanerTests
-bash scripts/verify-safety-contract.sh
-bash scripts/verify-cleanercore.sh
+  -destination 'platform=macOS' -only-testing:MyMacCleanerTests \
+  -enableCodeCoverage YES -resultBundlePath build/TestResults.xcresult
+bash scripts/check-app-coverage.sh build/TestResults.xcresult   # app coverage ratchet
+swiftlint lint                                                  # CI pins SwiftLint 0.65.1
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#local-gates) for what each gate covers.
 
 CleanerCore holds ≥80% line coverage — see [docs/COVERAGE.md](docs/COVERAGE.md).
 

@@ -10,13 +10,15 @@ The page refreshes a small set of local observations:
 - A memory-use snapshot.
 - Battery information on portable Macs; desktop Macs report that no battery is present.
 - A startup-item count.
-- A macOS update-status check.
+- The installed macOS version, shown for reference. The app does not check for updates, so this row never says macOS is up to date and does not count toward the score.
 
-It also displays hardware, storage, battery, and macOS information that is available from the system.
+It also displays hardware, storage (under the startup disk's own name), battery, and macOS information that is available from the system.
 
 ## Health score
 
 The score and status summarize the checks completed during the latest refresh. A warning or attention state is a prompt to inspect its specific check and decide on a response; it is not an automated repair recommendation.
+
+A check that couldn't run, for example when `diskutil` gives no answer, says so instead of passing. It counts as zero in the score, and the summary says the result is incomplete instead of calling the Mac healthy.
 
 ## How to use it
 
@@ -25,6 +27,6 @@ The score and status summarize the checks completed during the latest refresh. A
 3. Choose **Refresh** when you need a new snapshot.
 4. Investigate a warning using macOS settings, Activity Monitor, or the responsible application.
 
-## Phase-0 limitation
+## What this page does not do
 
 System Health collects and summarizes local evidence only. It does not change storage, memory, startup configuration, updates, or hardware settings.

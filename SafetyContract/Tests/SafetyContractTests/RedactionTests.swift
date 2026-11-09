@@ -8,19 +8,19 @@ struct RedactionTests {
     func hostileFixtureLeavesOnlyCodesMarkersAndCounts() {
         let fixture = Self.hostileFixture
         let record = RedactingDiagnostic.record(
-            event: .updateManagerNetworkFailed,
+            event: .receiptJournalIncomplete,
             sensitiveClasses: fixture.map(\.sensitiveClass)
         )
         let rendered = record.rendered
 
-        #expect(record.eventCode == .updateManagerNetworkFailed)
+        #expect(record.eventCode == .receiptJournalIncomplete)
         #expect(record.totalRedactionCount == fixture.count)
         #expect(record.markerCategories == SensitiveDiagnosticClass.allCases.map(\.rawValue))
 
         for value in fixture.map(\.rawValue) + Self.forbiddenFragments {
             #expect(!rendered.contains(value), "rendered diagnostic leaked sensitive fixture data")
         }
-        #expect(rendered.contains("UPDATE_MANAGER_NETWORK_FAILED"))
+        #expect(rendered.contains("RECEIPT_JOURNAL_INCOMPLETE"))
         #expect(rendered.contains("path=1"))
         #expect(rendered.contains("receipt=1"))
     }
@@ -29,7 +29,7 @@ struct RedactionTests {
     func everySensitiveClassIsCountedWithoutRawValue(_ sensitiveClass: SensitiveDiagnosticClass) {
         let rawValue = "private-\(sensitiveClass.rawValue)-workspace-item"
         let record = RedactingDiagnostic.record(
-            event: .fileScannerPathSkipped,
+            event: .receiptHistoryUnavailable,
             sensitiveClasses: [sensitiveClass]
         )
 
@@ -43,7 +43,7 @@ struct RedactionTests {
     @Test
     func countAndRenderingAreBounded() {
         let record = RedactingDiagnostic.record(
-            event: .fileScannerCategorySkipped,
+            event: .receiptRunRecorded,
             sensitiveClasses: Array(repeating: .path, count: 500)
         )
 

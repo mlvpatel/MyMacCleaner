@@ -104,12 +104,13 @@ for required_stage in \
 done
 
 readonly workflow="$repository_root/.github/workflows/safety-contract.yml"
+readonly verify_all="$repository_root/scripts/verify-all.sh"
 readonly documentation="$repository_root/docs/SAFETY-CONTRACT.md"
 # The .planning validation artifact is intentionally absent from the sanitized public repo.
 # It is checked below only when present (see the guarded block near the end of this file).
 readonly validation="$repository_root/.planning/phases/00-safety-freeze-and-baseline-contract/00-VALIDATION.md"
 
-for required_artifact in "$workflow" "$documentation"; do
+for required_artifact in "$workflow" "$verify_all" "$documentation"; do
     if [[ ! -f "$required_artifact" ]]; then
         echo "Missing safety contract artifact: ${required_artifact##*/}" >&2
         exit 1
@@ -123,7 +124,9 @@ for required_workflow_line in 'contents: read' 'persist-credentials: false' 'use
     fi
 done
 
-if [[ $(/usr/bin/grep -Fxc '        run: bash scripts/verify-safety-contract.sh' "$workflow") -ne 1 ]]; then
+# The workflow delegates to scripts/verify-all.sh, which must run the canonical command exactly once.
+if [[ $(/usr/bin/grep -Fxc '        run: bash scripts/verify-all.sh' "$workflow") -ne 1 ]] \
+    || [[ $(/usr/bin/grep -Fxc '    run_step bash scripts/verify-safety-contract.sh' "$verify_all") -ne 1 ]]; then
     echo "Safety workflow must run the canonical command exactly once." >&2
     exit 1
 fi
@@ -169,8 +172,9 @@ if ! /usr/bin/awk '
 fi
 
 # Note: `xcode-select` is permitted (the runner must select the toolchain); `xcodebuild`
-# remains prohibited so this minimal safety workflow cannot become a build/sign pipeline.
-if /usr/bin/grep -Eqi '(actions/(cache|upload-artifact|download-artifact)|xcodebuild|notari[sz]|(^|[^[:alpha:]])sign|release|publish|secrets[.]|github_token|^[[:space:]]*run:.*git[[:space:]]+push)' "$workflow"; then
+# remains prohibited so this minimal safety workflow (and the verify-all.sh it runs) cannot
+# become a build/sign pipeline.
+if /usr/bin/grep -Eqi '(actions/(cache|upload-artifact|download-artifact)|xcodebuild|notari[sz]|(^|[^[:alpha:]])sign|release|publish|secrets[.]|github_token|^[[:space:]]*run:.*git[[:space:]]+push)' "$workflow" "$verify_all"; then
     echo "Safety workflow contains a prohibited capability." >&2
     exit 1
 fi

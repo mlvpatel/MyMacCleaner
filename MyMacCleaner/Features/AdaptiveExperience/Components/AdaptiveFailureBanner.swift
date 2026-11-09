@@ -3,6 +3,8 @@ import SwiftUI
 /// Explains why evidence could not be shown or a run did not start. Never offers a retry that bypasses review.
 struct AdaptiveFailureBanner: View {
     let failure: AdaptiveSessionFailure
+    /// Used only when the message points at the receipts.
+    let onOpenReceipts: () -> Void
     let onDismiss: () -> Void
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -14,6 +16,11 @@ struct AdaptiveFailureBanner: View {
             Text(L(failure.messageKey))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("adaptive.failure.message")
+            if failure.opensReceipts {
+                Button(L("adaptive.failure.openReceipts"), action: onOpenReceipts)
+                    .accessibilityIdentifier("adaptive.failure.openReceipts")
+                    .accessibilityHint(L("adaptive.execution.viewReceipt.hint"))
+            }
             Button(L("adaptive.failure.dismiss"), action: onDismiss)
                 .accessibilityIdentifier("adaptive.failure.dismiss")
         }

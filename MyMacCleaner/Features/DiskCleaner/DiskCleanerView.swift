@@ -3,9 +3,13 @@ import SwiftUI
 struct DiskCleanerView: View {
     @ObservedObject var viewModel: DiskCleanerViewModel
     @ObservedObject var spaceLensViewModel: SpaceLensViewModel
-    @StateObject private var privacyViewModel = BrowserPrivacyViewModel()
+    /// Owned by AppState, like the other view models, so its results survive a section switch.
+    @ObservedObject var privacyViewModel: BrowserPrivacyViewModel
+    let openExperience: () -> Void
+    /// "Learn why" on the Trash notice: Experience on its Trash explanation, without a scan.
+    let openTrashExplanation: () -> Void
+    let openPermissions: () -> Void
     @State private var isVisible = false
-    @State private var selectedTab: DiskCleanerTab = .cleaner
 
     // Section color for disk cleaner
     private let sectionColor = Theme.Colors.storage
@@ -17,7 +21,7 @@ struct DiskCleanerView: View {
 
         var icon: String {
             switch self {
-            case .cleaner: return "trash"
+            case .cleaner: return "internaldrive"
             case .privacy: return "hand.raised.fill"
             case .spaceLens: return "circle.hexagongrid.fill"
             }
@@ -39,21 +43,28 @@ struct DiskCleanerView: View {
                     // Header
                     headerSection
                         .staggeredAnimation(index: 0, isActive: isVisible)
+                    if viewModel.scanStoppedByLeaving {
+                        ScanStoppedNotice()
+                    }
 
                     // Tab picker
                     tabPicker
                         .staggeredAnimation(index: 1, isActive: isVisible)
 
                     // Content based on selected tab
-                    switch selectedTab {
+                    switch viewModel.selectedTab {
                     case .cleaner:
                         cleanerContent
                             .staggeredAnimation(index: 2, isActive: isVisible)
                     case .privacy:
-                        BrowserPrivacyView(viewModel: privacyViewModel)
+                        BrowserPrivacyView(
+                            viewModel: privacyViewModel,
+                            openExperience: openExperience,
+                            openPermissions: openPermissions
+                        )
                             .staggeredAnimation(index: 2, isActive: isVisible)
                     case .spaceLens:
-                        SpaceLensView(viewModel: spaceLensViewModel)
+                        SpaceLensView(viewModel: spaceLensViewModel, openExperience: openExperience)
                             .staggeredAnimation(index: 2, isActive: isVisible)
                     }
                 }
@@ -70,40 +81,23 @@ struct DiskCleanerView: View {
                     .transition(.opacity)
 
                 ScanningOverlay(
-                    progress: viewModel.scanProgress,
-                    category: viewModel.currentScanCategory?.localizedName ?? L("diskCleaner.scan.preparing"),
+                    progress: nil,
+                    category: L("scan.inProgress.caption"),
                     accentColor: sectionColor,
                     onCancel: viewModel.cancelScan
                 )
-                .transition(.scale.combined(with: .opacity))
+                .motionTransition(.scale.combined(with: .opacity))
             }
 
-            // Toast
-            if viewModel.showToast {
-                VStack {
-                    ToastView(
-                        message: viewModel.toastMessage,
-                        type: viewModel.toastType,
-                        safetyNotice: viewModel.latestSafetyNotice,
-                        onDismiss: viewModel.dismissToast
-                    )
-                    .padding(.top, Theme.Spacing.lg)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
+            ToastOverlay(presenter: viewModel.toasts, onLearnWhy: openTrashExplanation)
         }
-        .animation(Theme.Animation.spring, value: selectedTab)
+        .animation(Theme.Animation.spring, value: viewModel.selectedTab)
         .animation(Theme.Animation.springSmooth, value: viewModel.isScanning)
-        .animation(Theme.Animation.spring, value: viewModel.showToast)
-        .sheet(isPresented: $viewModel.showCategoryDetail) {
-            if let category = viewModel.selectedCategory {
+        .sheet(item: $viewModel.detailCategory) { _ in
+            if let result = viewModel.detailResult {
                 CategoryDetailSheet(
-                    result: category,
-                    onToggleItem: { item in
-                        viewModel.toggleItemSelection(item, in: category.category)
-                    },
-                    onClose: { viewModel.showCategoryDetail = false }
+                    result: result,
+                    onClose: { viewModel.detailCategory = nil }
                 )
             }
         }
@@ -113,7 +107,7 @@ struct DiskCleanerView: View {
             }
         }
         .onDisappear {
-            viewModel.cancelScan()
+            viewModel.leavePage()
         }
     }
 
@@ -157,7 +151,7 @@ struct DiskCleanerView: View {
         HStack {
             GlassTabPicker(
                 tabs: DiskCleanerTab.allCases,
-                selection: $selectedTab,
+                selection: $viewModel.selectedTab,
                 icon: { $0.icon },
                 label: { $0.localizedName },
                 accentColor: sectionColor
@@ -171,18 +165,24 @@ struct DiskCleanerView: View {
 
     @ViewBuilder
     private var cleanerContent: some View {
+        if let error = viewModel.errorMessage {
+            ScanErrorNotice(message: error)
+        }
+
+        if let coverage = viewModel.lastScanCoverage, !coverage.isComplete {
+            ScanCoverageNotice(coverage: coverage, openPermissions: openPermissions)
+        }
+
         if !viewModel.hasScanned {
             // Initial scan prompt
             scanPromptSection
         } else if viewModel.scanResults.isEmpty {
-            // No junk found
             emptyStateSection
         } else {
             // Category list
             categoryListSection
 
-            // Review notice button
-            reviewButtonSection
+            ExperienceHandoffCard(openExperience: openExperience)
         }
 
         // Trash inventory card
@@ -233,6 +233,16 @@ struct DiskCleanerView: View {
             ) {
                 viewModel.startScan()
             }
+            .accessibilityIdentifier("diskCleaner.scan.start")
+
+            // Home's notice, said before the scan starts, so the macOS folder prompts are expected.
+            if !viewModel.hasFullDiskAccess {
+                Text(L("permissions.fda.limitedScan.folders"))
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 400)
+            }
         }
         .padding(Theme.Spacing.xxl)
         .frame(maxWidth: .infinity)
@@ -243,15 +253,16 @@ struct DiskCleanerView: View {
 
     private var emptyStateSection: some View {
         VStack(spacing: Theme.Spacing.lg) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: "tray")
                 .font(Theme.Typography.size48)
-                .foregroundStyle(.green)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
 
             VStack(spacing: Theme.Spacing.xs) {
-                Text(L("diskCleaner.empty.title"))
+                Text(L("scan.empty.title"))
                     .font(Theme.Typography.size20Semibold)
 
-                Text(L("diskCleaner.empty.description"))
+                Text(L(viewModel.lastScanCoverage?.isComplete == false ? "scan.empty.incomplete" : "scan.empty.complete"))
                     .font(Theme.Typography.size14)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -273,29 +284,11 @@ struct DiskCleanerView: View {
 
     private var categoryListSection: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            // Selection controls
             HStack {
                 Text(L("diskCleaner.categories"))
                     .font(Theme.Typography.headline)
 
                 Spacer()
-
-                Button(L("diskCleaner.selectAll")) {
-                    viewModel.selectAll()
-                }
-                .buttonStyle(.plain)
-                .font(Theme.Typography.size12Medium)
-                .foregroundStyle(sectionColor)
-
-                Text("·")
-                    .foregroundStyle(.tertiary)
-
-                Button(L("diskCleaner.deselectAll")) {
-                    viewModel.deselectAll()
-                }
-                .buttonStyle(.plain)
-                .font(Theme.Typography.size12Medium)
-                .foregroundStyle(sectionColor)
 
                 Button(action: viewModel.startScan) {
                     HStack(spacing: Theme.Spacing.xxs) {
@@ -320,47 +313,12 @@ struct DiskCleanerView: View {
                     onToggleExpand: {
                         viewModel.toggleCategoryExpansion(result.category)
                     },
-                    onToggleSelection: {
-                        viewModel.toggleCategorySelection(result.category)
-                    },
-                    onToggleItem: { item in
-                        viewModel.toggleItemSelection(item, in: result.category)
-                    },
                     onViewDetails: {
-                        viewModel.showDetails(for: result)
+                        viewModel.showDetails(for: result.category)
                     }
                 )
             }
         }
-    }
-
-    // MARK: - Review Button
-
-    private var reviewButtonSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                Text(LFormat("diskCleaner.selected %@", viewModel.formattedSelectedSize))
-                    .font(Theme.Typography.size15Semibold)
-
-                Text(LFormat("diskCleaner.itemCount %lld", viewModel.selectedItemCount))
-                    .font(Theme.Typography.size11)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            GlassActionButton(
-                LFormat("safety.notice.reviewSelected %@", viewModel.formattedSelectedSize),
-                icon: "info.circle.fill",
-                color: .blue,
-                disabled: viewModel.selectedItemCount == 0
-            ) {
-                viewModel.explainSelectedStorageReview()
-            }
-        }
-        .padding(Theme.Spacing.lg)
-        .glassCard()
-        .shadow(color: Color.blue.opacity(0.2), radius: 15, y: 5)
     }
 
     // MARK: - Trash Inventory Section
@@ -430,12 +388,14 @@ struct DiskCleanerView: View {
 // MARK: - Scanning Overlay
 
 struct ScanningOverlay: View {
-    let progress: Double
+    /// nil when the scan cannot measure progress: an indeterminate spinner, never a fake percentage.
+    let progress: Double?
     let category: String
     var accentColor: Color = .blue
     var onCancel: (() -> Void)? = nil
 
     @State private var isAnimating = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: Theme.Spacing.lg) {
@@ -446,23 +406,29 @@ struct ScanningOverlay: View {
                     .blur(radius: 20)
                     .scaleEffect(isAnimating ? 1.1 : 0.9)
 
-                Circle()
-                    .stroke(Color.white.opacity(0.1), lineWidth: 4)
-                    .frame(width: 80, height: 80)
+                if let progress {
+                    Circle()
+                        .stroke(Theme.Colors.track, lineWidth: 4)
+                        .frame(width: 80, height: 80)
 
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(
-                        accentColor.gradient,
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                    )
-                    .frame(width: 80, height: 80)
-                    .rotationEffect(.degrees(-90))
-                    .animation(Theme.Animation.spring, value: progress)
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(
+                            accentColor.gradient,
+                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                        )
+                        .frame(width: 80, height: 80)
+                        .rotationEffect(.degrees(-90))
+                        .animation(Theme.Animation.spring, value: progress)
 
-                Image(systemName: "magnifyingglass")
-                    .font(Theme.Typography.size28Medium)
-                    .foregroundStyle(accentColor)
+                    Image(systemName: "magnifyingglass")
+                        .font(Theme.Typography.size28Medium)
+                        .foregroundStyle(accentColor)
+                } else {
+                    ProgressView()
+                        .controlSize(.large)
+                        .tint(accentColor)
+                }
             }
 
             VStack(spacing: Theme.Spacing.xxs) {
@@ -472,25 +438,30 @@ struct ScanningOverlay: View {
                 Text(category)
                     .font(Theme.Typography.size13)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
 
-                Text("\(Int(progress * 100))%")
-                    .font(Theme.Typography.size24Bold.monospacedDigit())
-                    .foregroundStyle(accentColor)
-            }
-
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                        .fill(Color.white.opacity(0.1))
-                        .frame(height: 8)
-
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                        .fill(accentColor.gradient)
-                        .frame(width: geometry.size.width * progress, height: 8)
-                        .animation(Theme.Animation.spring, value: progress)
+                if let progress {
+                    Text("\(Int(progress * 100))%")
+                        .font(Theme.Typography.size24Bold.monospacedDigit())
+                        .foregroundStyle(accentColor)
                 }
             }
-            .frame(width: 200, height: 8)
+
+            if let progress {
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
+                            .fill(Theme.Colors.track)
+                            .frame(height: 8)
+
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
+                            .fill(accentColor.gradient)
+                            .frame(width: geometry.size.width * progress, height: 8)
+                            .animation(Theme.Animation.spring, value: progress)
+                    }
+                }
+                .frame(width: 200, height: 8)
+            }
 
             // Cancel button (optional)
             if let onCancel = onCancel {
@@ -500,10 +471,11 @@ struct ScanningOverlay: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, Theme.Spacing.lg)
                         .padding(.vertical, Theme.Spacing.xs)
-                        .background(Color.white.opacity(0.1))
+                        .background(Theme.Colors.surfaceHover)
                         .cornerRadius(Theme.CornerRadius.small)
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
                 .padding(.top, Theme.Spacing.xs)
             }
         }
@@ -511,6 +483,8 @@ struct ScanningOverlay: View {
         .frame(width: 280)
         .glassCardProminent()
         .onAppear {
+            // No perpetual pulse with Reduce Motion.
+            guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                 isAnimating = true
             }
@@ -521,6 +495,13 @@ struct ScanningOverlay: View {
 // MARK: - Preview
 
 #Preview {
-    DiskCleanerView(viewModel: DiskCleanerViewModel(), spaceLensViewModel: SpaceLensViewModel())
+    DiskCleanerView(
+        viewModel: DiskCleanerViewModel(),
+        spaceLensViewModel: SpaceLensViewModel(),
+        privacyViewModel: BrowserPrivacyViewModel(),
+        openExperience: {},
+        openTrashExplanation: {},
+        openPermissions: {}
+    )
         .frame(width: 800, height: 600)
 }

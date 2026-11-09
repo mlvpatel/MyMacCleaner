@@ -16,9 +16,11 @@ struct PortManagementView: View {
                     headerSection
                         .staggeredAnimation(index: 0, isActive: isVisible)
 
-                    // Stats
-                    statsSection
-                        .staggeredAnimation(index: 1, isActive: isVisible)
+                    // Stats; a failed read has no counts to show
+                    if !viewModel.isUnavailable {
+                        statsSection
+                            .staggeredAnimation(index: 1, isActive: isVisible)
+                    }
 
                     // Controls
                     controlsSection
@@ -42,6 +44,7 @@ struct PortManagementView: View {
             withAnimation(Theme.Animation.springSmooth) {
                 isVisible = true
             }
+            viewModel.loadIfNeeded()
         }
         .onDisappear {
             viewModel.cancelRefresh()
@@ -59,6 +62,12 @@ struct PortManagementView: View {
                 Text(L("portManagement.subtitle"))
                     .font(Theme.Typography.size13)
                     .foregroundStyle(.secondary)
+
+                if let lastRead = viewModel.lastRead {
+                    Text(LFormat("portManagement.lastRead %@", lastRead.formatted(date: .omitted, time: .shortened)))
+                        .font(Theme.Typography.size11)
+                        .foregroundStyle(.tertiary)
+                }
             }
 
             Spacer()
@@ -138,16 +147,18 @@ struct PortManagementView: View {
 
     // MARK: - Empty Section
 
+    /// Also covers a failed read, which must never look like "no connections".
     private var emptySection: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "network.slash")
+        let unavailable = viewModel.isUnavailable
+        return VStack(spacing: Theme.Spacing.md) {
+            Image(systemName: unavailable ? "exclamationmark.triangle" : "network.slash")
                 .font(Theme.Typography.size48)
                 .foregroundStyle(.tertiary)
 
-            Text(L("portManagement.empty.title"))
+            Text(L(unavailable ? "portManagement.unavailable.title" : "portManagement.empty.title"))
                 .font(Theme.Typography.headline)
 
-            Text(L("portManagement.empty.message"))
+            Text(L(unavailable ? "portManagement.unavailable.message" : "portManagement.empty.message"))
                 .font(Theme.Typography.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -279,7 +290,7 @@ struct ConnectionRow: View {
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
-        .background(isHovered ? Color.white.opacity(0.03) : Color.clear)
+        .background(isHovered ? Theme.Colors.subtleFill : Color.clear)
         .onHover { isHovered = $0 }
     }
 }

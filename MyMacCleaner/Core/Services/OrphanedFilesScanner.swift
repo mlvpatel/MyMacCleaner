@@ -11,7 +11,6 @@ struct OrphanedFile: Identifiable {
     let bundleIdPattern: String?
     let size: Int64
     let modificationDate: Date?
-    var isSelected: Bool = false
 
     var formattedSize: String {
         ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
@@ -327,7 +326,7 @@ actor OrphanedFilesScanner {
 
         // Calculate size
         if resourceValues?.isDirectory == true {
-            size = await calculateDirectorySize(url)
+            size = DirectorySize.allocatedBytes(at: url) ?? 0
         } else {
             size = Int64(resourceValues?.totalFileAllocatedSize ?? 0)
         }
@@ -345,23 +344,5 @@ actor OrphanedFilesScanner {
             size: size,
             modificationDate: modDate
         )
-    }
-
-    private func calculateDirectorySize(_ url: URL) async -> Int64 {
-        guard let enumerator = FileManager.default.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.totalFileAllocatedSizeKey],
-            options: [.skipsHiddenFiles]
-        ) else { return 0 }
-
-        var totalSize: Int64 = 0
-
-        while let fileURL = enumerator.nextObject() as? URL {
-            if let size = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey]).totalFileAllocatedSize {
-                totalSize += Int64(size)
-            }
-        }
-
-        return totalSize
     }
 }

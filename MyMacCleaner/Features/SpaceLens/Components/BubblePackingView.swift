@@ -35,6 +35,9 @@ class BubbleContainerView: NSView {
 
     private var bubbleViews: [UUID: SingleBubbleView] = [:]
     private var currentNodes: [FileNode] = []
+    /// Input IDs from the last update. Only the largest 20 nodes become bubbles, so comparing
+    /// against the placed bubbles would rebuild every bubble on each hover in larger folders.
+    private var lastInputIDs: [UUID] = []
     private var lastLayoutSize: CGSize = .zero
     private var isUpdating = false
 
@@ -54,20 +57,17 @@ class BubbleContainerView: NSView {
     func updateBubbles(nodes: [FileNode], parentSize: Int64) {
         guard !isUpdating else { return }
 
-        currentNodes = nodes
-
         // Update highlight state only
         for (id, view) in bubbleViews {
             view.isHighlighted = (id == highlightedNodeId)
         }
 
-        // Rebuild if nodes changed or first time
-        let nodeIds = Set(nodes.map { $0.id })
-        let existingIds = Set(bubbleViews.keys)
-
-        if nodeIds != existingIds {
-            rebuildBubblesIfNeeded()
-        }
+        // Rebuild only when the input changed (a hover changes the highlight, not the nodes)
+        let inputIDs = nodes.map(\.id)
+        guard inputIDs != lastInputIDs else { return }
+        lastInputIDs = inputIDs
+        currentNodes = nodes
+        rebuildBubblesIfNeeded()
     }
 
     private func rebuildBubblesIfNeeded() {

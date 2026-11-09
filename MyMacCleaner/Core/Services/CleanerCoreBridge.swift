@@ -1,32 +1,8 @@
 import Foundation
 import CleanerCore
-import SafetyContract
 
 struct LegacyScanSnapshot {
     let result: ScanResult
-    let state: LegacyBridgeState
-}
-
-struct LegacyBridgeIssue: Equatable {
-    let rootID: String
-    let detectorID: String
-    let cause: CoreErrorCause
-
-    init(_ issue: ProjectedIssue) {
-        rootID = issue.rootID.value
-        detectorID = issue.detectorID.value
-        cause = issue.cause
-    }
-}
-
-enum LegacyBridgeState: Equatable {
-    case complete
-    case continuing
-    case partial(issues: [LegacyBridgeIssue])
-    case permissionDenied
-    case cancelled
-    case corruptMetadata
-    case unsupportedLayout
 }
 
 enum CleanerCoreBridgeError: Error, Equatable {
@@ -57,8 +33,7 @@ enum CleanerCoreBridge {
         }
 
         return LegacyScanSnapshot(
-            result: ScanResult(category: category, items: items, isSelected: false),
-            state: LegacyBridgeState(projection.state)
+            result: ScanResult(category: category, items: items)
         )
     }
 
@@ -78,8 +53,7 @@ enum CleanerCoreBridge {
         }
 
         return LegacyScanSnapshot(
-            result: ScanResult(category: category, items: items, isSelected: false),
-            state: LegacyBridgeState(projection.state)
+            result: ScanResult(category: category, items: items)
         )
     }
 
@@ -107,9 +81,8 @@ enum CleanerCoreBridge {
             name: name,
             path: itemURL,
             size: try displaySize(from: finding.sizes),
-            modificationDate: nil,
-            category: category,
-            isSelected: false
+            modificationDate: modificationDate(from: finding.modification),
+            category: category
         )
     }
 
@@ -140,9 +113,14 @@ enum CleanerCoreBridge {
             path: itemURL,
             size: try displaySize(from: entry.space),
             modificationDate: nil,
-            category: category,
-            isSelected: false
+            category: category
         )
+    }
+
+    /// The instant the scan observed; unknown or unavailable evidence stays nil ("Unknown").
+    private static func modificationDate(from evidence: EvidenceValue<FileModificationInstant>) -> Date? {
+        guard case .observed(let instant) = evidence else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(instant.unixNanoseconds) / 1_000_000_000)
     }
 
     private static func resolve(locator: RelativeLocator, declaredRootURL: URL) throws -> URL {
@@ -216,151 +194,5 @@ enum CleanerCoreBridge {
             return logicalBytes
         }
         throw CleanerCoreBridgeError.unavailableSizeEvidence
-    }
-}
-
-enum BridgeReceiptFailure: Error, Equatable {
-    case historyBusy
-    case reviewRequired
-    case unknownReceipt
-    case refused
-    case invalidIdentifier
-}
-
-struct BridgeReceiptRow: Equatable {
-    let id: String
-    let createdAtNanoseconds: Int64
-    let statusMarker: String
-    let schemaMarker: String
-    let itemCount: Int
-    let estimateMarker: String
-    let observedReclaimMarker: String
-    let recoveryMarker: String
-    let guidanceMarker: String
-}
-
-enum BridgeRevealState: Equatable {
-    case revealRequested
-    case unavailable
-}
-
-extension CleanerCoreBridge {
-    struct ReceiptSession {
-        private let listHistory: @Sendable () async -> Result<[RedactedReceiptSummary], ReceiptPersistenceError>
-        private let deleteHistory: @Sendable ([ReceiptID]) async -> Result<Void, ReceiptPersistenceError>
-        private let revealItem: @Sendable (ReceiptID, ReceiptItemID) async -> ReceiptRevealOutcome
-
-        init(
-            listHistory: @escaping @Sendable () async -> Result<[RedactedReceiptSummary], ReceiptPersistenceError>,
-            deleteHistory: @escaping @Sendable ([ReceiptID]) async -> Result<Void, ReceiptPersistenceError>,
-            revealItem: @escaping @Sendable (ReceiptID, ReceiptItemID) async -> ReceiptRevealOutcome
-        ) {
-            self.listHistory = listHistory
-            self.deleteHistory = deleteHistory
-            self.revealItem = revealItem
-        }
-
-        func list() async -> Result<[BridgeReceiptRow], BridgeReceiptFailure> {
-            switch await listHistory() {
-            case let .failure(error):
-                return .failure(Self.map(error))
-            case let .success(rows):
-                SafetyDiagnosticLogger.emit(
-                    RedactingDiagnostic.record(event: .fileScannerCategorySkipped, sensitiveClasses: [.receipt])
-                )
-                return .success(rows.map(Self.row(from:)))
-            }
-        }
-
-        func delete(receiptID: String) async -> Result<Void, BridgeReceiptFailure> {
-            let id: ReceiptID
-            do {
-                id = try ReceiptID(receiptID)
-            } catch {
-                return .failure(.invalidIdentifier)
-            }
-            switch await deleteHistory([id]) {
-            case let .failure(error):
-                return .failure(Self.map(error))
-            case .success:
-                SafetyDiagnosticLogger.emit(
-                    RedactingDiagnostic.record(event: .fileScannerCategorySkipped, sensitiveClasses: [.receipt])
-                )
-                return .success(())
-            }
-        }
-
-        func reveal(receiptID: String, itemID: String) async -> BridgeRevealState {
-            let receipt: ReceiptID
-            let item: ReceiptItemID
-            do {
-                receipt = try ReceiptID(receiptID)
-                item = try ReceiptItemID(itemID)
-            } catch {
-                return .unavailable
-            }
-            switch await revealItem(receipt, item) {
-            case .revealRequested:
-                SafetyDiagnosticLogger.emit(
-                    RedactingDiagnostic.record(
-                        event: .fileScannerPathSkipped,
-                        sensitiveClasses: [.receipt, .path]
-                    )
-                )
-                return .revealRequested
-            case .unavailable:
-                return .unavailable
-            }
-        }
-
-        private static func row(from summary: RedactedReceiptSummary) -> BridgeReceiptRow {
-            BridgeReceiptRow(
-                id: summary.id.value,
-                createdAtNanoseconds: summary.createdAt.unixNanoseconds,
-                statusMarker: summary.statusMarker,
-                schemaMarker: summary.schemaMarker,
-                itemCount: summary.itemCount,
-                estimateMarker: summary.estimateMarker,
-                observedReclaimMarker: summary.observedReclaimMarker,
-                recoveryMarker: summary.recoveryMarker,
-                guidanceMarker: summary.guidanceMarker
-            )
-        }
-
-        private static func map(_ error: ReceiptPersistenceError) -> BridgeReceiptFailure {
-            switch error {
-            case .historyBusy:
-                return .historyBusy
-            case .reviewRequired:
-                return .reviewRequired
-            case .unknownReceipt:
-                return .unknownReceipt
-            case .invalidIdentifier:
-                return .invalidIdentifier
-            default:
-                return .refused
-            }
-        }
-    }
-}
-
-private extension LegacyBridgeState {
-    init(_ state: ProjectedScanState) {
-        switch state {
-        case .complete:
-            self = .complete
-        case .continuing:
-            self = .continuing
-        case .partial(let issues):
-            self = .partial(issues: issues.map(LegacyBridgeIssue.init))
-        case .permissionDenied:
-            self = .permissionDenied
-        case .cancelled:
-            self = .cancelled
-        case .corruptMetadata:
-            self = .corruptMetadata
-        case .unsupportedLayout:
-            self = .unsupportedLayout
-        }
     }
 }

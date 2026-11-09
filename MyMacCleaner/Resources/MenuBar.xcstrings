@@ -122,39 +122,6 @@
         }
       }
     },
-    "menuBar.memory.pressure.critical": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Memory pressure critical"
-          }
-        }
-      }
-    },
-    "menuBar.memory.pressure.normal": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Memory pressure normal"
-          }
-        }
-      }
-    },
-    "menuBar.memory.pressure.warning": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Memory pressure elevated"
-          }
-        }
-      }
-    },
     "menuBar.quit": {
       "extractionState": "manual",
       "localizations": {

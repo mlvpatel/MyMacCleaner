@@ -96,6 +96,8 @@ expect_failure "Empty Trash function reference fixture" "SC-PERMANENT-MUTATION" 
     "$verifier" --fixture-root "$fixtures/unsafe/EmptyTrashReference.swift"
 expect_failure "Empty Trash multiline reference fixture" "SC-PERMANENT-MUTATION" env SAFETY_CONTRACT_SELF_TEST_SENTINEL="$sentinel" \
     "$verifier" --fixture-root "$fixtures/unsafe/EmptyTrashMultilineReference.swift"
+expect_failure "wait before pipe drain fixture" "SC-PROCESS-DRAIN-ORDER" env SAFETY_CONTRACT_SELF_TEST_SENTINEL="$sentinel" \
+    "$verifier" --fixture-root "$fixtures/unsafe/WaitBeforeDrain.swift"
 expect_failure "missing fixture root" "SC-INVALID-INPUT" env SAFETY_CONTRACT_SELF_TEST_SENTINEL="$sentinel" \
     "$verifier" --fixture-root "$fixtures/missing"
 expect_failure "unreadable fixture root" "SC-INVALID-INPUT" env SAFETY_CONTRACT_SELF_TEST_SENTINEL="$sentinel" \
@@ -122,6 +124,14 @@ for callback in OnClean OnDelete OnRemove OnTrash; do
 done
 expect_failure "unlisted process fixture" "SC-UNLISTED-PROCESS" env SAFETY_CONTRACT_SELF_TEST_SENTINEL="$sentinel" \
     "$verifier" --fixture-root "$fixtures/unsafe/UnlistedProcess.swift"
+expect_failure "process outside the owner file" "SC-UNLISTED-PROCESS" env SAFETY_CONTRACT_SELF_TEST_SENTINEL="$sentinel" \
+    "$verifier" --fixture-process-root "$fixtures/process-owner/unlisted-caller"
+expect_failure "executable outside the allowlist" "SC-PROCESS-IDENTITY" env SAFETY_CONTRACT_SELF_TEST_SENTINEL="$sentinel" \
+    "$verifier" --fixture-process-root "$fixtures/process-owner/unlisted-executable"
+expect_failure "argument outside the allowlist" "SC-PROCESS-IDENTITY" env SAFETY_CONTRACT_SELF_TEST_SENTINEL="$sentinel" \
+    "$verifier" --fixture-process-root "$fixtures/process-owner/unlisted-argument"
+expect_failure "process owner fixture requires sentinel" "SC-FIXTURE-AUTHORIZATION" \
+    "$verifier" --fixture-process-root "$fixtures/process-owner/unlisted-caller"
 expect_success "foundation verifier" "$verifier" --foundation-only
 expect_success "fixed system process verifier" "$verifier" --system-process-only
 
@@ -264,11 +274,11 @@ printf '%s\n' \
 expect_manifest_failure "missing manifest rationale" "SC-MANIFEST-FIELD" "$temporary_directory/missing-rationale.txt"
 
 printf '%s\n' \
-    'startup.sfltool.dumpbtm|/usr/bin/sfltool|dumpbtm,extra|MyMacCleaner/Core/Services/StartupItemsService.swift|parseBackgroundItems|Fixed local read-only inventory; no network access.' \
-    'startup.launchctl.list|/bin/launchctl|list|MyMacCleaner/Core/Services/StartupItemsService.swift|parseLaunchctlItems|Fixed local read-only inventory; no network access.' \
-    'ports.lsof.tcp-list|/usr/sbin/lsof|-iTCP,-sTCP:LISTEN,ESTABLISHED,-n,-P|MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift|parsePorts|Fixed local read-only inventory; no network access.' \
-    'health.diskutil.root-info|/usr/sbin/diskutil|info,/|MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift|parseDiskInfo|Fixed local read-only inventory; no network access.' \
-    'activity.lsof.open-files|/usr/sbin/lsof|-Fn,-n,-P,-w,-b|MyMacCleaner/Core/Services/OpenFileActivityObserver.swift|parseOpenFilePaths|Fixed local read-only inventory; no network access.' \
+    'startup.sfltool.dumpbtm|/usr/bin/sfltool|dumpbtm,extra|MyMacCleaner/Core/Services/ReadOnlyProcess.swift|parseBackgroundItems|Fixed local read-only inventory; no network access.' \
+    'startup.launchctl.list|/bin/launchctl|list|MyMacCleaner/Core/Services/ReadOnlyProcess.swift|parseLaunchctlItems|Fixed local read-only inventory; no network access.' \
+    'ports.lsof.tcp-list|/usr/sbin/lsof|-iTCP,-sTCP:LISTEN,ESTABLISHED,-n,-P|MyMacCleaner/Core/Services/ReadOnlyProcess.swift|parsePorts|Fixed local read-only inventory; no network access.' \
+    'health.diskutil.root-info|/usr/sbin/diskutil|info,/|MyMacCleaner/Core/Services/ReadOnlyProcess.swift|parseDiskInfo|Fixed local read-only inventory; no network access.' \
+    'activity.lsof.open-files|/usr/sbin/lsof|-Fn,-n,-P,-w,-b|MyMacCleaner/Core/Services/ReadOnlyProcess.swift|parseOpenFilePaths|Fixed local read-only inventory; no network access.' \
     > "$temporary_directory/identity-mismatch.txt"
 expect_manifest_failure "fixed identity mismatch" "SC-MANIFEST-IDENTITY" "$temporary_directory/identity-mismatch.txt"
 

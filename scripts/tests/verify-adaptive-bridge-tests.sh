@@ -49,8 +49,9 @@ let isTechnicalUser = true
 EOF
 
 expect_success "closed intents" "$temporary_root/safe.swift"
-expect_failure "url authority" "AE-BRIDGE-AUTHORITY" "$temporary_root/url.swift"
-expect_failure "persona flag" "AE-BRIDGE-PERSONA" "$temporary_root/persona.swift"
+expect_failure "url authority" "AE-BRIDGE-AUTHORITY: url.swift:3: URL(" "$temporary_root/url.swift"
+expect_failure "rule reference" "see docs/VERIFIER-RULES.md#ae-bridge-authority" "$temporary_root/url.swift"
+expect_failure "persona flag" "AE-BRIDGE-PERSONA: persona.swift:3: isTechnicalUser" "$temporary_root/persona.swift"
 expect_success "production view model" "$repo_root/MyMacCleaner/Features/AdaptiveExperience/AdaptiveExperienceViewModel.swift"
 
 echo "AE-BRIDGE-SELF-TEST: PASS"

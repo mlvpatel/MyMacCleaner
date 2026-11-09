@@ -561,7 +561,7 @@ printf '%s\n' \
     'while [[ $# -gt 0 ]]; do' \
     '    if [[ "$1" == "--scratch-path" && $# -ge 2 ]]; then scratch_path="$2"; shift 2; elif [[ "$1" == "--filter" && $# -ge 2 ]]; then filter="$2"; shift 2; else shift; fi' \
     'done' \
-    'if [[ -n "$filter" ]]; then printf "%s\n" "phase-filter:$filter" >> "${CC_GATE_STAGE_LOG:?}"; exit 0; fi' \
+    'if [[ -n "$filter" ]]; then printf "%s\n" "filter:$filter" >> "${CC_GATE_STAGE_LOG:?}"; exit 0; fi' \
     'printf "%s\n" "swiftpm-tests-with-coverage" >> "${CC_GATE_STAGE_LOG:?}"' \
     '[[ -n "$scratch_path" ]] || exit 64' \
     '/bin/mkdir -p "$scratch_path"' \
@@ -775,7 +775,7 @@ reset_orchestrator
 # shellcheck disable=SC2119
 run_orchestrator > "$temporary_root/orchestrator-success.out"
 
-expected_stages=$'source-contract-self-tests\nrunner-self-tests\ncoverage-parser-self-tests\nsource-contract\nphase-filter:PolicyDispositionTests|PolicyRankingTests|CapabilityCardTests\nphase-filter:CleanupPlanTests|ApprovalBindingTests\nphase-filter:PolicyGoldenTests|PlanInvalidationPropertyTests\nphase-filter:TrashOperationAuthorityTests\nphase-filter:TrashRevalidationTests\nphase-filter:TrashExecutionTests\nphase-filter:FoundationTrashAdapterTests\nphase-filter:TrashExecutionHostileFixtureTests\nphase-filter:ReceiptTransitionTests|ReceiptStoreAdapterTests|ReceiptCoordinatorTests|ReceiptReconciliationTests|ReceiptPrivacyTests|ReceiptRetentionTests|ReceiptHistoryDeletionTests|ReceiptRecoveryTests|ReceiptHostileFixtureTests\nphase-filter:HuggingFaceInventoryTests\nphase-filter:HuggingFaceHostileFixtureTests|ModelStoreAuthorityTests\nphase-filter:OllamaInventoryTests\nphase-filter:SelectedModelRootTests|ModelStoreAuthorityTests\nphase-filter:AIModelHostileFixtureTests\nphase-filter:ModelStoreAuthorityTests|AIModelHostileFixtureTests\nswiftpm-tests-with-coverage\ncoverage-profile-merge\ncoverage-export\ncoverage-decision\ncoverage-decision\ncoverage-decision'
+expected_stages=$'source-contract-self-tests\nrunner-self-tests\ncoverage-parser-self-tests\nsource-contract\nfilter:PolicyDispositionTests|PolicyRankingTests|CapabilityCardTests\nfilter:CleanupPlanTests|ApprovalBindingTests\nfilter:PolicyGoldenTests|PlanInvalidationPropertyTests\nfilter:TrashOperationAuthorityTests\nfilter:TrashRevalidationTests\nfilter:TrashExecutionTests\nfilter:FoundationTrashAdapterTests\nfilter:TrashExecutionHostileFixtureTests\nfilter:ReceiptTransitionTests|ReceiptStoreAdapterTests|ReceiptCoordinatorTests|ReceiptReconciliationTests|ReceiptPrivacyTests|ReceiptRetentionTests|ReceiptHistoryDeletionTests|ReceiptRecoveryTests|ReceiptHostileFixtureTests\nfilter:HuggingFaceInventoryTests\nfilter:HuggingFaceHostileFixtureTests|ModelStoreAuthorityTests\nfilter:OllamaInventoryTests\nfilter:SelectedModelRootTests|ModelStoreAuthorityTests\nfilter:AIModelHostileFixtureTests\nfilter:ModelStoreAuthorityTests|AIModelHostileFixtureTests\nswiftpm-tests-with-coverage\ncoverage-profile-merge\ncoverage-export\ncoverage-decision\ncoverage-decision\ncoverage-decision'
 if [[ $(< "$orchestrator_stage_log") != "$expected_stages" ]]; then
     echo "Canonical CleanerCore stages are missing or out of order." >&2
     exit 1

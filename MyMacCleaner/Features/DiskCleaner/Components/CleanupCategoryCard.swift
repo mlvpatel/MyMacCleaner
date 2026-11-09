@@ -6,19 +6,9 @@ struct CleanupCategoryCard: View {
     let result: ScanResult
     let isExpanded: Bool
     let onToggleExpand: () -> Void
-    let onToggleSelection: () -> Void
-    let onToggleItem: (CleanableItem) -> Void
     let onViewDetails: () -> Void
 
     @State private var isHovered = false
-
-    private var allSelected: Bool {
-        result.items.allSatisfy { $0.isSelected }
-    }
-
-    private var someSelected: Bool {
-        result.items.contains { $0.isSelected } && !allSelected
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,39 +31,6 @@ struct CleanupCategoryCard: View {
 
     private var headerRow: some View {
         HStack(spacing: 0) {
-            // Selection checkbox - separate hit area
-            Button(action: onToggleSelection) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                        .stroke(allSelected || someSelected ? result.category.color : Color.secondary.opacity(0.5), lineWidth: 1.5)
-                        .frame(width: 20, height: 20)
-
-                    if allSelected {
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                            .fill(result.category.color)
-                            .frame(width: 20, height: 20)
-
-                        Image(systemName: "checkmark")
-                            .font(Theme.Typography.size10Bold)
-                            .foregroundStyle(.white)
-                    } else if someSelected {
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                            .fill(result.category.color.opacity(0.5))
-                            .frame(width: 20, height: 20)
-
-                        Image(systemName: "minus")
-                            .font(Theme.Typography.size10Bold)
-                            .foregroundStyle(.white)
-                    }
-                }
-                .padding(.leading, Theme.Spacing.md)
-                .padding(.trailing, Theme.Spacing.md)
-                .padding(.vertical, Theme.Spacing.md)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            // Expandable area - everything else
             HStack(spacing: Theme.Spacing.md) {
                 // Category icon
                 ZStack {
@@ -115,10 +72,10 @@ struct CleanupCategoryCard: View {
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
             }
-            .padding(.trailing, Theme.Spacing.md)
+            .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.md)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onToggleExpand)
+            .expandButton(isExpanded: isExpanded, action: onToggleExpand)
+            .accessibilityIdentifier("diskCleaner.category.\(result.category.rawValue)")
         }
     }
 
@@ -133,15 +90,11 @@ struct CleanupCategoryCard: View {
             let displayItems = Array(result.items.prefix(5))
 
             ForEach(displayItems) { item in
-                CleanableItemRow(
-                    item: item,
-                    categoryColor: result.category.color,
-                    onToggle: { onToggleItem(item) }
-                )
+                CleanableItemRow(item: item)
 
                 if item.id != displayItems.last?.id {
                     Divider()
-                        .padding(.leading, 60)
+                        .padding(.leading, 44)
                 }
             }
 
@@ -163,6 +116,7 @@ struct CleanupCategoryCard: View {
                     .padding(Theme.Spacing.md)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("diskCleaner.viewAll")
             }
         }
     }
@@ -172,33 +126,11 @@ struct CleanupCategoryCard: View {
 
 struct CleanableItemRow: View {
     let item: CleanableItem
-    let categoryColor: Color
-    let onToggle: () -> Void
 
     @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            // Checkbox
-            Button(action: onToggle) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                        .stroke(item.isSelected ? categoryColor : Color.secondary.opacity(0.5), lineWidth: 1.5)
-                        .frame(width: 18, height: 18)
-
-                    if item.isSelected {
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                            .fill(categoryColor)
-                            .frame(width: 18, height: 18)
-
-                        Image(systemName: "checkmark")
-                            .font(Theme.Typography.size9Bold)
-                            .foregroundStyle(.white)
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-
             // File icon
             Image(systemName: fileIcon(for: item.name))
                 .font(Theme.Typography.size14)
@@ -234,7 +166,7 @@ struct CleanableItemRow: View {
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
-        .background(isHovered ? Color.white.opacity(0.03) : Color.clear)
+        .background(isHovered ? Theme.Colors.subtleFill : Color.clear)
         .onHover { isHovered = $0 }
     }
 
@@ -263,7 +195,6 @@ struct CleanableItemRow: View {
 
 struct CategoryDetailSheet: View {
     let result: ScanResult
-    let onToggleItem: (CleanableItem) -> Void
     let onClose: () -> Void
 
     @State private var searchText = ""
@@ -338,6 +269,10 @@ struct CategoryDetailSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel(L("common.close"))
+                .help(L("common.close"))
+                .accessibilityIdentifier("diskCleaner.detail.close")
             }
             .padding(Theme.Spacing.lg)
 
@@ -353,7 +288,7 @@ struct CategoryDetailSheet: View {
                         .textFieldStyle(.plain)
                 }
                 .padding(Theme.Spacing.sm)
-                .background(Color.white.opacity(0.05))
+                .background(Theme.Colors.surfaceLight)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
 
                 Picker(L("diskCleaner.sort"), selection: $sortOrder) {
@@ -371,15 +306,16 @@ struct CategoryDetailSheet: View {
             // Item list
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(filteredItems) { item in
-                        CleanableItemRow(
-                            item: item,
-                            categoryColor: result.category.color,
-                            onToggle: { onToggleItem(item) }
-                        )
+                    let items = filteredItems
+                    if items.isEmpty && !result.items.isEmpty {
+                        NoSearchMatchesView(query: searchText) { searchText = "" }
+                    }
+
+                    ForEach(items) { item in
+                        CleanableItemRow(item: item)
 
                         Divider()
-                            .padding(.leading, 60)
+                            .padding(.leading, 44)
                     }
                 }
             }
@@ -394,28 +330,26 @@ struct CategoryDetailSheet: View {
     VStack {
         CleanupCategoryCard(
             result: ScanResult(
-                category: .userCache,
+                category: .caches,
                 items: [
                     CleanableItem(
                         name: "com.apple.Safari",
                         path: URL(fileURLWithPath: "/Users/test/Library/Caches/com.apple.Safari"),
                         size: 1024 * 1024 * 150,
                         modificationDate: Date().addingTimeInterval(-86400),
-                        category: .userCache
+                        category: .caches
                     ),
                     CleanableItem(
                         name: "com.google.Chrome",
                         path: URL(fileURLWithPath: "/Users/test/Library/Caches/com.google.Chrome"),
                         size: 1024 * 1024 * 300,
                         modificationDate: Date().addingTimeInterval(-172800),
-                        category: .userCache
+                        category: .caches
                     )
                 ]
             ),
             isExpanded: true,
             onToggleExpand: {},
-            onToggleSelection: {},
-            onToggleItem: { _ in },
             onViewDetails: {}
         )
     }

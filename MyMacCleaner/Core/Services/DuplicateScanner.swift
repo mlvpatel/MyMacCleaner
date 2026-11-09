@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import os
 import SwiftUI
 
 // MARK: - Duplicate Group Model
@@ -42,8 +43,6 @@ struct DuplicateFile: Identifiable, Hashable {
     let url: URL
     let size: Int64
     let modificationDate: Date?
-    var isSelected: Bool = false
-    var isKept: Bool = false  // The one to keep
 
     var name: String {
         url.lastPathComponent
@@ -120,6 +119,23 @@ enum FileType: String, CaseIterable {
     }
 }
 
+// MARK: - Scan Result
+
+enum DuplicateScanLimits {
+    /// Upper bound on files collected for comparison; beyond this the result is marked truncated.
+    static let maxEntries = 500_000
+}
+
+struct DuplicateScanResult {
+    let groups: [DuplicateGroup]
+    /// True when enumeration stopped at the entry cap, so some files were not compared.
+    let isTruncated: Bool
+    /// Cloud-synced files left out because their contents are not on this Mac.
+    var skippedCloudOnlyCount = 0
+
+    static let empty = DuplicateScanResult(groups: [], isTruncated: false)
+}
+
 // MARK: - Duplicate Scanner
 
 actor DuplicateScanner {
@@ -144,6 +160,9 @@ actor DuplicateScanner {
     /// time and duplicate large media is rarely the reclaim target.
     static let defaultMaximumFileSize: Int64 = 5_000_000_000
 
+    /// Read size for full hashes; cancellation is checked between chunks.
+    private static let hashChunkBytes = 65_536
+
     /// AI model-store roots are never treated as duplicates — they are
     /// inventory-only and must never be offered for deletion here.
     private let modelStoreRoots: [String] = {
@@ -156,6 +175,13 @@ actor DuplicateScanner {
 
     private init() {}
 
+    /// A ubiquitous (cloud-synced) item whose contents are not on this Mac: hashing it would
+    /// start a download.
+    static func isCloudOnly(isUbiquitous: Bool, downloadingStatus: URLUbiquitousItemDownloadingStatus?) -> Bool {
+        guard isUbiquitous else { return false }
+        return downloadingStatus != .current && downloadingStatus != .downloaded
+    }
+
     private func isUnderModelStore(_ url: URL) -> Bool {
         let path = url.standardizedFileURL.path
         return modelStoreRoots.contains { path == $0 || path.hasPrefix($0 + "/") }
@@ -164,18 +190,12 @@ actor DuplicateScanner {
     /// Drops hardlinks to the same physical file (same identity) so shared
     /// storage is not mistaken for reclaimable duplicates and not hashed twice.
     private func dedupedByIdentity(_ urls: [URL]) -> [URL] {
-        var seen: [any NSObjectProtocol] = []
-        var result: [URL] = []
-        for url in urls {
-            let identity = (try? url.resourceValues(forKeys: [.fileResourceIdentifierKey]))?
-                .fileResourceIdentifier
-            if let identity {
-                if seen.contains(where: { $0.isEqual(identity) }) { continue }
-                seen.append(identity)
-            }
-            result.append(url)
+        var seen = Set<NSObject>()
+        return urls.filter { url in
+            guard let identity = (try? url.resourceValues(forKeys: [.fileResourceIdentifierKey]))?
+                .fileResourceIdentifier as? NSObject else { return true }
+            return seen.insert(identity).inserted
         }
-        return result
     }
 
     // MARK: - Main Scan
@@ -190,8 +210,9 @@ actor DuplicateScanner {
         at path: URL,
         minSize: Int64 = 1024,
         maxSize: Int64 = DuplicateScanner.defaultMaximumFileSize,
+        maxEntries: Int = DuplicateScanLimits.maxEntries,
         progress: @escaping @Sendable @MainActor (Double, String) -> Void
-    ) async -> [DuplicateGroup] {
+    ) async -> DuplicateScanResult {
         var duplicateGroups: [DuplicateGroup] = []
 
         await MainActor.run { progress(0.05, L("duplicates.scan.enumerating")) }
@@ -199,6 +220,8 @@ actor DuplicateScanner {
         // Step 1: Enumerate all files and group by size
         var sizeGroups: [Int64: [URL]] = [:]
         var totalFiles = 0
+        var isTruncated = false
+        var skippedCloudOnly = 0
         var lastProgressUpdate = Date()
 
         let resourceKeys: Set<URLResourceKey> = [
@@ -206,7 +229,9 @@ actor DuplicateScanner {
             .isDirectoryKey,
             .isSymbolicLinkKey,
             .isReadableKey,
-            .contentModificationDateKey
+            .contentModificationDateKey,
+            .isUbiquitousItemKey,
+            .ubiquitousItemDownloadingStatusKey
         ]
 
         guard let enumerator = FileManager.default.enumerator(
@@ -215,7 +240,7 @@ actor DuplicateScanner {
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else {
             await MainActor.run { progress(1.0, L("common.complete")) }
-            return []
+            return .empty
         }
 
         // Enumerate files with safety checks
@@ -223,7 +248,7 @@ actor DuplicateScanner {
             // Check for cancellation
             if isCancelled {
                 await MainActor.run { progress(1.0, L("duplicates.scan.cancelled")) }
-                return []
+                return .empty
             }
 
             guard let fileURL = item as? URL else { continue }
@@ -245,6 +270,15 @@ actor DuplicateScanner {
 
             // Skip unreadable files
             if resourceValues.isReadable == false {
+                continue
+            }
+
+            // Never trigger a cloud download just to compare a file
+            if Self.isCloudOnly(
+                isUbiquitous: resourceValues.isUbiquitousItem == true,
+                downloadingStatus: resourceValues.ubiquitousItemDownloadingStatus
+            ) {
+                skippedCloudOnly += 1
                 continue
             }
 
@@ -272,6 +306,12 @@ actor DuplicateScanner {
                 continue
             }
 
+            // Bound memory on very large folders; the result says it was cut short.
+            if totalFiles >= maxEntries {
+                isTruncated = true
+                break
+            }
+
             let size = Int64(fileSize)
             sizeGroups[size, default: []].append(fileURL)
             totalFiles += 1
@@ -290,7 +330,7 @@ actor DuplicateScanner {
 
         if isCancelled {
             await MainActor.run { progress(1.0, L("duplicates.scan.cancelled")) }
-            return []
+            return .empty
         }
 
         let finalTotalFiles = totalFiles
@@ -303,7 +343,7 @@ actor DuplicateScanner {
 
         if totalGroupsToProcess == 0 {
             await MainActor.run { progress(1.0, L("common.complete")) }
-            return []
+            return DuplicateScanResult(groups: [], isTruncated: isTruncated, skippedCloudOnlyCount: skippedCloudOnly)
         }
 
         // Step 2: For each size group, calculate partial hashes
@@ -311,7 +351,7 @@ actor DuplicateScanner {
             // Check for cancellation
             if isCancelled {
                 await MainActor.run { progress(1.0, L("duplicates.scan.cancelled")) }
-                return []
+                return .empty
             }
 
             processedGroups += 1
@@ -376,11 +416,6 @@ actor DuplicateScanner {
                     // Sort by date (newest first)
                     duplicateFiles.sort { ($0.modificationDate ?? .distantPast) > ($1.modificationDate ?? .distantPast) }
 
-                    // Mark the first one (newest) as kept by default
-                    if !duplicateFiles.isEmpty {
-                        duplicateFiles[0].isKept = true
-                    }
-
                     duplicateGroups.append(DuplicateGroup(hash: hash, files: duplicateFiles))
                 }
             }
@@ -388,7 +423,7 @@ actor DuplicateScanner {
 
         if isCancelled {
             await MainActor.run { progress(1.0, L("duplicates.scan.cancelled")) }
-            return []
+            return .empty
         }
 
         await MainActor.run { progress(0.95, L("duplicates.scan.finalizing")) }
@@ -398,7 +433,7 @@ actor DuplicateScanner {
 
         await MainActor.run { progress(1.0, L("common.complete")) }
 
-        return duplicateGroups
+        return DuplicateScanResult(groups: duplicateGroups, isTruncated: isTruncated, skippedCloudOnlyCount: skippedCloudOnly)
     }
 
     // MARK: - Safe Hash Methods
@@ -415,15 +450,19 @@ actor DuplicateScanner {
         }
     }
 
-    /// Calculate full hash with proper error handling
+    /// Calculate full hash off the actor. `Task.isCancelled` is not visible on the GCD
+    /// thread, so the task's cancellation is relayed through a lock and checked every chunk.
     private func safeFullHash(_ url: URL) async -> String? {
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                autoreleasepool {
-                    let result = self.fullHashSync(url)
+        let cancelled = OSAllocatedUnfairLock(initialState: false)
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let result = Self.fullHash(of: url) { cancelled.withLock { $0 } }
                     continuation.resume(returning: result)
                 }
             }
+        } onCancel: {
+            cancelled.withLock { $0 = true }
         }
     }
 
@@ -452,41 +491,31 @@ actor DuplicateScanner {
     }
 
     /// Calculate full SHA256 hash - synchronous
-    private nonisolated func fullHashSync(_ url: URL) -> String? {
-        do {
-            // Check file is readable
-            guard FileManager.default.isReadableFile(atPath: url.path) else {
-                return nil
-            }
-
-            let handle = try FileHandle(forReadingFrom: url)
-            defer {
-                try? handle.close()
-            }
-
-            var hasher = SHA256()
-            let bufferSize = 65536 // 64KB chunks
-
-            var keepReading = true
-            while keepReading {
-                autoreleasepool {
-                    do {
-                        if let data = try handle.read(upToCount: bufferSize), !data.isEmpty {
-                            hasher.update(data: data)
-                        } else {
-                            keepReading = false
-                        }
-                    } catch {
-                        keepReading = false
-                    }
-                }
-            }
-
-            let hash = hasher.finalize()
-            return hash.compactMap { String(format: "%02x", $0) }.joined()
-        } catch {
-            // Silently fail for unreadable files
+    nonisolated static func fullHash(of url: URL, isCancelled: () -> Bool) -> String? {
+        guard FileManager.default.isReadableFile(atPath: url.path),
+              let handle = try? FileHandle(forReadingFrom: url) else {
             return nil
         }
+        defer { try? handle.close() }
+        return fullHash(reading: handle, isCancelled: isCancelled)
+    }
+
+    /// Hashes the rest of `handle` in 64 KB chunks. Returns nil when cancelled or when any
+    /// read fails, so the hash of a partial read never stands in for the whole file.
+    nonisolated static func fullHash(reading handle: FileHandle, isCancelled: () -> Bool) -> String? {
+        var hasher = SHA256()
+        while !isCancelled() {
+            let chunk: Data?
+            do {
+                chunk = try autoreleasepool { try handle.read(upToCount: hashChunkBytes) }
+            } catch {
+                return nil
+            }
+            guard let chunk, !chunk.isEmpty else {
+                return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+            }
+            hasher.update(data: chunk)
+        }
+        return nil
     }
 }

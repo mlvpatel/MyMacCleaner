@@ -7,22 +7,26 @@ struct PermissionsView: View {
     private let sectionColor = Theme.Colors.permissions
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: Theme.Spacing.lg) {
-                headerSection
-                    .staggeredAnimation(index: 0, isActive: isVisible)
+        ZStack {
+            ScrollView {
+                VStack(spacing: Theme.Spacing.lg) {
+                    headerSection
+                        .staggeredAnimation(index: 0, isActive: isVisible)
 
-                summaryCard
-                    .staggeredAnimation(index: 1, isActive: isVisible)
+                    summaryCard
+                        .staggeredAnimation(index: 1, isActive: isVisible)
 
-                categoriesSection
-                    .staggeredAnimation(index: 2, isActive: isVisible)
+                    categoriesSection
+                        .staggeredAnimation(index: 2, isActive: isVisible)
 
-                Spacer(minLength: Theme.Spacing.xl)
+                    Spacer(minLength: Theme.Spacing.xl)
+                }
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.bottom, Theme.Spacing.lg)
+                .padding(.top, Theme.Spacing.pageTopPadding)
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.bottom, Theme.Spacing.lg)
-            .padding(.top, Theme.Spacing.pageTopPadding)
+
+            ToastOverlay(presenter: viewModel.toasts)
         }
         .onAppear {
             withAnimation(Theme.Animation.springSmooth) {

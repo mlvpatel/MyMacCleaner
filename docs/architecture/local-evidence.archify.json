@@ -1,0 +1,719 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Where local evidence flows (and where it never goes)",
+    "output": "docs/architecture/local-evidence.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/mlvpatel/MyMacCleaner",
+      "revision": "2095f154f4b0c9c40ddac13353afa96942420add",
+      "link_mode": "local-only"
+    },
+    "subtitle": "Smart Scan, Adaptive Experience and Performance only"
+  },
+  "stages": [
+    {
+      "label": "On-device sources"
+    },
+    {
+      "label": "Read-only adapters"
+    },
+    {
+      "label": "Evidence & rules"
+    },
+    {
+      "label": "Session & stores"
+    },
+    {
+      "label": "Consumers & sinks"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "roots",
+      "type": "database",
+      "label": "Six Mac roots",
+      "sublabel": "GeneralMacScopeCatalog",
+      "tag": "read-only",
+      "stage": 0,
+      "row": 0,
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Detectors/GeneralMac/GeneralMacScopeCatalog.swift",
+          "line": 53,
+          "end_line": 64,
+          "label": "six root registrations"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/GeneralMacFilesystemAdapter.swift",
+          "line": 74,
+          "end_line": 89,
+          "label": "Caches, Logs, tmp, Downloads, Desktop, Documents"
+        }
+      ]
+    },
+    {
+      "id": "openFiles",
+      "type": "backend",
+      "label": "Open-file check",
+      "sublabel": "full lsof listing",
+      "tag": "keeps root paths only",
+      "stage": 0,
+      "row": 1,
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/OpenFileActivityObserver.swift",
+          "line": 31,
+          "end_line": 58,
+          "label": "snapshot of open paths under roots"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/OpenFileActivityObserver.swift",
+          "line": 53,
+          "end_line": 72,
+          "label": "whole lsof listing, kept only under the roots"
+        },
+        {
+          "path": "scripts/read-only-process-allowlist.txt",
+          "line": 6,
+          "end_line": 6,
+          "label": "allowlisted read-only process"
+        }
+      ]
+    },
+    {
+      "id": "modelDirs",
+      "type": "database",
+      "label": "Model store dirs",
+      "sublabel": "Hugging Face, Ollama, picked dir",
+      "stage": 0,
+      "row": 2,
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreLiveScan.swift",
+          "line": 70,
+          "end_line": 80,
+          "label": "default HF and Ollama roots"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreLiveScan.swift",
+          "line": 119,
+          "end_line": 141,
+          "label": "user-picked root only"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AppState.swift",
+          "line": 86,
+          "end_line": 86,
+          "label": "picked dir scanned outside the session"
+        }
+      ]
+    },
+    {
+      "id": "devTools",
+      "type": "backend",
+      "label": "Tool presence",
+      "sublabel": "DeveloperInventoryAdapter",
+      "tag": "metadata",
+      "stage": 0,
+      "row": 3,
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/DeveloperInventoryAdapter.swift",
+          "line": 15,
+          "end_line": 32,
+          "label": "app bundles and dotfile roots"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/DeveloperInventoryAdapter.swift",
+          "line": 49,
+          "end_line": 77,
+          "label": "presence and allocated bytes"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreLiveScan.swift",
+          "line": 45,
+          "end_line": 56,
+          "label": "app wiring"
+        }
+      ],
+      "yOffset": -40
+    },
+    {
+      "id": "darwin",
+      "type": "backend",
+      "label": "Memory sampler",
+      "sublabel": "VM, swap, process names + memory",
+      "tag": "Mach, sysctl, libproc",
+      "stage": 0,
+      "row": 4,
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreDarwin/DarwinMemoryObservationAdapter.swift",
+          "line": 49,
+          "end_line": 110,
+          "label": "DarwinMemoryObservationAdapter.observe"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreDarwin/SystemDarwinMemorySystem.swift",
+          "line": 167,
+          "end_line": 292,
+          "label": "VM, swap, process names and memory"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreDarwin/DarwinWorkloadSampler.swift",
+          "line": 22,
+          "end_line": 29,
+          "label": "process workload sampling"
+        }
+      ],
+      "yOffset": -50
+    },
+    {
+      "id": "fsAdapter",
+      "type": "backend",
+      "label": "Metadata walk",
+      "sublabel": "GeneralMacFilesystemAdapter",
+      "tag": "depth 8, 25k",
+      "stage": 1,
+      "row": 0,
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/GeneralMacFilesystemAdapter.swift",
+          "line": 148,
+          "end_line": 190,
+          "label": "one entry per call, skips unreadable"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/GeneralMacFilesystemAdapter.swift",
+          "line": 237,
+          "end_line": 270,
+          "label": "builds FileObservation"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Detectors/GeneralMac/GeneralMacScopeCatalog.swift",
+          "line": 16,
+          "end_line": 24,
+          "label": "per-root caps"
+        }
+      ]
+    },
+    {
+      "id": "msParsers",
+      "type": "backend",
+      "label": "Store parsers",
+      "sublabel": "ModelStoreFilesystemAdapter",
+      "tag": "no weights",
+      "stage": 1,
+      "row": 2,
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreLiveScan.swift",
+          "line": 89,
+          "end_line": 111,
+          "label": "HuggingFaceCacheParser, OllamaStoreParser"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/ModelStoreFilesystemAdapter.swift",
+          "line": 125,
+          "end_line": 154,
+          "label": "bounded pointer-file reads"
+        }
+      ]
+    },
+    {
+      "id": "permProbe",
+      "type": "security",
+      "label": "Permission probe",
+      "sublabel": "TCC.db, ~/Library/Caches",
+      "tag": "open/close only",
+      "stage": 1,
+      "row": 3,
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/PermissionProbe.swift",
+          "line": 22,
+          "end_line": 28,
+          "label": "open() then close(), never reads"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/PermissionProbe.swift",
+          "line": 34,
+          "end_line": 45,
+          "label": "TCC.db and ~/Library/Caches"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 177,
+          "end_line": 177,
+          "label": "permissionGaps in the source"
+        }
+      ],
+      "yOffset": 10
+    },
+    {
+      "id": "detector",
+      "type": "backend",
+      "label": "Evidence detector",
+      "sublabel": "GeneralMacEvidenceDetector",
+      "stage": 2,
+      "row": 0,
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Scanning/ScanCoordinator.swift",
+          "line": 400,
+          "end_line": 436,
+          "label": "pulls observations, makes findings"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Detectors/GeneralMac/GeneralMacEvidenceDetector.swift",
+          "line": 10,
+          "end_line": 48,
+          "label": "GeneralMacFinding"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Detectors/GeneralMac/GeneralMacEvidenceDetector.swift",
+          "line": 154,
+          "end_line": 174,
+          "label": "registry wrapper"
+        }
+      ]
+    },
+    {
+      "id": "policy",
+      "type": "security",
+      "label": "Policy verdicts",
+      "sublabel": "PolicyEvaluator",
+      "tag": "open files, owner lists narrow",
+      "stage": 2,
+      "row": 1,
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Scanning/AdaptiveScanSession.swift",
+          "line": 65,
+          "end_line": 120,
+          "label": "AdaptiveScanSession.classify"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluation.swift",
+          "line": 65,
+          "end_line": 98,
+          "label": "open file or under 15 min: never eligible"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluator.swift",
+          "line": 117,
+          "end_line": 170,
+          "label": "evaluateCache: sole eligible path"
+        }
+      ]
+    },
+    {
+      "id": "msProj",
+      "type": "backend",
+      "label": "Store graph",
+      "sublabel": "ModelStoreProjection",
+      "tag": "inspect-only",
+      "stage": 2,
+      "row": 2,
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Bridge/ModelStoreProjection.swift",
+          "line": 1,
+          "end_line": 45,
+          "label": "graph and accounting summary"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Bridge/ModelStoreProjection.swift",
+          "line": 46,
+          "end_line": 69,
+          "label": "operation: Never?"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/ModelInventory/ModelStoreAccounting.swift",
+          "line": 1,
+          "end_line": 6,
+          "label": "ModelStoreAccounting"
+        }
+      ]
+    },
+    {
+      "id": "memCoach",
+      "type": "backend",
+      "label": "Memory coach",
+      "sublabel": "MemoryCoachingRules",
+      "stage": 2,
+      "row": 4,
+      "sources": [
+        {
+          "path": "MyMacCleaner/Features/Performance/PerformanceViewModel.swift",
+          "line": 106,
+          "end_line": 146,
+          "label": "observe, then rules.evaluate"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/MemoryCoach/MemoryCoachingRules.swift",
+          "line": 186,
+          "end_line": 200,
+          "label": "MemoryCoachPresentation"
+        }
+      ]
+    },
+    {
+      "id": "legacy",
+      "type": "backend",
+      "label": "Legacy projection",
+      "sublabel": "LegacyScanProjection",
+      "tag": "CleanerCoreBridge",
+      "stage": 3,
+      "row": 0,
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreLiveScan.swift",
+          "line": 179,
+          "end_line": 218,
+          "label": "uses collection.findings only"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreBridge.swift",
+          "line": 19,
+          "end_line": 38,
+          "label": "makeSnapshot to ScanResult"
+        }
+      ]
+    },
+    {
+      "id": "session",
+      "type": "backend",
+      "label": "Trust session",
+      "sublabel": "AdaptiveTrustSession",
+      "tag": "plan in memory",
+      "stage": 3,
+      "row": 1,
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 141,
+          "end_line": 187,
+          "label": "displayedPlan and AdaptiveExperienceSource"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 189,
+          "end_line": 253,
+          "label": "digest-bound run, rescan first"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 34,
+          "end_line": 36,
+          "label": "Trash scope: Library/Caches only"
+        }
+      ],
+      "height": 74
+    },
+    {
+      "id": "receipts",
+      "type": "database",
+      "label": "Receipt store",
+      "sublabel": "paths (hex), Trash locations",
+      "tag": "owner-only, no backup",
+      "stage": 3,
+      "row": 2,
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 158,
+          "end_line": 188,
+          "label": "isExcludedFromBackup, owner-only"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 524,
+          "end_line": 550,
+          "label": "hex path item IDs, Trash destination kept"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Ports/ReceiptHistoryPorts.swift",
+          "line": 50,
+          "end_line": 82,
+          "label": "RedactedReceiptSummary"
+        }
+      ]
+    },
+    {
+      "id": "homeViews",
+      "type": "frontend",
+      "label": "Home, Disk Cleaner",
+      "sublabel": "SwiftUI views",
+      "stage": 4,
+      "row": 0,
+      "sources": [
+        {
+          "path": "MyMacCleaner/Features/Home/HomeViewModel.swift",
+          "line": 133,
+          "end_line": 159,
+          "label": "shared scan's legacy report"
+        },
+        {
+          "path": "MyMacCleaner/Features/DiskCleaner/DiskCleanerViewModel.swift",
+          "line": 86,
+          "end_line": 112,
+          "label": "shared scan's legacy report"
+        }
+      ]
+    },
+    {
+      "id": "adaptiveUI",
+      "type": "frontend",
+      "label": "Adaptive Experience",
+      "sublabel": "AdaptiveExperienceProjector",
+      "tag": "Guided, Standard, Technical",
+      "stage": 4,
+      "row": 2,
+      "sources": [
+        {
+          "path": "MyMacCleaner/Features/AdaptiveExperience/AdaptiveExperienceViewModel.swift",
+          "line": 393,
+          "end_line": 397,
+          "label": "project(authority, mode:)"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Presentation/AdaptiveExperienceProjection.swift",
+          "line": 211,
+          "end_line": 287,
+          "label": "AdaptiveExperienceProjector"
+        },
+        {
+          "path": "MyMacCleaner/Features/AdaptiveExperience/ExperienceDashboardView.swift",
+          "line": 126,
+          "end_line": 159,
+          "label": "tool and model cards read source"
+        }
+      ]
+    },
+    {
+      "id": "trash",
+      "type": "database",
+      "label": "User Trash",
+      "sublabel": "FoundationTrashAdapter",
+      "tag": "only change to user files",
+      "stage": 4,
+      "row": 1,
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift",
+          "line": 32,
+          "end_line": 59,
+          "label": "sole trashItem call"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift",
+          "line": 61,
+          "end_line": 75,
+          "label": "revalidates before the move"
+        }
+      ]
+    },
+    {
+      "id": "perfView",
+      "type": "frontend",
+      "label": "Performance view",
+      "sublabel": "SwiftUI view",
+      "stage": 4,
+      "row": 4,
+      "sources": [
+        {
+          "path": "MyMacCleaner/Features/Performance/PerformanceViewModel.swift",
+          "line": 10,
+          "end_line": 18,
+          "label": "published MemoryCoachPresentation"
+        }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "f-metadata",
+      "from": "roots",
+      "to": "fsAdapter",
+      "label": "entry metadata",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-observation",
+      "from": "fsAdapter",
+      "to": "detector",
+      "label": "FileObservation",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-finding",
+      "from": "detector",
+      "to": "policy",
+      "label": "GeneralMacFinding",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-legacy",
+      "from": "detector",
+      "to": "legacy",
+      "label": "findings only"
+    },
+    {
+      "id": "f-scanresult",
+      "from": "legacy",
+      "to": "homeViews",
+      "label": "ScanResult rows"
+    },
+    {
+      "id": "f-active",
+      "from": "openFiles",
+      "to": "policy",
+      "label": "processActive",
+      "variant": "security"
+    },
+    {
+      "id": "f-collection",
+      "from": "policy",
+      "to": "session",
+      "label": "scan collection",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-pointers",
+      "from": "modelDirs",
+      "to": "msParsers",
+      "label": "dirs + pointers"
+    },
+    {
+      "id": "f-parse",
+      "from": "msParsers",
+      "to": "msProj",
+      "label": "parse result"
+    },
+    {
+      "id": "f-accounting",
+      "from": "msProj",
+      "to": "session",
+      "label": "default stores"
+    },
+    {
+      "id": "f-permission",
+      "from": "permProbe",
+      "to": "session",
+      "label": "permission gaps",
+      "variant": "security"
+    },
+    {
+      "id": "f-presence",
+      "from": "devTools",
+      "to": "session",
+      "label": "presence facts"
+    },
+    {
+      "id": "f-memory-session",
+      "from": "darwin",
+      "to": "session",
+      "label": "memory snapshot"
+    },
+    {
+      "id": "f-memory-coach",
+      "from": "darwin",
+      "to": "memCoach",
+      "label": "memory snapshot",
+      "fromSide": "bottom"
+    },
+    {
+      "id": "f-coach",
+      "from": "memCoach",
+      "to": "perfView",
+      "label": "coach advice"
+    },
+    {
+      "id": "f-source",
+      "from": "session",
+      "to": "adaptiveUI",
+      "label": "experience source",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-picked",
+      "from": "msProj",
+      "to": "adaptiveUI",
+      "label": "picked store",
+      "toSide": "bottom"
+    },
+    {
+      "id": "f-receipt-write",
+      "from": "session",
+      "to": "receipts",
+      "label": "run receipt",
+      "labelDx": 39,
+      "labelDy": 33
+    },
+    {
+      "id": "f-receipt-read",
+      "from": "receipts",
+      "to": "session",
+      "label": "redacted summary",
+      "variant": "security",
+      "labelDx": -47
+    },
+    {
+      "id": "f-move",
+      "from": "session",
+      "to": "trash",
+      "label": "approved move",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "No network code (checked in source)",
+      "items": [
+        "None of the app's sources use network APIs; the only https:// is a brew.sh link the user can click (ApplicationsView.swift:343)",
+        "Checked in source, not enforced by macOS: the app is not sandboxed (MyMacCleaner.entitlements:5-6)",
+        "App-wide check bans URLSession, URLRequest and Sparkle (verify-safety-contract.sh:960); network APIs and https:// are banned in SafetyContract and named files (:952, :973) and in CleanerCore (verify-cleanercore-contract.sh:122)",
+        "No update channel: UpdateCapability has one case, .unavailable (UpdateCapability.swift:3-8)"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Logs carry counts, not evidence",
+      "items": [
+        "Scan diagnostics go to AdaptiveSilentDiagnostics, which drops them (AdaptiveScanSession.swift:165-167)",
+        "SafetyDiagnosticLogger writes to the macOS unified log and takes only an event code plus per-class counts (SafetyDiagnosticLogger.swift:4-21, RedactingDiagnostic.swift:43-56)",
+        "Callers: StartupItemsService failures, the open-file check when its listing fails, and receipt-history events in AdaptiveTrustSession"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "One change to user files, narrowly gated",
+      "items": [
+        "Only ~/Library/Caches/com.apple.iconservices.store files idle 15+ minutes and not held open can become candidates; if the open-file listing fails, none can",
+        "A move needs the digest (hash) of the plan on screen; the plan's roots are rescanned and checked again first",
+        "FoundationTrashAdapter re-checks identity, then calls trashItem",
+        "Receipts (Application Support, owner-only 0700, out of backups) hold item paths hex-encoded and Trash locations; only a redacted summary leaves the store (PolicyEvaluation.swift:178-183, AppSupportReceiptStore.swift:463-476, 532-550)",
+        "The app also writes and prunes its own receipts (ReceiptHistoryCoordinator.swift:141-147)"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Scope notes",
+      "items": [
+        "Not shown: Duplicates (hashes file contents), Space Lens, Startup Items, Ports, System Health",
+        "Six roots: ~/Library/Caches, ~/Library/Logs, the per-user temp folder ($TMPDIR), Downloads, Desktop, Documents",
+        "Open-file check reads the whole lsof listing of files the user's processes hold open, then keeps only paths under the roots, in memory",
+        "Model stores parsed: Hugging Face (HF) hub, Ollama models, and a user-picked directory; model weights are never read",
+        "A picked directory goes straight to the Adaptive view model, not through the trust session (AdaptiveExperienceViewModel.swift:245-262); for HF_HOME and OLLAMA_MODELS the app only checks whether they are set",
+        "LM Studio and MLX are never scanned as stores; they appear only as app presence, workload labels or association evidence",
+        "Legacy projection turns findings into the older ScanResult rows that Home and Disk Cleaner show, without policy verdicts; Home can reveal a listed file in Finder",
+        "Sources as of main, November 2026"
+      ]
+    }
+  ]
+}
