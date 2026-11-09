@@ -29,7 +29,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Full Disk Access is required to scan system caches and logs."
+            "value": "Optional. With Full Disk Access, scans can read folders macOS protects, such as Safari data, app containers and some cache folders."
           }
         }
       }
@@ -45,6 +45,28 @@
         }
       }
     },
+    "settings.fullDiskAccess.granted": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Granted"
+          }
+        }
+      }
+    },
+    "settings.fullDiskAccess.notGranted": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not granted"
+          }
+        }
+      }
+    },
     "settings.general": {
       "extractionState": "manual",
       "localizations": {
@@ -52,17 +74,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "General"
-          }
-        }
-      }
-    },
-    "settings.launchAtLogin": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Launch at login"
           }
         }
       }

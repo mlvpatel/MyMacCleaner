@@ -144,17 +144,6 @@
         }
       }
     },
-    "systemHealth.check.diskHealth.healthy": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Disk appears healthy"
-          }
-        }
-      }
-    },
     "systemHealth.check.diskHealth.ssd": {
       "extractionState": "manual",
       "localizations": {
@@ -162,6 +151,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "SSD - SMART not applicable"
+          }
+        }
+      }
+    },
+    "systemHealth.check.diskHealth.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't read disk health"
           }
         }
       }
@@ -250,6 +250,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ available - consider cleaning up"
+          }
+        }
+      }
+    },
+    "systemHealth.check.macOSVersion": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS Version"
+          }
+        }
+      }
+    },
+    "systemHealth.check.macOSVersion.info %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS %@ is installed. Updates are not checked here."
           }
         }
       }
@@ -375,61 +397,6 @@
         }
       }
     },
-    "systemHealth.check.updates": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "System Updates"
-          }
-        }
-      }
-    },
-    "systemHealth.check.updates.checking": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Checking for updates..."
-          }
-        }
-      }
-    },
-    "systemHealth.check.updates.failed %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "macOS %@ - outdated"
-          }
-        }
-      }
-    },
-    "systemHealth.check.updates.passed %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "macOS %@ - current"
-          }
-        }
-      }
-    },
-    "systemHealth.check.updates.warning %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "macOS %@ - update available"
-          }
-        }
-      }
-    },
     "systemHealth.checks.title": {
       "extractionState": "manual",
       "localizations": {
@@ -448,6 +415,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Free: %@"
+          }
+        }
+      }
+    },
+    "systemHealth.disk.startup": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Startup Disk"
           }
         }
       }
@@ -558,6 +536,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld checks failed. Attention required."
+          }
+        }
+      }
+    },
+    "systemHealth.summary.incomplete %lld %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld checks passed. %2$lld couldn't run, so this result is incomplete."
           }
         }
       }

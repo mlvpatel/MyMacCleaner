@@ -7,12 +7,14 @@ struct StaggeredAnimation: ViewModifier {
     let isActive: Bool
     let baseDelay: Double
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func body(content: Content) -> some View {
         content
             .opacity(isActive ? 1 : 0)
-            .offset(y: isActive ? 0 : 20)
+            .offset(y: isActive || reduceMotion ? 0 : 20)
             .animation(
-                Theme.Animation.spring.delay(Double(index) * baseDelay),
+                Theme.Animation.motion(Theme.Animation.spring.delay(Double(index) * baseDelay), reduce: reduceMotion),
                 value: isActive
             )
     }
@@ -24,10 +26,30 @@ extension View {
     }
 }
 
+// MARK: - Motion Transition
+
+extension View {
+    /// Applies `transition`, or a plain fade when Reduce Motion is on.
+    func motionTransition(_ transition: AnyTransition) -> some View {
+        modifier(MotionTransition(transition: transition))
+    }
+}
+
+private struct MotionTransition: ViewModifier {
+    let transition: AnyTransition
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content.transition(reduceMotion ? .opacity : transition)
+    }
+}
+
 // MARK: - Breathing Animation (for scan button)
 
 struct BreathingAnimation: ViewModifier {
     @State private var isBreathing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let minScale: CGFloat
     let maxScale: CGFloat
     let duration: Double
@@ -40,9 +62,9 @@ struct BreathingAnimation: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .scaleEffect(isBreathing ? maxScale : minScale)
+            .scaleEffect(reduceMotion ? 1 : (isBreathing ? maxScale : minScale))
             .animation(
-                .easeInOut(duration: duration).repeatForever(autoreverses: true),
+                Theme.Animation.motion(.easeInOut(duration: duration).repeatForever(autoreverses: true), reduce: reduceMotion),
                 value: isBreathing
             )
             .onAppear {

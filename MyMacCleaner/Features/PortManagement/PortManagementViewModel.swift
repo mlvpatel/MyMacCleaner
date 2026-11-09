@@ -8,8 +8,21 @@ final class PortManagementViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var searchText = ""
     @Published var filterType: FilterType = .all
+    /// When the shown list was read; nil before a read and after a failed one.
+    @Published private(set) var lastRead: Date?
+    /// True when the last read failed, so the page never shows that as "no connections".
+    @Published private(set) var isUnavailable = false
 
-    private var refreshTask: Task<Void, Never>?
+    /// Readable so tests can await a refresh instead of sleeping.
+    private(set) var refreshTask: Task<Void, Never>?
+    /// True once a refresh has finished, so only the first visit loads on its own.
+    private var hasLoaded = false
+    /// nil means unavailable, as `ReadOnlyProcess.run` reports it.
+    private let readPorts: @Sendable () async -> [NetworkConnection]?
+
+    init(readPorts: @escaping @Sendable () async -> [NetworkConnection]? = { await PortManagementViewModel.readPorts() }) {
+        self.readPorts = readPorts
+    }
 
     enum FilterType: String, CaseIterable {
         case all
@@ -48,18 +61,23 @@ final class PortManagementViewModel: ObservableObject {
     var listeningCount: Int { connections.filter { $0.state == "LISTEN" }.count }
     var establishedCount: Int { connections.filter { $0.state == "ESTABLISHED" }.count }
 
-    init() {
+    /// Reads ports on the page's first appearance instead of at app launch.
+    func loadIfNeeded() {
+        guard !hasLoaded else { return }
         refreshConnections()
     }
 
     func refreshConnections() {
         guard !isLoading else { return }
         isLoading = true
-        refreshTask = Task {
-            let ports = await Self.readPorts()
-            // The lsof read itself runs to completion; a cancelled refresh just drops its output.
+        refreshTask = Task { [readPorts] in
+            let ports = await readPorts()
+            // Cancelling the refresh stops lsof; its output is dropped.
             guard !Task.isCancelled else { return }
-            connections = ports
+            connections = ports ?? []
+            isUnavailable = ports == nil
+            lastRead = ports == nil ? nil : Date()
+            hasLoaded = true
             refreshTask = nil
             isLoading = false
         }
@@ -74,33 +92,13 @@ final class PortManagementViewModel: ObservableObject {
     }
 
     // SAFETY-AUDIT: fixed read-only process adapter — /usr/sbin/lsof -iTCP -sTCP:LISTEN,ESTABLISHED -n -P
-    private nonisolated static func readPorts() async -> [NetworkConnection] {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-                process.arguments = ["-iTCP", "-sTCP:LISTEN,ESTABLISHED", "-n", "-P"]
-                let output = Pipe()
-                process.standardOutput = output
-                process.standardError = FileHandle.nullDevice
-
-                guard (try? process.run()) != nil else {
-                    continuation.resume(returning: [])
-                    return
-                }
-
-                process.waitUntilExit()
-                let data = output.fileHandleForReading.readDataToEndOfFile()
-                guard process.terminationStatus == 0,
-                      let text = String(data: data, encoding: .utf8)
-                else {
-                    continuation.resume(returning: [])
-                    return
-                }
-
-                continuation.resume(returning: parsePorts(text))
-            }
+    nonisolated static func readPorts() async -> [NetworkConnection]? {
+        guard let data = await ReadOnlyProcess.run(.tcpPorts),
+              let text = String(data: data, encoding: .utf8)
+        else {
+            return nil
         }
+        return parsePorts(text)
     }
 
     /// Parses `lsof -iTCP` output. Internal for tests.

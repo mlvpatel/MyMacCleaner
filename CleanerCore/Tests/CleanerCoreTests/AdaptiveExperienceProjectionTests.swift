@@ -24,6 +24,65 @@ struct AdaptiveExperienceProjectionTests {
     }
 
     @Test
+    func aCachedAuthorityProjectsEveryModeExactlyAsAFullProjection() throws {
+        let source = try fixtureSource()
+        let projector = AdaptiveExperienceProjector()
+        let authority = try projector.authority(from: source)
+
+        for mode in PresentationMode.allCases {
+            #expect(projector.project(authority, mode: mode) == (try projector.project(source, mode: mode)))
+        }
+        #expect(authority.boundarySummaries.map(\.identity) == authority.evidenceIdentities)
+    }
+
+    @Test
+    func planItemsNameOnlyTheDisplayedPlanAndCountTheRestAsReviewOnly() throws {
+        let eligible = try PolicyPlanFixtureFactory.eligibleCache(component: "card.bin", bytes: 4_096, node: 9)
+        let incomplete = try PolicyPlanFixtureFactory.finding(
+            components: ["com.apple.iconservices.store", "gap.bin"],
+            complete: false
+        )
+        let source = try fixtureSource(findings: [
+            ProjectedFinding(eligible.evidence.finding.finding),
+            ProjectedFinding(incomplete.finding),
+        ])
+        let projector = AdaptiveExperienceProjector()
+
+        let authority = try projector.authority(from: source)
+
+        #expect(authority.planItems == [
+            AdaptivePlanItem(
+                identity: AdaptiveExperienceIdentity.hex(eligible.stableIdentity.utf8Bytes),
+                name: "card.bin",
+                parentName: "com.apple.iconservices.store",
+                conservativeBytes: 4_096,
+                recoveryPath: .rebuildable
+            ),
+        ])
+        #expect(authority.evidenceIdentities.contains(authority.planItems[0].identity))
+        #expect(authority.reviewOnlyFindingCount == 1)
+        for mode in PresentationMode.allCases {
+            #expect(projector.project(authority, mode: mode).authority.planItems == authority.planItems)
+        }
+    }
+
+    @Test
+    func noPlanMeansNoPlanItemsAndEveryFindingIsReviewOnly() throws {
+        let source = try fixtureSource(includePlan: false)
+
+        let authority = try AdaptiveExperienceProjector().authority(from: source)
+
+        #expect(authority.planItems.isEmpty)
+        #expect(authority.reviewOnlyFindingCount == source.findings.count)
+    }
+
+    @Test
+    func hexIsTwoLowerCaseDigitsPerByte() {
+        #expect(AdaptiveExperienceIdentity.hex([0x00, 0x0a, 0x10, 0xff]) == "000a10ff")
+        #expect(AdaptiveExperienceIdentity.hex([]) == "")
+    }
+
+    @Test
     func everyMappedAuthorityFieldAppearsOnceAndIsModeInvariant() throws {
         let source = try fixtureSource()
         let projection = try AdaptiveExperienceProjector().project(source, mode: .standard)
@@ -45,9 +104,7 @@ struct AdaptiveExperienceProjectionTests {
         #expect(authority.approvalValidity == .validForReview)
         #expect(authority.executionState == .complete)
         #expect(authority.executionOutcomes == [.moved])
-        #expect(authority.receiptIDs.count == 1)
-        #expect(authority.receiptStatusMarkers.count == 1)
-        #expect(authority.receiptRecoveryMarkers.count == 1)
+        #expect(authority.receipts.count == 1)
         #expect(authority.memoryOutcome == .unavailable)
         #expect(!authority.memoryUnavailable.isEmpty)
         #expect(authority.capabilityAuthorities.count == 4)
@@ -96,6 +153,33 @@ struct AdaptiveExperienceProjectionTests {
     }
 
     @Test
+    func receiptRowsKeepHistoryOrderAndPairEachIDWithItsOwnMarkers() throws {
+        // History order is newest first; "b-newer" sorts after "a-older" lexically on purpose.
+        let newer = try receiptSummary(id: "b-newer", createdAt: 20, aggregate: .partial, canReveal: false, itemCount: 3)
+        let older = try receiptSummary(id: "a-older", createdAt: 10, aggregate: .complete, canReveal: true)
+        let source = try fixtureSource(receipts: [newer, older])
+
+        let rows = try AdaptiveExperienceProjector().project(source, mode: .standard).authority.receipts
+
+        #expect(rows == [
+            AdaptiveReceiptRow(
+                id: "b-newer",
+                createdAtUnixNanoseconds: 20,
+                statusMarker: "receipt.aggregate.partial",
+                recoveryMarker: "receipt.recovery.unavailable",
+                itemCount: 3
+            ),
+            AdaptiveReceiptRow(
+                id: "a-older",
+                createdAtUnixNanoseconds: 10,
+                statusMarker: "receipt.aggregate.complete",
+                recoveryMarker: "receipt.recovery.mayBeAvailable",
+                itemCount: 1
+            ),
+        ])
+    }
+
+    @Test
     func duplicateIdentitiesAreRejected() throws {
         let finding = try PolicyPlanFixtureFactory.finding(
             components: ["com.apple.iconservices.store", "dup.bin"]
@@ -126,7 +210,7 @@ struct AdaptiveExperienceProjectionTests {
             includePlan: false,
             approvalValidity: .invalid(.missingApproval)
         )
-        let identities = try AdaptiveExperienceIdentity.uniqueSorted(from: source.findings)
+        let identities = try AdaptiveExperienceIdentity.keyedUniqueSorted(source.findings).map(\.key)
         #expect(identities == identities.sorted())
         #expect(throws: AdaptiveExperienceProjectionError.overflowingByteTotal) {
             try AdaptiveExperienceProjector().project(source, mode: .guided)
@@ -186,6 +270,42 @@ struct AdaptiveExperienceProjectionTests {
         // Modified at 1 ns, scanned at the test clock's 900 s: inactive for the full 15 minutes.
         #expect(collected.evaluations.compactMap(\.candidate).count == 1)
     }
+
+    @Test
+    func scanSessionClassifiesEachFindingWithItsOwnRootsDetector() async throws {
+        let catalog = GeneralMacScopeCatalog.current
+        let caches = try catalog.declaredRoot(for: .userLibraryCaches)
+        let logs = try catalog.declaredRoot(for: .userLibraryLogs)
+        let fileSystem = ScriptedFileSystem(stepsByRoot: [
+            caches.id: [
+                .observation(try PolicyPlanFixtureFactory.observation(
+                    components: ["com.apple.iconservices.store", "inactive.bin"]
+                )),
+                .terminal(.complete),
+            ],
+            logs.id: [
+                .observation(try PolicyPlanFixtureFactory.observation(
+                    scope: .userLibraryLogs,
+                    components: ["app.log"],
+                    node: 43
+                )),
+                .terminal(.complete),
+            ],
+        ])
+        let session = try AdaptiveScanSession(
+            fileSystem: fileSystem,
+            clock: AdaptiveTestClock(),
+            cancellation: AdaptiveNeverCancel()
+        )
+
+        let collected = await session.collect(
+            request: try catalog.scanRequest(for: [.userLibraryCaches, .userLibraryLogs])
+        )
+
+        // Both findings are classified; only the cache can be eligible, a log never is.
+        #expect(collected.evaluations.count == 2)
+        #expect(collected.evaluations.compactMap(\.candidate).count == 1)
+    }
 }
 
 private let explicitScanStates: [ProjectedScanState] = {
@@ -213,7 +333,8 @@ private func fixtureSource(
     evaluations: [PolicyEvaluation]? = nil,
     includePlan: Bool = true,
     approvalValidity: ApprovalValidity? = nil,
-    developerInventory: [AdaptiveDeveloperInventoryFact] = []
+    developerInventory: [AdaptiveDeveloperInventoryFact] = [],
+    receipts: [RedactedReceiptSummary]? = nil
 ) throws -> AdaptiveExperienceSource {
     let candidate = try PolicyPlanFixtureFactory.eligibleCache(component: "card.bin", bytes: 4_096, node: 9)
     let finding = candidate.evidence.finding
@@ -236,16 +357,7 @@ private func fixtureSource(
     } else {
         validity = .invalid(.missingApproval)
     }
-    let receipt = RedactedReceiptSummary.make(
-        from: ReceiptHistorySummary(
-            id: try ReceiptID("receipt-opaque"),
-            createdAt: .init(unixNanoseconds: 1),
-            aggregate: .complete,
-            isQuarantined: false,
-            itemCount: 1,
-            canRevealMovedItem: true
-        )
-    )
+    let receipt = try receiptSummary(id: "receipt-opaque", createdAt: 1, aggregate: .complete, canReveal: true)
     let memory = MemoryCoachSnapshot(
         sessionID: .init(1),
         samplingBudget: .standard,
@@ -267,11 +379,30 @@ private func fixtureSource(
         approvalValidity: validity,
         executionState: .complete,
         executionOutcomes: [.moved],
-        receipts: [receipt],
+        receipts: receipts ?? [receipt],
         memory: memory,
         capabilities: capabilities,
         permissionGaps: [.fullDiskAccess],
         developerInventory: developerInventory
+    )
+}
+
+private func receiptSummary(
+    id: String,
+    createdAt: Int64,
+    aggregate: ReceiptAggregateState,
+    canReveal: Bool,
+    itemCount: Int = 1
+) throws -> RedactedReceiptSummary {
+    RedactedReceiptSummary.make(
+        from: ReceiptHistorySummary(
+            id: try ReceiptID(id),
+            createdAt: .init(unixNanoseconds: createdAt),
+            aggregate: aggregate,
+            isQuarantined: false,
+            itemCount: itemCount,
+            canRevealMovedItem: canReveal
+        )
     )
 }
 

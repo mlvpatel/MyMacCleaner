@@ -30,7 +30,7 @@ specific run.
 
 | ID | Category | Component | Severity | Control | Verify |
 |----|----------|-----------|----------|---------|--------|
-| T-SAFE-ELEV | Elevation of Privilege | Privileged shell / AppleScript | critical | Phase 0 freeze; `DisabledOperationGateway` | `bash scripts/verify-safety-contract.sh` |
+| T-SAFE-ELEV | Elevation of Privilege | Privileged shell / AppleScript | critical | Privileged routes removed; `DisabledOperationGateway` | `bash scripts/verify-safety-contract.sh` |
 | T-SAFE-RM | Tampering | `rm`, Empty Trash, purge | critical | Mutation APIs removed; typed Trash only | SafetyContract source denylist |
 | T-CORE-SCOPE | Elevation of Privilege | Detector registry | high | Shipped, versioned detectors only | CleanerCore registry tests |
 | T-CORE-LINK | Tampering | Symlink / mount / home | high | Topology stops; incomplete is not eligible | General-Mac hostile fixtures |
@@ -42,6 +42,7 @@ specific run.
 | T-REC-LEAK | Information Disclosure | Receipt payload in logs | high | Opaque IDs; redacted diagnostics | receipt privacy tests |
 | T-UX-AUTH | Elevation of Privilege | Mode picker | high | Presentation-only modes | `AdaptiveExperienceProjectionTests` |
 | T-REL-CLAIM | Spoofing | Notarization / Gatekeeper prose | high | This register + release runbook | Do not claim pending gates |
+| T-REL-INJECT | Elevation of Privilege | Foreign dylib or debugger in the signed app inherits Full Disk Access | critical | Hardened runtime with library validation on; no `disable-library-validation`, `allow-dyld-environment-variables`, `allow-unsigned-executable-memory` or `get-task-allow` in release builds | `scripts/check-signed-entitlements.sh` in `release.sh` and the CI Archive Test job |
 
 ## Residual risks (named, not closed)
 

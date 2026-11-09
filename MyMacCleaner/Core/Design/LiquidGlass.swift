@@ -23,13 +23,7 @@ extension View {
     }
 
     private func glassCardFallback(cornerRadius: CGFloat) -> some View {
-        self
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .strokeBorder(.white.opacity(0.15), lineWidth: 1)
-            )
+        modifier(GlassFallback(shape: RoundedRectangle(cornerRadius: cornerRadius)))
     }
 
     /// Glass card with custom corner radius
@@ -63,13 +57,7 @@ extension View {
     }
 
     private func glassCardProminentFallback(cornerRadius: CGFloat) -> some View {
-        self
-            .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .strokeBorder(.white.opacity(0.2), lineWidth: 1)
-            )
+        modifier(GlassFallback(shape: RoundedRectangle(cornerRadius: cornerRadius), material: .regularMaterial))
             .shadow(color: .black.opacity(0.15), radius: 20, y: 8)
     }
 
@@ -88,9 +76,7 @@ extension View {
     }
 
     private func glassCardSubtleFallback(cornerRadius: CGFloat) -> some View {
-        self
-            .background(.ultraThinMaterial.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        modifier(GlassFallback(shape: RoundedRectangle(cornerRadius: cornerRadius), outline: nil))
     }
 
     /// Pill-shaped glass (for tags, buttons)
@@ -108,10 +94,7 @@ extension View {
     }
 
     private func glassPillFallback() -> some View {
-        self
-            .background(.ultraThinMaterial)
-            .clipShape(.capsule)
-            .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 1))
+        modifier(GlassFallback(shape: Capsule()))
     }
 
     /// Glass effect with tint color
@@ -131,23 +114,61 @@ extension View {
     private func glassCardTintFallback(tint: Color, cornerRadius: CGFloat) -> some View {
         self
             .background(tint.opacity(0.1))
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .strokeBorder(tint.opacity(0.3), lineWidth: 1)
-            )
+            .modifier(GlassFallback(shape: RoundedRectangle(cornerRadius: cornerRadius), outline: tint.opacity(0.3)))
+    }
+}
+
+// MARK: - Glass Fallback (macOS 14-15)
+
+/// The stand-in for Liquid Glass before macOS 26: a material behind the content and a
+/// separator-colour outline, both readable in Light and Dark. Reduce Transparency swaps the
+/// material for the opaque control background; Increase Contrast thickens the outline.
+struct GlassFallback<S: InsettableShape>: ViewModifier {
+    let shape: S
+    /// nil draws no fill (the unfocused search field, unhovered menus).
+    var material: Material? = .ultraThinMaterial
+    /// nil draws no outline.
+    var outline: Color? = Theme.Colors.glassStroke
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        content
+            .background(fill, in: shape)
+            .clipShape(shape)
+            .overlay {
+                if let outline {
+                    shape.strokeBorder(outline, lineWidth: contrast == .increased ? 1.5 : 1)
+                }
+            }
+    }
+
+    private var fill: AnyShapeStyle {
+        guard let material else { return AnyShapeStyle(Color.clear) }
+        return reduceTransparency ? AnyShapeStyle(Theme.Colors.secondaryBackground) : AnyShapeStyle(material)
     }
 }
 
 // MARK: - Interactive Effects
 
 extension View {
-    /// Applies hover effect with scale
+    /// Applies hover effect with scale (none with Reduce Motion)
     func hoverEffect(isHovered: Bool, scale: CGFloat = 1.02) -> some View {
-        self
-            .scaleEffect(isHovered ? scale : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+        modifier(HoverEffect(isHovered: isHovered, scale: scale))
+    }
+}
+
+private struct HoverEffect: ViewModifier {
+    let isHovered: Bool
+    let scale: CGFloat
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isHovered && !reduceMotion ? scale : 1.0)
+            .animation(Theme.Animation.motion(.spring(response: 0.3, dampingFraction: 0.7), reduce: reduceMotion), value: isHovered)
     }
 }
 
@@ -168,111 +189,7 @@ struct GlassCapsuleModifier: ViewModifier {
     }
 
     private func capsuleFallback(content: Content) -> some View {
-        content
-            .background(.ultraThinMaterial)
-            .clipShape(.capsule)
-            .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 1))
-    }
-}
-
-// MARK: - Glass Button Style (Backward Compatible)
-
-struct LiquidGlassButtonStyle: ButtonStyle {
-    enum Variant {
-        case regular
-        case prominent
-        case tinted(Color)
-    }
-
-    let variant: Variant
-    let cornerRadius: CGFloat
-
-    init(_ variant: Variant = .regular, cornerRadius: CGFloat = 12) {
-        self.variant = variant
-        self.cornerRadius = cornerRadius
-    }
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.vertical, 10)
-            .background {
-                switch variant {
-                case .prominent:
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.blue, Color.blue.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                default:
-                    Color.clear
-                }
-            }
-            .modifier(GlassEffectModifier(variant: variant, cornerRadius: cornerRadius))
-            .foregroundStyle(foregroundColor)
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-
-    private var foregroundColor: Color {
-        switch variant {
-        case .regular: return .primary
-        case .prominent: return .white
-        case .tinted(let color): return color
-        }
-    }
-}
-
-// Helper modifier for button glass effect
-struct GlassEffectModifier: ViewModifier {
-    let variant: LiquidGlassButtonStyle.Variant
-    let cornerRadius: CGFloat
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        #if !CI_BUILD
-        if #available(macOS 26, *) {
-            content.glassEffect(glassVariantMacOS26, in: RoundedRectangle(cornerRadius: cornerRadius))
-        } else {
-            fallbackContent(content: content)
-        }
-        #else
-        fallbackContent(content: content)
-        #endif
-    }
-
-    private func fallbackContent(content: Content) -> some View {
-        content
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .strokeBorder(.white.opacity(0.2), lineWidth: 1)
-            )
-    }
-
-    #if !CI_BUILD
-    @available(macOS 26, *)
-    private var glassVariantMacOS26: Glass {
-        switch variant {
-        case .regular, .prominent:
-            return .regular
-        case .tinted(let color):
-            return .regular.tint(color)
-        }
-    }
-    #endif
-}
-
-extension ButtonStyle where Self == LiquidGlassButtonStyle {
-    static var liquidGlass: LiquidGlassButtonStyle { LiquidGlassButtonStyle(.regular) }
-    static var liquidGlassProminent: LiquidGlassButtonStyle { LiquidGlassButtonStyle(.prominent) }
-    static func liquidGlassTinted(_ color: Color) -> LiquidGlassButtonStyle {
-        LiquidGlassButtonStyle(.tinted(color))
+        content.modifier(GlassFallback(shape: Capsule()))
     }
 }
 
@@ -301,17 +218,6 @@ extension ButtonStyle where Self == LiquidGlassButtonStyle {
                 .padding(.vertical, Theme.Spacing.xs)
                 .glassPill()
 
-            HStack(spacing: Theme.Spacing.sm) {
-                Button("Glass") {}
-                    .buttonStyle(.liquidGlass)
-
-                Button("Prominent") {}
-                    .buttonStyle(.liquidGlassProminent)
-
-                Button("Tinted") {}
-                    .buttonStyle(.liquidGlassTinted(.green))
-            }
-
             GlassSearchField(text: .constant(""), placeholder: "Search...")
                 .frame(width: 300)
 
@@ -320,8 +226,6 @@ extension ButtonStyle where Self == LiquidGlassButtonStyle {
                 selection: .constant("All"),
                 label: { $0 }
             )
-
-            FloatingActionButton(icon: "plus", color: .blue) {}
         }
         .padding()
     }

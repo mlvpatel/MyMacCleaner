@@ -7,7 +7,8 @@ struct SystemStats {
     var cpuUsage: Double = 0
     var memoryUsed: UInt64 = 0
     var memoryTotal: UInt64 = 0
-    var memoryPressure: Double = 0
+    var diskUsed: Int64 = 0
+    var diskTotal: Int64 = 0
 
     var formattedCPU: String {
         "\(Int(cpuUsage))%"
@@ -24,6 +25,17 @@ struct SystemStats {
     var memoryUsagePercent: Double {
         guard memoryTotal > 0 else { return 0 }
         return Double(memoryUsed) / Double(memoryTotal) * 100
+    }
+
+    var formattedDisk: String {
+        let used = ByteCountFormatter.string(fromByteCount: diskUsed, countStyle: .file)
+        let total = ByteCountFormatter.string(fromByteCount: diskTotal, countStyle: .file)
+        return "\(used) / \(total)"
+    }
+
+    var diskUsageFraction: Double {
+        guard diskTotal > 0 else { return 0 }
+        return Double(diskUsed) / Double(diskTotal)
     }
 }
 
@@ -44,6 +56,11 @@ final class SystemStatsProvider: ObservableObject, @unchecked Sendable {
     private var numCpuInfo: mach_msg_type_number_t = 0
     private var numPrevCpuInfo: mach_msg_type_number_t = 0
     private var numCPUs: UInt32 = 0
+    /// Last disk reading; touched only on `queue`.
+    private var diskSample: (used: Int64, total: Int64, takenAt: Date)?
+
+    /// Disk use changes slowly and the important-usage query can be slow, so it is re-read at most this often.
+    private static let diskRefreshInterval: TimeInterval = 30
 
     private let queue = DispatchQueue(label: "com.mymaccleaner.stats", qos: .utility)
 
@@ -69,10 +86,11 @@ final class SystemStatsProvider: ObservableObject, @unchecked Sendable {
         // Initial update
         updateStats()
 
-        // Start timer
+        // Start timer; a 20 % tolerance lets macOS coalesce the wakeup with other work
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.updateStats()
         }
+        timer?.tolerance = interval * 0.2
     }
 
     func stopMonitoring() {
@@ -87,16 +105,46 @@ final class SystemStatsProvider: ObservableObject, @unchecked Sendable {
         queue.async { [weak self] in
             guard let self = self else { return }
 
-            let cpu = self.calculateCPUUsage()
             let memory = self.calculateMemoryUsage()
+            let disk = self.currentDiskUsage()
+            let stats = SystemStats(
+                cpuUsage: self.calculateCPUUsage(),
+                memoryUsed: memory.used,
+                memoryTotal: memory.total,
+                diskUsed: disk.used,
+                diskTotal: disk.total
+            )
 
+            // One assignment per tick, so observers see one change instead of one per field.
             DispatchQueue.main.async {
-                self.stats.cpuUsage = cpu
-                self.stats.memoryUsed = memory.used
-                self.stats.memoryTotal = memory.total
-                self.stats.memoryPressure = memory.pressure
+                self.stats = stats
             }
         }
+    }
+
+    // MARK: - Disk Usage
+
+    private func currentDiskUsage() -> (used: Int64, total: Int64) {
+        if let sample = diskSample, Date().timeIntervalSince(sample.takenAt) < Self.diskRefreshInterval {
+            return (sample.used, sample.total)
+        }
+        let disk = Self.diskUsage()
+        diskSample = (disk.used, disk.total, Date())
+        return disk
+    }
+
+    /// Used and total bytes of the startup volume; purgeable space counts as free (important-usage
+    /// capacity, as Finder shows it). Zeros if the volume cannot be read.
+    static func diskUsage() -> (used: Int64, total: Int64) {
+        let homeURL = FileManager.default.homeDirectoryForCurrentUser
+        guard let values = try? homeURL.resourceValues(
+            forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey]
+        ) else {
+            return (0, 0)
+        }
+        let total = Int64(values.volumeTotalCapacity ?? 0)
+        let available = values.volumeAvailableCapacityForImportantUsage ?? 0
+        return (total - available, total)
     }
 
     // MARK: - CPU Usage
@@ -140,7 +188,14 @@ final class SystemStatsProvider: ObservableObject, @unchecked Sendable {
 
     // MARK: - Memory Usage
 
-    private func calculateMemoryUsage() -> (used: UInt64, total: UInt64, pressure: Double) {
+    private func calculateMemoryUsage() -> (used: UInt64, total: UInt64) {
+        Self.memoryUsage() ?? (0, ProcessInfo.processInfo.physicalMemory)
+    }
+
+    /// The app's one memory reading, shared by the menu bar, Home and System Health:
+    /// used = Active + Wired + Compressed (matches Activity Monitor and htop). Nil if the kernel
+    /// refuses the query. Safe from any thread.
+    static func memoryUsage() -> (used: UInt64, total: UInt64)? {
         var stats = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.stride / MemoryLayout<integer_t>.stride)
 
@@ -150,38 +205,13 @@ final class SystemStatsProvider: ObservableObject, @unchecked Sendable {
             }
         }
 
-        guard result == KERN_SUCCESS else {
-            return (0, ProcessInfo.processInfo.physicalMemory, 0)
-        }
+        guard result == KERN_SUCCESS else { return nil }
 
         let pageSize = UInt64(getpagesize())
-
         let active = UInt64(stats.active_count) * pageSize
         let wired = UInt64(stats.wire_count) * pageSize
         let compressed = UInt64(stats.compressor_page_count) * pageSize
 
-        // Used = Active + Wired + Compressed (matches Activity Monitor)
-        let used = active + wired + compressed
-        let total = ProcessInfo.processInfo.physicalMemory
-
-        // Memory pressure (0-1 scale)
-        let pressure = Double(used) / Double(total)
-
-        return (used, total, pressure)
-    }
-
-    // MARK: - Snapshot
-
-    /// Get current stats without starting monitoring
-    func getSnapshot() -> SystemStats {
-        let cpu = calculateCPUUsage()
-        let memory = calculateMemoryUsage()
-
-        return SystemStats(
-            cpuUsage: cpu,
-            memoryUsed: memory.used,
-            memoryTotal: memory.total,
-            memoryPressure: memory.pressure
-        )
+        return (active + wired + compressed, ProcessInfo.processInfo.physicalMemory)
     }
 }

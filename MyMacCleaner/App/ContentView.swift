@@ -4,11 +4,12 @@ struct ContentView: View {
     @EnvironmentObject private var appState: AppState
     @State private var selectedSection: NavigationSection = .home
     @State private var isFullScreen = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationSplitView {
             // Sidebar
-            SidebarView(selection: $selectedSection)
+            SidebarView(selection: $selectedSection, homeViewModel: appState.homeViewModel)
         } detail: {
             // Detail content
             DetailContentView(
@@ -18,7 +19,7 @@ struct ContentView: View {
                     if let section = NavigationSection.allCases.first(where: {
                         $0.rawValue.lowercased().replacingOccurrences(of: " ", with: "") == sectionName.lowercased()
                     }) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(Theme.Animation.motion(.spring(response: 0.3, dampingFraction: 0.8), reduce: reduceMotion)) {
                             selectedSection = section
                         }
                     }
@@ -27,6 +28,7 @@ struct ContentView: View {
             )
         }
         .navigationSplitViewStyle(.balanced)
+        .focusedSceneValue(\.selectedSection, $selectedSection)
         .frame(minWidth: 1000, minHeight: 650)
         .toolbar(removing: .sidebarToggle)
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
@@ -34,6 +36,12 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
             isFullScreen = false
+        }
+        // The menu bar's Scan request starts the Smart Scan in AppState; every window shows Home.
+        .onChange(of: appState.smartScanRequests) {
+            withAnimation(Theme.Animation.motion(.spring(response: 0.3, dampingFraction: 0.8), reduce: reduceMotion)) {
+                selectedSection = .home
+            }
         }
     }
 }
@@ -95,6 +103,12 @@ enum NavigationSection: String, CaseIterable, Identifiable {
         L(key: "navigation.\(rawValue)")
     }
 
+    /// Command-1 to Command-9 in the Go menu, in sidebar order; later sections have none.
+    var goShortcut: KeyboardShortcut? {
+        guard let index = Self.allCases.firstIndex(of: self), index < 9 else { return nil }
+        return KeyboardShortcut(KeyEquivalent(Character(String(index + 1))))
+    }
+
     var localizedDescription: String {
         L(key: "navigation.\(rawValue).description")
     }
@@ -117,10 +131,25 @@ enum NavigationSection: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Go Menu Target
+
+/// The key window's section, so the Go menu switches the window the user is in.
+struct SelectedSectionKey: FocusedValueKey {
+    typealias Value = Binding<NavigationSection>
+}
+
+extension FocusedValues {
+    var selectedSection: Binding<NavigationSection>? {
+        get { self[SelectedSectionKey.self] }
+        set { self[SelectedSectionKey.self] = newValue }
+    }
+}
+
 // MARK: - Sidebar View
 
 struct SidebarView: View {
     @Binding var selection: NavigationSection
+    let homeViewModel: HomeViewModel
     @State private var hoveredSection: NavigationSection?
 
     var body: some View {
@@ -132,40 +161,32 @@ struct SidebarView: View {
 
             // Divider
             Rectangle()
-                .fill(Color.white.opacity(0.1))
+                .fill(Theme.Colors.glassStroke)
                 .frame(height: 1)
                 .padding(.horizontal, Theme.Spacing.md)
 
-            // Navigation items
-            ScrollView {
-                VStack(spacing: Theme.Spacing.xxs) {
-                    ForEach(NavigationSection.allCases) { section in
-                        SidebarRow(
-                            section: section,
-                            isSelected: selection == section,
-                            isHovered: hoveredSection == section
-                        )
-                        .accessibilityIdentifier(section.accessibilityIdentifier)
-                        .onTapGesture {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                selection = section
-                            }
-                        }
-                        .onHover { isHovered in
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                hoveredSection = isHovered ? section : nil
-                            }
+            // Navigation items: a sidebar List, so the arrow keys, Full Keyboard Access and
+            // VoiceOver can move through it and each row reports its selected state.
+            List(selection: $selection) {
+                ForEach(NavigationSection.allCases) { section in
+                    SidebarRow(
+                        section: section,
+                        isSelected: selection == section,
+                        isHovered: hoveredSection == section
+                    )
+                    .tag(section)
+                    .accessibilityIdentifier(section.accessibilityIdentifier)
+                    .onHover { isHovered in
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            hoveredSection = isHovered ? section : nil
                         }
                     }
                 }
-                .padding(.horizontal, Theme.Spacing.sm)
-                .padding(.vertical, Theme.Spacing.sm)
             }
-
-            Spacer()
+            .listStyle(.sidebar)
 
             // Bottom status
-            SystemStatusBadge()
+            SystemStatusBadge(viewModel: homeViewModel)
         }
         .navigationSplitViewColumnWidth(min: 240, ideal: 260, max: 300)
     }
@@ -178,17 +199,25 @@ struct SidebarRow: View {
     let isSelected: Bool
     let isHovered: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.backgroundProminence) private var backgroundProminence
+
+    /// The section colour, or white on the list's emphasized (accent-coloured) selection.
+    private var tint: Color {
+        backgroundProminence == .increased ? .white : section.color
+    }
+
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
             // Icon with background
             ZStack {
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.medium)
-                    .fill(isSelected ? section.color.opacity(0.2) : (isHovered ? Color.white.opacity(0.05) : Color.clear))
+                    .fill(isSelected ? tint.opacity(0.2) : (isHovered ? Theme.Colors.surfaceLight : Color.clear))
                     .frame(width: 36, height: 36)
 
                 Image(systemName: section.icon)
                     .font(Theme.Typography.size15Semibold)
-                    .foregroundStyle(isSelected ? section.color : .secondary)
+                    .foregroundStyle(isSelected ? tint : .secondary)
             }
 
             // Text
@@ -208,9 +237,9 @@ struct SidebarRow: View {
             // Selection indicator
             if isSelected {
                 Circle()
-                    .fill(section.color)
+                    .fill(tint)
                     .frame(width: 6, height: 6)
-                    .shadow(color: section.color.opacity(0.5), radius: 4)
+                    .shadow(color: tint.opacity(0.5), radius: 4)
             }
         }
         .padding(.vertical, Theme.Spacing.xs)
@@ -218,19 +247,19 @@ struct SidebarRow: View {
         .background {
             if isSelected {
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.medium)
-                    .fill(section.color.opacity(0.1))
+                    .fill(tint.opacity(0.1))
                     .overlay {
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.medium)
-                            .strokeBorder(section.color.opacity(0.2), lineWidth: 0.5)
+                            .strokeBorder(tint.opacity(0.2), lineWidth: 0.5)
                     }
             } else if isHovered {
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.medium)
-                    .fill(Color.white.opacity(0.05))
+                    .fill(Theme.Colors.surfaceLight)
             }
         }
         .contentShape(Rectangle())
-        .scaleEffect(isHovered && !isSelected ? 1.02 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+        .scaleEffect(isHovered && !isSelected && !reduceMotion ? 1.02 : 1.0)
+        .animation(Theme.Animation.motion(.spring(response: 0.3, dampingFraction: 0.7), reduce: reduceMotion), value: isHovered)
     }
 }
 
@@ -256,20 +285,21 @@ struct SidebarHeader: View {
 
 // MARK: - System Status Badge
 
+/// The Home health level from the last Smart Scan, or "Not scanned yet"; never a fixed "healthy".
+/// It is not interactive, so it has no hover effect.
 struct SystemStatusBadge: View {
-    @State private var isHovered = false
+    @ObservedObject var viewModel: HomeViewModel
 
     var body: some View {
         VStack(spacing: 0) {
             Divider()
 
             HStack(spacing: Theme.Spacing.xs) {
-                Circle()
-                    .fill(.green)
-                    .frame(width: 8, height: 8)
-                    .shadow(color: .green.opacity(0.5), radius: 4)
+                Image(systemName: viewModel.healthLevel.icon)
+                    .font(.caption)
+                    .foregroundStyle(viewModel.healthLevel.color)
 
-                Text(L("sidebar.systemHealthy"))
+                Text(viewModel.healthLevel.label)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -277,12 +307,9 @@ struct SystemStatusBadge: View {
             }
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm)
-            .background(isHovered ? Color.white.opacity(0.03) : Color.clear)
-            .onHover { hovering in
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    isHovered = hovering
-                }
-            }
+            .help(L("home.health.basis"))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("sidebar.health-status")
         }
     }
 }
@@ -350,27 +377,39 @@ struct DetailContentView: View {
         .animation(.easeInOut(duration: 0.4), value: section)
     }
 
+    private func openExperience() {
+        onNavigate(NavigationSection.adaptiveExperience.rawValue)
+    }
+
+    /// "Learn why" on a Trash notice: Experience opens on its Trash explanation without a scan.
+    private func openTrashExplanation() {
+        onNavigate(appState.destination(for: .trashExplanation).rawValue)
+    }
+
     @ViewBuilder
     private var contentView: some View {
         switch section {
         case .home:
-            HomeView(viewModel: appState.homeViewModel)
-                .onAppear {
-                    appState.homeViewModel.onNavigateToSection = onNavigate
-                }
+            HomeView(viewModel: appState.homeViewModel) { link in
+                onNavigate(appState.destination(for: link).rawValue)
+            }
         case .adaptiveExperience:
             AdaptiveExperienceView(viewModel: appState.adaptiveExperienceViewModel)
         case .diskCleaner:
             DiskCleanerView(
                 viewModel: appState.diskCleanerViewModel,
-                spaceLensViewModel: appState.spaceLensViewModel
+                spaceLensViewModel: appState.spaceLensViewModel,
+                privacyViewModel: appState.browserPrivacyViewModel,
+                openExperience: openExperience,
+                openTrashExplanation: openTrashExplanation,
+                openPermissions: { onNavigate(NavigationSection.permissions.rawValue) }
             )
         case .spaceLens:
-            SpaceLensSectionView(viewModel: appState.spaceLensViewModel)
+            SpaceLensSectionView(viewModel: appState.spaceLensViewModel, openExperience: openExperience)
         case .orphanedFiles:
-            OrphanedFilesView(viewModel: appState.orphanedFilesViewModel)
+            OrphanedFilesView(viewModel: appState.orphanedFilesViewModel, openExperience: openExperience)
         case .duplicates:
-            DuplicatesView(viewModel: appState.duplicatesViewModel)
+            DuplicatesView(viewModel: appState.duplicatesViewModel, openExperience: openExperience)
         case .performance:
             PerformanceView(viewModel: appState.performanceViewModel)
         case .applications:

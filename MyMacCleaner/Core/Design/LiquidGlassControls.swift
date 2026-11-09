@@ -1,63 +1,72 @@
 import SwiftUI
 
-// MARK: - Floating Action Button (Backward Compatible)
+// MARK: - Focus Ring
 
-struct FloatingActionButton: View {
-    let icon: String
-    let color: Color
-    let action: () -> Void
+extension View {
+    /// The one focus ring for custom buttons and rows: a 2 pt stroke in the system keyboard-focus
+    /// colour that follows the control's corner radius. Apply it to the Button.
+    func focusRing(cornerRadius: CGFloat = Theme.CornerRadius.medium) -> some View {
+        modifier(FocusRing(cornerRadius: cornerRadius))
+    }
 
-    @State private var isHovered = false
-    @State private var isPressed = false
-
-    var body: some View {
+    /// Makes a tap-only view a plain Button with the focus ring, so the keyboard, Full Keyboard
+    /// Access, Switch Control and VoiceOver can press it. The view must not contain other buttons.
+    func pressable(cornerRadius: CGFloat = Theme.CornerRadius.large, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon)
-                .font(Theme.Typography.size20Semibold)
-                .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
-                .background {
-                    Circle()
-                        .fill(color.gradient)
-                }
-                .modifier(CircleGlassModifier(color: color))
-                .shadow(color: color.opacity(0.4), radius: isHovered ? 20 : 12, y: isHovered ? 8 : 4)
+            contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .scaleEffect(isPressed ? 0.92 : (isHovered ? 1.05 : 1.0))
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
-        .onHover { isHovered = $0 }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
+        .focusRing(cornerRadius: cornerRadius)
+    }
+
+    /// A pressable disclosure header that reports whether its content is expanded.
+    func expandButton(isExpanded: Bool, cornerRadius: CGFloat = Theme.CornerRadius.large, action: @escaping () -> Void) -> some View {
+        pressable(cornerRadius: cornerRadius, action: action)
+            .accessibilityValue(L(isExpanded ? "common.expanded" : "common.collapsed"))
     }
 }
 
-struct CircleGlassModifier: ViewModifier {
-    let color: Color
+private struct FocusRing: ViewModifier {
+    let cornerRadius: CGFloat
 
-    @ViewBuilder
+    @FocusState private var isFocused: Bool
+
     func body(content: Content) -> some View {
-        #if !CI_BUILD
-        if #available(macOS 26, *) {
-            content.glassEffect(.regular.tint(color), in: .circle)
-        } else {
-            circleFallback(content: content)
-        }
-        #else
-        circleFallback(content: content)
-        #endif
+        content
+            .focused($isFocused)
+            .focusEffectDisabled()
+            .overlay {
+                if isFocused {
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 2)
+                        .allowsHitTesting(false)
+                }
+            }
+    }
+}
+
+// MARK: - Glass Press Style
+
+/// Hover and press scale for the custom glass buttons. Press comes from `configuration.isPressed`,
+/// not a drag gesture, so it follows the button's own press handling; no scale with Reduce Motion.
+struct GlassPressStyle: ButtonStyle {
+    let isHovered: Bool
+    var hoverScale: CGFloat = 1.02
+    var pressedScale: CGFloat = 0.96
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(scale(isPressed: configuration.isPressed))
+            .animation(Theme.Animation.motion(.spring(response: 0.3, dampingFraction: 0.7), reduce: reduceMotion), value: isHovered)
+            .animation(Theme.Animation.motion(.spring(response: 0.2, dampingFraction: 0.7), reduce: reduceMotion), value: configuration.isPressed)
     }
 
-    private func circleFallback(content: Content) -> some View {
-        content
-            .overlay(
-                Circle()
-                    .strokeBorder(.white.opacity(0.3), lineWidth: 1)
-            )
+    private func scale(isPressed: Bool) -> CGFloat {
+        if reduceMotion { return 1 }
+        if isPressed { return pressedScale }
+        return isHovered ? hoverScale : 1
     }
 }
 
@@ -71,7 +80,6 @@ struct GlassActionButton: View {
     var isDisabled: Bool = false
 
     @State private var isHovered = false
-    @State private var isPressed = false
 
     init(_ title: String, icon: String? = nil, color: Color, disabled: Bool = false, action: @escaping () -> Void) {
         self.title = title
@@ -106,17 +114,10 @@ struct GlassActionButton: View {
                     )
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassPressStyle(isHovered: isHovered))
+        .focusRing(cornerRadius: Theme.CornerRadius.medium)
         .disabled(isDisabled)
-        .scaleEffect(isPressed ? 0.96 : (isHovered ? 1.02 : 1.0))
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovered)
-        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
         .onHover { isHovered = $0 }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in if !isDisabled { isPressed = true } }
-                .onEnded { _ in isPressed = false }
-        )
     }
 }
 
@@ -128,13 +129,14 @@ struct GlassSegmentedControl<T: Hashable>: View {
     let label: (T) -> String
 
     @Namespace private var segmentNamespace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         glassContainerWrapper {
             HStack(spacing: Theme.Spacing.xxs) {
                 ForEach(options, id: \.self) { option in
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(Theme.Animation.motion(.spring(response: 0.3, dampingFraction: 0.7), reduce: reduceMotion)) {
                             selection = option
                         }
                     } label: {
@@ -151,10 +153,12 @@ struct GlassSegmentedControl<T: Hashable>: View {
                             }
                     }
                     .buttonStyle(.plain)
+                    .focusRing(cornerRadius: Theme.CornerRadius.pill)
+                    .accessibilityAddTraits(selection == option ? .isSelected : [])
                 }
             }
             .padding(Theme.Spacing.xxs)
-            .background(Color.white.opacity(0.05))
+            .background(Theme.Colors.surfaceLight)
             .clipShape(.capsule)
         }
     }
@@ -168,13 +172,11 @@ struct GlassSegmentedControl<T: Hashable>: View {
             }
         } else {
             content()
-                .background(.ultraThinMaterial)
-                .clipShape(.capsule)
+                .modifier(GlassFallback(shape: Capsule(), outline: nil))
         }
         #else
         content()
-            .background(.ultraThinMaterial)
-            .clipShape(.capsule)
+            .modifier(GlassFallback(shape: Capsule(), outline: nil))
         #endif
     }
 
@@ -187,11 +189,11 @@ struct GlassSegmentedControl<T: Hashable>: View {
                 .glassEffect(.regular, in: .capsule)
         } else {
             Capsule()
-                .fill(.white.opacity(0.15))
+                .fill(Theme.Colors.surfaceHover)
         }
         #else
         Capsule()
-            .fill(.white.opacity(0.15))
+            .fill(Theme.Colors.surfaceHover)
         #endif
     }
 }
@@ -206,6 +208,7 @@ struct GlassTabPicker<T: Hashable>: View {
     let accentColor: Color
 
     @Namespace private var tabNamespace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         tabs: [T],
@@ -231,7 +234,7 @@ struct GlassTabPicker<T: Hashable>: View {
                     accentColor: accentColor,
                     namespace: tabNamespace
                 ) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                    withAnimation(Theme.Animation.motion(.spring(response: 0.35, dampingFraction: 0.7), reduce: reduceMotion)) {
                         selection = tab
                     }
                 }
@@ -273,6 +276,8 @@ struct GlassTabButton: View {
             }
         }
         .buttonStyle(.plain)
+        .focusRing(cornerRadius: Theme.CornerRadius.pill)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .onHover { isHovered = $0 }
     }
 }
@@ -284,6 +289,7 @@ struct GlassSearchField: View {
     let placeholder: String
 
     @FocusState private var isFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: Theme.Spacing.xs) {
@@ -312,8 +318,8 @@ struct GlassSearchField: View {
         .frame(height: Theme.ControlSize.toolbarHeight)
         .frame(maxWidth: Theme.ControlSize.searchFieldMaxWidth)
         .modifier(SearchFieldGlassModifier(isFocused: isFocused))
-        .scaleEffect(isFocused ? 1.01 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFocused)
+        .scaleEffect(isFocused && !reduceMotion ? 1.01 : 1.0)
+        .animation(Theme.Animation.motion(.spring(response: 0.3, dampingFraction: 0.7), reduce: reduceMotion), value: isFocused)
     }
 }
 
@@ -337,12 +343,9 @@ struct SearchFieldGlassModifier: ViewModifier {
     }
 
     private func searchFieldFallback(content: Content) -> some View {
-        content
-            .background(isFocused ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.clear))
-            .clipShape(RoundedRectangle(cornerRadius: Theme.ControlSize.controlRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.ControlSize.controlRadius)
-                    .strokeBorder(.white.opacity(isFocused ? 0.2 : 0.1), lineWidth: 1)
-            )
+        content.modifier(GlassFallback(
+            shape: RoundedRectangle(cornerRadius: Theme.ControlSize.controlRadius),
+            material: isFocused ? .ultraThinMaterial : nil
+        ))
     }
 }

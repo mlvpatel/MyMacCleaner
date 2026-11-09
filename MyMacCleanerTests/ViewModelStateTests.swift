@@ -1,107 +1,70 @@
 import Testing
 import Foundation
+import AppKit
 @testable import MyMacCleaner
 
-// MARK: - Disk Cleaner Selection Tests
+// MARK: - Disk Cleaner Inventory Tests
 
-@Suite("Disk Cleaner Selection Tests")
+@Suite("Disk Cleaner Inventory Tests")
 @MainActor
-struct DiskCleanerSelectionTests {
-    private func item(_ name: String, _ size: Int64, _ category: ScanCategory, selected: Bool = false) -> CleanableItem {
+struct DiskCleanerInventoryTests {
+    private func item(_ name: String, _ size: Int64, _ category: ScanCategory) -> CleanableItem {
         CleanableItem(
             name: name,
             path: URL(fileURLWithPath: "/tmp/\(name)"),
             size: size,
             modificationDate: nil,
-            category: category,
-            isSelected: selected
+            category: category
         )
     }
 
     private func makeViewModel() -> DiskCleanerViewModel {
         let viewModel = DiskCleanerViewModel()
         viewModel.scanResults = [
-            ScanResult(category: .userCache, items: [item("a", 100, .userCache), item("b", 50, .userCache)], isSelected: false),
-            ScanResult(category: .applicationLogs, items: [item("c", 10, .applicationLogs)], isSelected: false),
+            ScanResult(category: .caches, items: [item("a", 100, .caches), item("b", 50, .caches)]),
+            ScanResult(category: .logs, items: [item("c", 10, .logs)]),
         ]
         return viewModel
     }
 
-    @Test("Totals start with nothing selected")
-    func totalsStartUnselected() {
+    @Test("Totals cover every finding")
+    func totalsCoverEveryFinding() {
         let viewModel = makeViewModel()
 
         #expect(viewModel.totalReviewableSize == 160)
         #expect(viewModel.totalItemCount == 3)
-        #expect(viewModel.selectedItemCount == 0)
-        #expect(viewModel.selectedSize == 0)
     }
 
-    @Test("Toggling one item changes only that item")
-    func togglesSingleItem() throws {
+    @Test("Unknown categories are ignored")
+    func ignoresUnknownCategories() {
         let viewModel = makeViewModel()
-        let target = try #require(viewModel.scanResults.first?.items.first)
 
-        viewModel.toggleItemSelection(target, in: .userCache)
-
-        #expect(viewModel.selectedItemCount == 1)
-        #expect(viewModel.selectedSize == 100)
-        viewModel.toggleItemSelection(target, in: .userCache)
-        #expect(viewModel.selectedItemCount == 0)
+        #expect(viewModel.result(for: .documents) == nil)
+        #expect(viewModel.result(for: .logs)?.itemCount == 1)
     }
 
-    @Test("Toggling a category selects all its items, then clears them")
-    func togglesCategory() {
+    @Test("The detail sheet always shows the live result for its category")
+    func detailSheetReadsLiveResult() {
         let viewModel = makeViewModel()
 
-        viewModel.toggleCategorySelection(.userCache)
-        #expect(viewModel.selectedItemCount == 2)
-        #expect(viewModel.selectedSize == 150)
+        viewModel.showDetails(for: .caches)
+        #expect(viewModel.detailCategory == .caches)
+        #expect(viewModel.detailResult?.itemCount == 2)
 
-        viewModel.toggleCategorySelection(.userCache)
-        #expect(viewModel.selectedItemCount == 0)
-    }
+        viewModel.scanResults = [ScanResult(category: .caches, items: [item("z", 1, .caches)])]
+        #expect(viewModel.detailResult?.itemCount == 1)
 
-    @Test("Select all and deselect all cover every category")
-    func selectsAndDeselectsAll() {
-        let viewModel = makeViewModel()
-
-        viewModel.selectAll()
-        #expect(viewModel.selectedItemCount == 3)
-        viewModel.deselectAll()
-        #expect(viewModel.selectedItemCount == 0)
-    }
-
-    @Test("Unknown categories and items are ignored")
-    func ignoresUnknownTargets() {
-        let viewModel = makeViewModel()
-
-        viewModel.toggleCategorySelection(.dockerData)
-        viewModel.toggleItemSelection(item("ghost", 1, .dockerData), in: .dockerData)
-
-        #expect(viewModel.selectedItemCount == 0)
-        #expect(viewModel.result(for: .dockerData) == nil)
-        #expect(viewModel.result(for: .applicationLogs)?.itemCount == 1)
-    }
-
-    @Test("Reviewing with nothing selected explains instead of acting")
-    func reviewWithoutSelectionShowsNotice() {
-        let viewModel = makeViewModel()
-
-        viewModel.explainSelectedStorageReview()
-
-        #expect(viewModel.showToast)
-        #expect(viewModel.toastType == .info)
-        #expect(viewModel.toastMessage == L("safety.notice.noSelection"))
+        viewModel.scanResults = []
+        #expect(viewModel.detailResult == nil)
     }
 
     @Test("Category expansion toggles open and closed")
     func togglesExpansion() {
         let viewModel = makeViewModel()
 
-        viewModel.toggleCategoryExpansion(.userCache)
-        #expect(viewModel.expandedCategory == .userCache)
-        viewModel.toggleCategoryExpansion(.userCache)
+        viewModel.toggleCategoryExpansion(.caches)
+        #expect(viewModel.expandedCategory == .caches)
+        viewModel.toggleCategoryExpansion(.caches)
         #expect(viewModel.expandedCategory == nil)
     }
 }
@@ -125,34 +88,90 @@ struct HomeViewModelTests {
         #expect(viewModel.showPermissionPrompt == false)
     }
 
-    @Test("Reviewing with no scan results explains instead of acting")
-    func reviewWithoutSelectionShowsNotice() {
-        let viewModel = HomeViewModel()
-
-        viewModel.explainSelectedStorageReview()
-
-        #expect(viewModel.showToast)
-        #expect(viewModel.toastMessage == L("safety.notice.noSelection"))
-        viewModel.dismissToast()
-        #expect(viewModel.showToast == false)
+    /// Never finishes on its own, so a scan stays running until the test cancels it.
+    private static func endlessStore() -> SharedScanStore {
+        SharedScanStore(scan: {
+            try await Task.sleep(for: .seconds(600))
+            throw CancellationError()
+        })
     }
 
-    @Test("Before any scan the junk tile asks the user to scan")
-    func junkTileStartsHonest() {
-        #expect(HomeViewModel().junkSize == L("home.stats.scanToCheck"))
+    @Test("After Limited Scan the Full Disk Access prompt stays away for the session")
+    func limitedScanChoiceIsRemembered() {
+        let viewModel = HomeViewModel(scanStore: Self.endlessStore())
+        viewModel.hasFullDiskAccess = false
+
+        viewModel.startSmartScan()
+        viewModel.continueWithLimitedScan()
+        viewModel.cancelScan()
+        viewModel.startSmartScan()
+
+        #expect(viewModel.showPermissionPrompt == false)
+        #expect(viewModel.isScanning)
+        viewModel.cancelScan()
     }
 
-    @Test("Large files navigation targets the Space Lens section")
-    func largeFilesNavigatesToSpaceLens() {
+    @Test("Maybe Later still asks again on the next scan")
+    func maybeLaterAsksAgain() {
+        let viewModel = HomeViewModel(scanStore: Self.endlessStore())
+        viewModel.hasFullDiskAccess = false
+
+        viewModel.startSmartScan()
+        viewModel.dismissPermissionPrompt()
+        viewModel.startSmartScan()
+
+        #expect(viewModel.showPermissionPrompt)
+        #expect(viewModel.isScanning == false)
+    }
+
+    @Test("Granting Full Disk Access while the prompt is open closes it and runs the scan")
+    func grantingAccessClosesPrompt() {
+        let viewModel = HomeViewModel(scanStore: Self.endlessStore())
+        viewModel.hasFullDiskAccess = false
+        viewModel.startSmartScan()
+
+        viewModel.updateFullDiskAccess(true)
+
+        #expect(viewModel.showPermissionPrompt == false)
+        #expect(viewModel.isScanning)
+        viewModel.cancelScan()
+    }
+
+    @Test("The Trash safety notice shows and dismisses")
+    func trashNoticeShowsAndDismisses() {
         let viewModel = HomeViewModel()
-        var destination: String?
-        viewModel.onNavigateToSection = { destination = $0 }
 
-        viewModel.viewLargeFiles()
-        #expect(destination == NavigationSection.spaceLens.rawValue)
+        viewModel.explainTrashSafety()
 
-        viewModel.openMemoryGuide()
-        #expect(destination == NavigationSection.performance.rawValue)
+        #expect(viewModel.toasts.current?.safetyNotice != nil)
+        viewModel.toasts.dismiss()
+        #expect(viewModel.toasts.current == nil)
+    }
+
+    @Test("Before any scan the cache tile asks the user to scan")
+    func cacheTileStartsHonest() {
+        #expect(HomeViewModel().cacheAndLogSize == L("home.stats.scanToCheck"))
+    }
+
+    @Test("The cache tile counts caches, logs and temporary files but never personal folders")
+    func cacheTileExcludesPersonalFolders() {
+        func result(_ category: ScanCategory, _ size: Int64) -> ScanResult {
+            ScanResult(category: category, items: [
+                CleanableItem(
+                    name: category.rawValue,
+                    path: URL(fileURLWithPath: "/tmp/\(category.rawValue)"),
+                    size: size,
+                    modificationDate: nil,
+                    category: category
+                )
+            ])
+        }
+        let results = [
+            result(.caches, 1), result(.logs, 2), result(.temporaryFiles, 4),
+            result(.downloads, 8), result(.desktop, 16), result(.documents, 32)
+        ]
+
+        #expect(HomeViewModel.cacheAndLogBytes(in: results) == 7)
     }
 }
 
@@ -198,6 +217,58 @@ struct PortManagementStateTests {
         viewModel.searchText = "ZET"
         #expect(viewModel.filteredConnections.map(\.processName) == ["zeta"])
     }
+
+    @Test("A failed read says so instead of looking like no connections")
+    func failedReadIsUnavailable() async {
+        let viewModel = PortManagementViewModel(readPorts: { nil })
+
+        viewModel.refreshConnections()
+        await viewModel.refreshTask?.value
+
+        #expect(viewModel.isUnavailable)
+        #expect(viewModel.lastRead == nil)
+        #expect(viewModel.connections.isEmpty)
+    }
+
+    @Test("A successful read, even an empty one, records when the list was read")
+    func successfulReadIsTimestamped() async {
+        let viewModel = PortManagementViewModel(readPorts: { [] })
+
+        viewModel.refreshConnections()
+        await viewModel.refreshTask?.value
+
+        #expect(viewModel.isUnavailable == false)
+        #expect(viewModel.lastRead != nil)
+    }
+}
+
+// MARK: - Startup Items State Tests
+
+@Suite("Startup Items State Tests")
+@MainActor
+struct StartupItemsStateTests {
+    private func item(_ name: String, enabled: Bool, running: Bool, system: Bool) -> StartupItem {
+        StartupItem(
+            id: name, name: name, label: name, type: .launchAgent, path: "/tmp/\(name).plist",
+            executablePath: nil, isEnabled: enabled, isRunning: running, isSystemItem: system,
+            developer: nil, bundleIdentifier: nil
+        )
+    }
+
+    @Test("Every stat counts the same user items, so Running can't exceed Total")
+    func statsCountTheSameItems() {
+        let viewModel = StartupItemsViewModel {}
+        viewModel.items = [
+            item("user-running", enabled: true, running: true, system: false),
+            item("user-idle", enabled: false, running: false, system: false),
+            item("system-a", enabled: true, running: true, system: true),
+            item("system-b", enabled: true, running: true, system: true),
+        ]
+
+        #expect(viewModel.totalCount == 2)
+        #expect(viewModel.runningCount == 1)
+        #expect(viewModel.enabledCount + viewModel.disabledCount == viewModel.totalCount)
+    }
 }
 
 // MARK: - Permissions View Model Tests
@@ -223,6 +294,46 @@ struct PermissionsViewModelTests {
 
         #expect(viewModel.categories.first?.isExpanded == !wasExpanded)
         #expect(viewModel.categories.dropFirst().map(\.isExpanded) == othersBefore)
+    }
+
+    @Test("Grant on a folder macOS still refuses opens Files and Folders and says so")
+    func stillDeniedFolderOpensFilesAndFolders() async {
+        var opened: [String] = []
+        let viewModel = PermissionsViewModel(openURL: { opened.append($0.absoluteString) })
+        let folder = FolderAccessInfo(
+            path: "/nonexistent-\(UUID().uuidString)",
+            displayName: "Desktop",
+            status: .denied,
+            canTriggerTCCDialog: true
+        )
+
+        await viewModel.requestAccess(to: folder)
+
+        #expect(opened == ["x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders"])
+        #expect(viewModel.toasts.current?.message == LFormat("permissions.folder.stillDenied %@", "Desktop"))
+    }
+
+    @Test("Only folders macOS lets the user change get a System Settings button")
+    func manageButtonOnlyWhereAccessCanChange() {
+        let folders = PermissionsViewModel().categories.flatMap(\.folders)
+        let managed = Set(folders.filter(\.isAccessManagedInSystemSettings).map(\.path))
+
+        #expect(managed.contains("~/Desktop"))
+        #expect(managed.contains("~/Library/Safari/Bookmarks.plist"))
+        // World-readable folders: nothing in System Settings changes access to them.
+        #expect(!managed.contains("/System/Library/LaunchAgents"))
+        #expect(!managed.contains("/Library/Caches"))
+        #expect(!managed.contains("~/Library/Caches"))
+    }
+
+    @Test("The Full Disk Access prompt lists only what the app reads with it")
+    func fullDiskAccessFeaturesAreReal() {
+        let features = PermissionsService.fullDiskAccessInfo.localizedFeatures
+
+        #expect(features.count == 5)
+        #expect(!features.contains { $0.localizedCaseInsensitiveContains("mail") })
+        // A missing catalog key would show as the raw key.
+        #expect(!features.contains { $0.hasPrefix("permissions.") })
     }
 }
 
@@ -262,6 +373,15 @@ struct MenuBarTests {
 
         #expect(controller.displayMode == .ramOnly)
     }
+
+    @Test("Icon mode shows no numbers, so stats are sampled only while the popover is open")
+    func samplesOnlyWhenSomethingShowsStats() {
+        for mode in MenuBarController.DisplayMode.allCases where mode != .icon {
+            #expect(MenuBarController.needsSampling(mode: mode, isPopoverShown: false))
+        }
+        #expect(!MenuBarController.needsSampling(mode: .icon, isPopoverShown: false))
+        #expect(MenuBarController.needsSampling(mode: .icon, isPopoverShown: true))
+    }
 }
 
 // MARK: - App State Tests
@@ -277,5 +397,73 @@ struct AppStateTests {
         #expect(appState.spaceLensViewModel === first)
         #expect(first.isScanning == false)
         #expect(appState.adaptiveExperienceViewModel.isExecuting == false)
+    }
+
+    @Test("Each Home link names its section and readies that page; the caller switches its own window")
+    func homeLinksReadyTheirPage() {
+        let appState = AppState()
+
+        #expect(appState.destination(for: .experience) == .adaptiveExperience)
+        #expect(appState.destination(for: .permissions) == .permissions)
+        #expect(appState.destination(for: .trashExplanation) == .adaptiveExperience)
+
+        // Large Files opens Space Lens filtered to large items. Space Lens never scans on entry.
+        #expect(appState.destination(for: .largeFiles) == .spaceLens)
+        #expect(appState.spaceLensViewModel.sizeFilter == .over100MB)
+        #expect(appState.spaceLensViewModel.isScanning == false)
+
+        // Memory Guide opens Performance at its guidance, once.
+        #expect(appState.destination(for: .memoryGuide) == .performance)
+        #expect(appState.performanceViewModel.consumeGuidanceRequest())
+        #expect(appState.performanceViewModel.consumeGuidanceRequest() == false)
+    }
+
+    @Test("The menu bar Scan request switches to Home and starts the Smart Scan flow")
+    func menuBarScanRequestStartsSmartScan() {
+        let center = NotificationCenter()
+        let appState = AppState(notificationCenter: center)
+        appState.homeViewModel.hasFullDiskAccess = false
+
+        center.post(name: .triggerSmartScan, object: nil)
+
+        #expect(appState.smartScanRequests == 1)
+        // Without Full Disk Access the Smart Scan starts by asking, exactly like the Home button.
+        #expect(appState.homeViewModel.showPermissionPrompt)
+        #expect(appState.homeViewModel.isScanning == false)
+    }
+
+    private func waitForMainWindow(_ isPresent: Bool) async -> Bool {
+        for _ in 0..<100 where NSApp.windows.contains(where: MyMacCleanerApp.isMainWindow) != isPresent {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return NSApp.windows.contains(where: MyMacCleanerApp.isMainWindow) == isPresent
+    }
+
+    @Test("The menu bar recognises the launched main window and reopens it after it is closed")
+    func mainWindowIsRecognisedAndReopened() async throws {
+        let identifiers = { NSApp.windows.map { $0.identifier?.rawValue ?? "nil" } }
+        #expect(await waitForMainWindow(true), Comment(rawValue: "window identifiers: \(identifiers())"))
+        let launched = try #require(NSApp.windows.first(where: MyMacCleanerApp.isMainWindow))
+
+        launched.performClose(nil)
+        #expect(await waitForMainWindow(false))
+
+        MyMacCleanerApp.reopenMainWindow()
+        #expect(await waitForMainWindow(true), Comment(rawValue: "window identifiers: \(identifiers())"))
+    }
+
+    @Test("Only the main WindowGroup window counts as the window to reopen")
+    func mainWindowMatchesItsWindowGroupID() {
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        window.identifier = NSUserInterfaceItemIdentifier("Fixture-1-AppWindow-1")
+        #expect(MyMacCleanerApp.isMainWindow(window) == false, "a closed window must be reopened, not reused")
+
+        window.orderBack(nil)
+        defer { window.close() }
+        #expect(MyMacCleanerApp.isMainWindow(window))
+
+        window.identifier = NSUserInterfaceItemIdentifier("com_apple_SwiftUI_Settings_window")
+        #expect(MyMacCleanerApp.isMainWindow(window) == false)
     }
 }

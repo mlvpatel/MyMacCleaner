@@ -1,18 +1,30 @@
 import CleanerCore
 import Darwin
 import Foundation
+import SafetyContract
 
 /// C5: which scanned files a running process currently holds open, taken from one fixed,
 /// read-only `lsof` listing before the scan. An open file is in-use and never a cleanup
-/// candidate. If the listing is unavailable, nothing is marked open and activity falls back
-/// to the modification-time rule, so this can only narrow eligibility.
+/// candidate. If the listing is unavailable, every file in a Trash-eligible root counts as
+/// open for that run (fail closed), so this can only narrow eligibility, never widen it.
 struct OpenFileActivitySnapshot: ProcessActivityObserving {
-    let openPaths: Set<String>
+    /// Nil when the listing was unavailable.
+    let openPaths: Set<String>?
     let rootPaths: [DeclaredRootID: String]
 
+    var isListingAvailable: Bool { openPaths != nil }
+
     func isFileOpen(rootID: DeclaredRootID, components: [String]) -> Bool {
-        guard let root = rootPaths[rootID], !components.isEmpty else { return false }
+        guard !components.isEmpty else { return false }
+        guard let openPaths else { return Self.isTrashEligible(rootID) }
+        guard let root = rootPaths[rootID] else { return false }
         return openPaths.contains(root + "/" + components.joined(separator: "/"))
+    }
+
+    /// A root that cannot be named is treated as Trash-eligible, so it fails closed too.
+    private static func isTrashEligible(_ rootID: DeclaredRootID) -> Bool {
+        guard let kind = try? GeneralMacScopeCatalog.current.rootKind(for: rootID) else { return true }
+        return AdaptiveTrustSession.trashEligibleRootKinds.contains(kind)
     }
 }
 
@@ -23,56 +35,35 @@ enum OpenFileActivityReader {
         let roots = Dictionary(kinds.compactMap { kind in
             (try? catalog.declaredRoot(for: kind)).map { ($0.id, canonicalPath(AppAdaptiveRoots.url(for: kind))) }
         }, uniquingKeysWith: { first, _ in first })
-        return snapshot(roots: roots, listing: await readOpenFileListing())
+        // SAFETY-AUDIT: fixed read-only process adapter — /usr/sbin/lsof -Fn -n -P -w -b
+        let listing = await ReadOnlyProcess.run(.openFiles)
+        // A cancelled scan is not a broken guard, so only a real failure is logged.
+        if listing == nil, !Task.isCancelled {
+            SafetyDiagnosticLogger.emit(
+                RedactingDiagnostic.record(
+                    event: .openFileActivityUnavailable,
+                    sensitiveClasses: [.command, .error]
+                )
+            )
+        }
+        return snapshot(roots: roots, listing: listing)
     }
 
-    /// A `nil` listing (lsof missing, failed, or non-zero exit) marks nothing open.
-    static func snapshot(roots: [DeclaredRootID: String], listing: String?) -> OpenFileActivitySnapshot {
-        guard let listing else {
-            return OpenFileActivitySnapshot(openPaths: [], rootPaths: roots)
-        }
-        return OpenFileActivitySnapshot(
-            openPaths: parseOpenFilePaths(listing, under: Array(roots.values)),
+    /// A `nil` listing (lsof missing, failed, non-zero exit, timed out or cancelled) fails closed.
+    static func snapshot(roots: [DeclaredRootID: String], listing: Data?) -> OpenFileActivitySnapshot {
+        OpenFileActivitySnapshot(
+            openPaths: listing.map { parseOpenFilePaths($0, under: Array(roots.values)) },
             rootPaths: roots
         )
     }
 
-    // SAFETY-AUDIT: fixed read-only process adapter — /usr/sbin/lsof -Fn -n -P -w -b
-    private static func readOpenFileListing() async -> String? {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-                process.arguments = ["-Fn", "-n", "-P", "-w", "-b"]
-                let output = Pipe()
-                process.standardOutput = output
-                process.standardError = FileHandle.nullDevice
-
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                // Drain before waiting: a full listing is far larger than the pipe buffer.
-                let data = output.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                guard process.terminationStatus == 0 else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                continuation.resume(returning: String(decoding: data, as: UTF8.self))
-            }
-        }
-    }
-
-    /// Parses `lsof -F n` output, keeping names strictly under one of `roots`. Internal for tests.
-    static func parseOpenFilePaths(_ output: String, under roots: [String]) -> Set<String> {
+    /// Parses `lsof -F n` output line by line on the raw bytes, keeping names strictly under one
+    /// of `roots`; only name lines are decoded. Internal for tests.
+    static func parseOpenFilePaths(_ output: Data, under roots: [String]) -> Set<String> {
         let prefixes = roots.map { $0 + "/" }
         var paths: Set<String> = []
-        for line in output.split(separator: "\n") where line.first == "n" {
-            let name = decodeLsofName(String(line.dropFirst()))
+        for line in output.split(separator: UInt8(ascii: "\n")) where line.first == UInt8(ascii: "n") {
+            let name = decodeLsofName(line.dropFirst())
             if prefixes.contains(where: { name.hasPrefix($0) }) {
                 paths.insert(name)
             }
@@ -82,8 +73,8 @@ enum OpenFileActivityReader {
 
     /// `lsof` prints each non-printable byte as `\xNN`; decode them back to UTF-8.
     /// Anything that is not a well-formed escape stays literal. Internal for tests.
-    static func decodeLsofName(_ raw: String) -> String {
-        let bytes = Array(raw.utf8)
+    static func decodeLsofName(_ raw: some Collection<UInt8>) -> String {
+        let bytes = Array(raw)
         var decoded: [UInt8] = []
         decoded.reserveCapacity(bytes.count)
         var index = 0

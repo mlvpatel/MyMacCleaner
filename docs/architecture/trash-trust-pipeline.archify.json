@@ -1,0 +1,756 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "From scan to Trash: the cleanup trust pipeline",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/architecture/trash-trust-pipeline.html",
+    "repository": {
+      "url": "https://github.com/mlvpatel/MyMacCleaner",
+      "revision": "2095f154f4b0c9c40ddac13353afa96942420add",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "app",
+      "label": "App session (AdaptiveTrustSession)"
+    },
+    {
+      "id": "scan",
+      "label": "Observation (scan + evidence)"
+    },
+    {
+      "id": "decide",
+      "label": "Decisions (policy, plan, approval, fresh evidence)"
+    },
+    {
+      "id": "exec",
+      "label": "Receipt journal + sole Trash adapter"
+    },
+    {
+      "id": "disk",
+      "label": "Receipt history on disk"
+    },
+    {
+      "id": "stop",
+      "label": "Refused, skipped, inventory only",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p_scan",
+      "label": "1 Scan",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "p_policy",
+      "label": "2 Evidence + policy",
+      "fromCol": 1,
+      "toCol": 1,
+      "variant": "security"
+    },
+    {
+      "id": "p_plan",
+      "label": "3 Review plan",
+      "fromCol": 2,
+      "toCol": 2
+    },
+    {
+      "id": "p_approve",
+      "label": "4 Approval",
+      "fromCol": 3,
+      "toCol": 3,
+      "variant": "security"
+    },
+    {
+      "id": "p_fresh",
+      "label": "5 Fresh evidence",
+      "fromCol": 4,
+      "toCol": 4,
+      "variant": "security"
+    },
+    {
+      "id": "p_exec",
+      "label": "6 Move + receipt",
+      "fromCol": 5,
+      "toCol": 5,
+      "variant": "emphasis"
+    }
+  ],
+  "groups": [
+    {
+      "id": "deny_first",
+      "label": "Deny-first policy",
+      "lane": "decide",
+      "fromCol": 0,
+      "toCol": 1,
+      "variant": "security"
+    },
+    {
+      "id": "per_item",
+      "label": "One item at a time",
+      "lane": "exec",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "live_scan",
+    "scan_coord",
+    "detector",
+    "policy",
+    "plan",
+    "shown",
+    "approve",
+    "validity",
+    "fresh",
+    "journal",
+    "adapter",
+    "run_state"
+  ],
+  "nodes": [
+    {
+      "id": "live_scan",
+      "lane": "app",
+      "col": 0,
+      "type": "backend",
+      "label": "Live scan",
+      "sublabel": "CleanerCoreLiveScan",
+      "tag": "6 roots, lsof first",
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreLiveScan.swift",
+          "line": 5,
+          "end_line": 43,
+          "label": "roots + collect"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/OpenFileActivityObserver.swift",
+          "line": 31,
+          "end_line": 72,
+          "label": "lsof snapshot"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Detectors/GeneralMac/GeneralMacScopeCatalog.swift",
+          "line": 16,
+          "end_line": 24,
+          "label": "per-root scan limits"
+        }
+      ]
+    },
+    {
+      "id": "scan_coord",
+      "lane": "scan",
+      "col": 0,
+      "type": "backend",
+      "label": "ScanCoordinator",
+      "sublabel": "BFS, unreadable skipped",
+      "tag": "cap: issue, next root",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Scanning/ScanCoordinator.swift",
+          "line": 390,
+          "end_line": 421,
+          "label": "per-root caps"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/GeneralMacFilesystemAdapter.swift",
+          "line": 160,
+          "end_line": 184,
+          "label": "skip unreadable entry"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/GeneralMacFilesystemAdapter.swift",
+          "line": 456,
+          "end_line": 503,
+          "label": "breadth-first walk"
+        }
+      ]
+    },
+    {
+      "id": "detector",
+      "lane": "scan",
+      "col": 1,
+      "type": "backend",
+      "label": "Evidence",
+      "sublabel": "GeneralMacEvidenceDetector",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Scanning/AdaptiveScanSession.swift",
+          "line": 65,
+          "end_line": 120,
+          "label": "classify findings"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Detectors/GeneralMac/GeneralMacEvidenceDetector.swift",
+          "line": 10,
+          "end_line": 48,
+          "label": "makeFinding"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Detectors/GeneralMac/GeneralMacEvidenceDetector.swift",
+          "line": 105,
+          "end_line": 122,
+          "label": "completeness"
+        }
+      ]
+    },
+    {
+      "id": "narrow",
+      "lane": "decide",
+      "col": 0,
+      "type": "security",
+      "label": "Narrow only",
+      "sublabel": "open file = in use; owners relabel",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Detectors/GeneralMac/GeneralMacCacheOwnerCatalog.swift",
+          "line": 13,
+          "end_line": 27,
+          "label": "tool-cache keys only"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/OpenFileActivityObserver.swift",
+          "line": 6,
+          "end_line": 29,
+          "label": "open file = in use; no listing = all open"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluation.swift",
+          "line": 65,
+          "end_line": 76,
+          "label": "processActive forces active"
+        }
+      ]
+    },
+    {
+      "id": "policy",
+      "lane": "decide",
+      "col": 1,
+      "type": "security",
+      "label": "PolicyEvaluator",
+      "sublabel": "deny-first",
+      "tag": "eligible: evaluateCache",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluator.swift",
+          "line": 24,
+          "end_line": 170,
+          "label": "deny-first + evaluateCache"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluator.swift",
+          "line": 260,
+          "end_line": 287,
+          "label": "link count 1, boundaries"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluation.swift",
+          "line": 35,
+          "end_line": 98,
+          "label": "named scope + 15 min"
+        }
+      ]
+    },
+    {
+      "id": "inventory",
+      "lane": "stop",
+      "col": 1,
+      "type": "security",
+      "label": "Inventory only",
+      "sublabel": "protected, review or inspect first",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluator.swift",
+          "line": 43,
+          "end_line": 106,
+          "label": "inspect first, review, protected"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluator.swift",
+          "line": 191,
+          "end_line": 227,
+          "label": "ineligible, no candidate"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/DisplayedPlanFactory.swift",
+          "line": 11,
+          "end_line": 12,
+          "label": "only candidates planned"
+        }
+      ]
+    },
+    {
+      "id": "plan",
+      "lane": "decide",
+      "col": 2,
+      "type": "backend",
+      "label": "Review plan",
+      "sublabel": "DisplayedPlanFactory",
+      "tag": "SHA-256, 15 min expiry",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/DisplayedPlanFactory.swift",
+          "line": 1,
+          "end_line": 22,
+          "label": "makePlan"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/ReviewPlan.swift",
+          "line": 98,
+          "end_line": 151,
+          "label": "lifetime + build"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/CryptoKitPlanDigestAdapter.swift",
+          "line": 5,
+          "end_line": 10,
+          "label": "SHA-256 PlanDigesting"
+        }
+      ]
+    },
+    {
+      "id": "shown",
+      "lane": "app",
+      "col": 2,
+      "type": "frontend",
+      "label": "Displayed plan",
+      "sublabel": "Plan held with its digest",
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 141,
+          "end_line": 187,
+          "label": "makeSource"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 360,
+          "end_line": 375,
+          "label": "no approval yet"
+        },
+        {
+          "path": "MyMacCleaner/Features/AdaptiveExperience/AdaptiveExperienceViewModel.swift",
+          "line": 194,
+          "end_line": 199,
+          "label": "UI keeps digest hex"
+        }
+      ]
+    },
+    {
+      "id": "approve",
+      "lane": "app",
+      "col": 3,
+      "type": "backend",
+      "label": "Approve",
+      "sublabel": "executeDisplayedPlan",
+      "tag": "Approval record",
+      "sources": [
+        {
+          "path": "MyMacCleaner/Features/AdaptiveExperience/AdaptiveExperienceViewModel.swift",
+          "line": 200,
+          "end_line": 204,
+          "label": "user confirms"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 200,
+          "end_line": 212,
+          "label": "attestation + context"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveExecutionControl.swift",
+          "line": 8,
+          "end_line": 20,
+          "label": "hex to PlanDigest"
+        }
+      ]
+    },
+    {
+      "id": "validity",
+      "lane": "decide",
+      "col": 3,
+      "type": "security",
+      "label": "Approval gate",
+      "sublabel": "ApprovalValidity.evaluate",
+      "tag": "approved digest, 15-min expiry",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/ApprovedTrashOperationFactory.swift",
+          "line": 1,
+          "end_line": 16,
+          "label": "makeOperations"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/ApprovalValidity.swift",
+          "line": 52,
+          "end_line": 74,
+          "label": "validity checks"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/CanonicalPlanEncoder.swift",
+          "line": 9,
+          "end_line": 20,
+          "label": "digest covers createdAt"
+        }
+      ]
+    },
+    {
+      "id": "refused",
+      "lane": "stop",
+      "col": 3,
+      "type": "security",
+      "label": "Refused: nothing moved",
+      "sublabel": "refusedRun",
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 195,
+          "end_line": 233,
+          "label": "refusal branches"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 338,
+          "end_line": 343,
+          "label": "refusedRun"
+        },
+        {
+          "path": "MyMacCleaner/Features/AdaptiveExperience/AdaptiveExperienceViewModel.swift",
+          "line": 347,
+          "end_line": 363,
+          "label": "failure.outlivesReload reloads"
+        }
+      ]
+    },
+    {
+      "id": "fresh",
+      "lane": "decide",
+      "col": 4,
+      "type": "security",
+      "label": "Fresh evidence",
+      "sublabel": "rescan plan roots",
+      "tag": "policy + lsof re-run",
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreLiveScan.swift",
+          "line": 20,
+          "end_line": 43,
+          "label": "rescan: new lsof snapshot"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 222,
+          "end_line": 241,
+          "label": "rescan, scope backstop"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/FreshEvidenceRevalidator.swift",
+          "line": 99,
+          "end_line": 106,
+          "label": "still-eligible findings only"
+        }
+      ]
+    },
+    {
+      "id": "journal",
+      "lane": "exec",
+      "col": 4,
+      "type": "backend",
+      "label": "Receipt journal",
+      "sublabel": "ReceiptHistoryCoordinator",
+      "tag": "intent persisted first",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Receipts/ReceiptHistoryCoordinator.swift",
+          "line": 19,
+          "end_line": 33,
+          "label": "exclusive lease"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Receipts/ReceiptHistoryCoordinator.swift",
+          "line": 47,
+          "end_line": 108,
+          "label": "intent, per-item loop"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Receipts/ReceiptHistoryCoordinator.swift",
+          "line": 110,
+          "end_line": 127,
+          "label": "admission"
+        }
+      ]
+    },
+    {
+      "id": "store",
+      "lane": "disk",
+      "col": 4,
+      "type": "database",
+      "label": "Receipt store",
+      "sublabel": "AppSupportReceiptStore",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 61,
+          "end_line": 87,
+          "label": "persist intent, transitions"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 116,
+          "end_line": 119,
+          "label": "lease file beside Receipts"
+        }
+      ]
+    },
+    {
+      "id": "adapter",
+      "lane": "exec",
+      "col": 5,
+      "type": "security",
+      "label": "Trash adapter",
+      "sublabel": "FoundationTrashAdapter",
+      "tag": "re-probe, trashItem",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift",
+          "line": 61,
+          "end_line": 108,
+          "label": "revalidate, probe, move"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/FreshEvidenceRevalidator.swift",
+          "line": 153,
+          "end_line": 190,
+          "label": "per-item comparison"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift",
+          "line": 116,
+          "end_line": 165,
+          "label": "symlink walk, link count"
+        }
+      ]
+    },
+    {
+      "id": "stale",
+      "lane": "stop",
+      "col": 5,
+      "type": "security",
+      "label": "Not moved",
+      "sublabel": "skippedStale or failed",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/TrashExecutionOutcome.swift",
+          "line": 1,
+          "end_line": 25,
+          "label": "stale reasons, failure"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift",
+          "line": 65,
+          "end_line": 84,
+          "label": "skip or fail paths"
+        }
+      ]
+    },
+    {
+      "id": "run_state",
+      "lane": "app",
+      "col": 5,
+      "type": "backend",
+      "label": "Run state",
+      "sublabel": "ReceiptReconciliation",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Receipts/ReceiptReconciliation.swift",
+          "line": 39,
+          "end_line": 72,
+          "label": "reconcile transitions"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 242,
+          "end_line": 252,
+          "label": "recordRun sets state, then makeSource"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 437,
+          "end_line": 446,
+          "label": "runState mapping"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_request",
+      "from": "live_scan",
+      "to": "scan_coord",
+      "label": "roots to scan",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e_findings",
+      "from": "scan_coord",
+      "to": "detector",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e_evidence",
+      "from": "detector",
+      "to": "policy",
+      "label": "GeneralMacFinding",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e_narrow",
+      "from": "narrow",
+      "to": "policy",
+      "variant": "security"
+    },
+    {
+      "id": "e_ineligible",
+      "from": "policy",
+      "to": "inventory",
+      "label": "ineligible",
+      "variant": "security",
+      "role": "branch"
+    },
+    {
+      "id": "e_candidates",
+      "from": "policy",
+      "to": "plan",
+      "label": "eligible",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e_display",
+      "from": "plan",
+      "to": "shown",
+      "label": "plan + digest",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e_confirm",
+      "from": "shown",
+      "to": "approve",
+      "label": "confirm",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e_attest",
+      "from": "approve",
+      "to": "validity",
+      "label": "approved digest",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e_invalid",
+      "from": "validity",
+      "to": "refused",
+      "label": "invalid",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "e_operations",
+      "from": "validity",
+      "to": "fresh",
+      "label": "valid",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e_fresh",
+      "from": "fresh",
+      "to": "journal",
+      "label": "fresh per target",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e_persist",
+      "from": "journal",
+      "to": "store",
+      "label": "intent, transitions",
+      "variant": "dashed"
+    },
+    {
+      "id": "e_history_refused",
+      "from": "journal",
+      "to": "refused",
+      "label": "lock busy, 50+ unresolved, write failed",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "e_item",
+      "from": "journal",
+      "to": "adapter",
+      "label": "each item",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e_stale",
+      "from": "adapter",
+      "to": "stale",
+      "label": "stale or error",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "e_outcomes",
+      "from": "adapter",
+      "to": "run_state",
+      "label": "outcomes",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e_refresh",
+      "from": "run_state",
+      "to": "live_scan",
+      "label": "makeSource: new plan",
+      "variant": "dashed",
+      "role": "return",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "What can become eligible",
+      "items": [
+        "Only PolicyEvaluator.evaluateCache returns eligible: a regular file under ~/Library/Caches/com.apple.iconservices.store, modified 15+ minutes before scan start, link count 1, every boundary flag observed false, reclaimable bytes above zero.",
+        "lsof lists files open in running apps; a file it reports open is never eligible. If the lsof listing is unavailable, every ~/Library/Caches file counts as open, so nothing is eligible that run and the page says the open-file check could not run. GeneralMacCacheOwnerCatalog only relabels known tool caches; none sits inside the eligible scope.",
+        "Scan budget per root: depth 8, 25,000 entries, 10,000 findings (GeneralMacScanLimits.current)."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Approval binding",
+      "items": [
+        "One approval covers every eligible item at once: DisplayedPlanFactory puts all candidates into a single plan (DisplayedPlanFactory.swift:11).",
+        "ApprovedTrashOperationFactory.makeOperations emits MoveToTrash operations only when ApprovalValidity.evaluate returns validForReview and the plan has targets.",
+        "The digest is SHA-256 over CanonicalPlanEncoder bytes, which include createdAt and expiresAt, so every rebuilt plan carries a new digest and an old approval cannot match it.",
+        "At this call site ApprovalContext reuses the displayed plan's digest and targets, so the binding checks are approved hex vs plan.digest and the 15-minute expiry; file evidence is rechecked per item later."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Refusals and skips",
+      "items": [
+        "Invalid approval, a failed rescan, or receipt history failing before the first recorded item (busy, review required, intent write) ends in a refusal: nothing is moved. A history failure after items moved reports receiptIncomplete and keeps their Trash locations.",
+        "A target no longer eligible on rescan (opened, modified less than 15 minutes ago, or gone), or outside isWithinTrashScope (backstop), gets no fresh evidence and is skipped as missingFreshEvidence.",
+        "Right before FileManager.trashItem the adapter re-probes the leaf (no symlinked component, same device and inode, link count 1, size, mtime). A mismatch is skippedStale; a throw is failed(nativeMoveFailed).",
+        "Open state comes from the rescan's lsof snapshot; the final probe does not re-check it. A small check-to-move race remains (FoundationTrashAdapter.swift:32-33). Only ~/Library/Caches resolves as a move root; any other root is skippedStale(rootChanged) (AdaptiveTrustSession.swift:34-36, 104-110; FoundationTrashAdapter.swift:68-70).",
+        "Stop between items: remaining planned items reconcile as cancelled and the run reads interrupted.",
+        "Sources as of main, November 2026."
+      ]
+    }
+  ]
+}

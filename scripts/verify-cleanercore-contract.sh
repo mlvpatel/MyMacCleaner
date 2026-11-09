@@ -17,6 +17,7 @@ fail() {
     else
         printf '%s\n' "$rule_id" >&2
     fi
+    printf '  see docs/VERIFIER-RULES.md#%s\n' "$(printf '%s' "$rule_id" | /usr/bin/tr '[:upper:]' '[:lower:]')" >&2
     exit 1
 }
 
@@ -115,12 +116,7 @@ scan_common_source_file() {
 
     line_number=$(first_match_line 'import[[:space:]]+(SwiftUI|AppKit|UIKit|WebKit|Sparkle|Network|CloudKit)|canImport[[:space:]]*\([[:space:]]*(SwiftUI|AppKit|Sparkle|Network|CloudKit)[[:space:]]*\)' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        if [[ "$(basename "$file")" == "FinderReceiptRevealAdapter.swift" ]] \
-            && ! /usr/bin/grep -Eq 'import[[:space:]]+(SwiftUI|UIKit|WebKit|Sparkle|Network|CloudKit)|canImport[[:space:]]*\([[:space:]]*(SwiftUI|Sparkle|Network|CloudKit)[[:space:]]*\)' "$file"; then
-            :
-        else
-            report_match "CC-FORBIDDEN-IMPORT" "$file" "$line_number"
-        fi
+        report_match "CC-FORBIDDEN-IMPORT" "$file" "$line_number"
     fi
 
     line_number=$(first_match_line 'URLSession|URLRequest|NSURLSession|NW(Connection|Listener|PathMonitor)|https?://' "$file" || true)
@@ -219,12 +215,6 @@ scan_foundation_source_file() {
                     report_match "CC-FOUNDATION-IMPORT" "$file" "${line_number:-1}"
                 fi
                 ;;
-            "import AppKit")
-                if [[ "$(basename "$file")" != "FinderReceiptRevealAdapter.swift" ]]; then
-                    line_number=$(first_match_line "^${line}$" "$file" || true)
-                    report_match "CC-FOUNDATION-IMPORT" "$file" "${line_number:-1}"
-                fi
-                ;;
             import*)
                 line_number=$(first_match_line "^${line}$" "$file" || true)
                 report_match "CC-FOUNDATION-IMPORT" "$file" "${line_number:-1}"
@@ -242,16 +232,7 @@ scan_foundation_source_file() {
         trash_count=$(/usr/bin/grep -c 'trashItem[[:space:]]*(' "$file" || true)
         if [[ "$trash_count" -ne 1 ]]; then
             line_number=$(first_match_line 'trashItem[[:space:]]*(' "$file" || true)
-            report_match "CC-PHASE6-SOLE-CALL" "$file" "${line_number:-1}"
-        fi
-    fi
-
-    if [[ "$(basename "$file")" == "FinderReceiptRevealAdapter.swift" ]]; then
-        local reveal_count
-        reveal_count=$(/usr/bin/grep -c 'activateFileViewerSelecting' "$file" || true)
-        if [[ "$reveal_count" -ne 1 ]]; then
-            line_number=$(first_match_line 'activateFileViewerSelecting' "$file" || true)
-            report_match "CC-FINDER-REVEAL-OWNER" "$file" "${line_number:-1}"
+            report_match "CC-TRASH-SOLE-CALL" "$file" "${line_number:-1}"
         fi
     fi
 }
@@ -438,32 +419,32 @@ scan_model_inventory_directory() {
     done <<<"$discovered_files"
 }
 
-scan_phase5_authority_file() {
+scan_plan_authority_file() {
     local file="$1"
     local line_number
 
     line_number=$(first_match_line 'ExecutionPort|ReceiptPort' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        report_match "CC-PHASE5-EXECUTION-RECEIPT" "$file" "$line_number"
+        report_match "CC-PLAN-EXECUTION-RECEIPT" "$file" "$line_number"
     fi
 
     line_number=$(first_match_line 'public[[:space:]]+init[[:space:]]*\([^)]*(EligibleCandidate|candidate:)' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        report_match "CC-PHASE5-PUBLIC-CANDIDATE" "$file" "$line_number"
+        report_match "CC-PLAN-PUBLIC-CANDIDATE" "$file" "$line_number"
     fi
 
     line_number=$(first_match_line 'UserDefaults|isApproved[[:space:]]*:[[:space:]]*Bool|approved[[:space:]]*=[[:space:]]*true' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        report_match "CC-PHASE5-PERSISTENT-APPROVAL" "$file" "$line_number"
+        report_match "CC-PLAN-PERSISTENT-APPROVAL" "$file" "$line_number"
     fi
 
     line_number=$(first_match_line 'trashItem[[:space:]]*\(|removeItem[[:space:]]*\(|emptyTrash|NSWorkspace' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        report_match "CC-PHASE5-MUTATION" "$file" "$line_number"
+        report_match "CC-PLAN-MUTATION" "$file" "$line_number"
     fi
 }
 
-scan_phase5_authority_owners() {
+scan_plan_authority_owners() {
     local directory
     local file
     local owners=(
@@ -473,72 +454,72 @@ scan_phase5_authority_owners() {
     )
 
     for directory in "${owners[@]}"; do
-        [[ -d "$directory" && -r "$directory" ]] || fail "CC-PHASE5-MISSING-SCOPE" "$(location_for "$directory")"
+        [[ -d "$directory" && -r "$directory" ]] || fail "CC-PLAN-MISSING-SCOPE" "$(location_for "$directory")"
         while IFS= read -r -d '' file; do
-            scan_phase5_authority_file "$file"
+            scan_plan_authority_file "$file"
         done < <(/usr/bin/find "$directory" -type f -name '*.swift' -print0)
     done
 }
 
 require_cryptokit_plan_digest_adapter() {
     local adapter="$package_root/Sources/CleanerCoreFoundation/CryptoKitPlanDigestAdapter.swift"
-    [[ -f "$adapter" && -r "$adapter" ]] || fail "CC-PHASE5-DIGEST-ADAPTER" "CleanerCore/Sources/CleanerCoreFoundation/CryptoKitPlanDigestAdapter.swift"
-    /usr/bin/grep -Fq 'import CryptoKit' "$adapter" || fail "CC-PHASE5-DIGEST-ADAPTER" "$(location_for "$adapter")"
-    /usr/bin/grep -Fq 'SHA256' "$adapter" || fail "CC-PHASE5-DIGEST-ADAPTER" "$(location_for "$adapter")"
+    [[ -f "$adapter" && -r "$adapter" ]] || fail "CC-PLAN-DIGEST-ADAPTER" "CleanerCore/Sources/CleanerCoreFoundation/CryptoKitPlanDigestAdapter.swift"
+    /usr/bin/grep -Fq 'import CryptoKit' "$adapter" || fail "CC-PLAN-DIGEST-ADAPTER" "$(location_for "$adapter")"
+    /usr/bin/grep -Fq 'SHA256' "$adapter" || fail "CC-PLAN-DIGEST-ADAPTER" "$(location_for "$adapter")"
 }
 
-scan_phase6_execution_file() {
+scan_trash_execution_file() {
     local file="$1"
     local line_number
 
     line_number=$(first_match_line ':[[:space:]]*URL|URL\?|[[:space:]]URL[[:space:]]*\(|\[URL\]' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        report_match "CC-PHASE6-PUBLIC-INPUT" "$file" "$line_number"
+        report_match "CC-TRASH-PUBLIC-INPUT" "$file" "$line_number"
     fi
 
     line_number=$(first_match_line 'public[[:space:]]+init[[:space:]]*\([^)]*(target:|path:|category:|callback:)' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        report_match "CC-PHASE6-PUBLIC-OPERATION" "$file" "$line_number"
+        report_match "CC-TRASH-PUBLIC-OPERATION" "$file" "$line_number"
     fi
 
     line_number=$(first_match_line 'Codable|Decodable' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        report_match "CC-PHASE6-DECODED-OPERATION" "$file" "$line_number"
+        report_match "CC-TRASH-DECODED-OPERATION" "$file" "$line_number"
     fi
 
     line_number=$(first_match_line 'withTaskGroup|TaskGroup|async let' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        report_match "CC-PHASE6-PARALLEL" "$file" "$line_number"
+        report_match "CC-TRASH-PARALLEL" "$file" "$line_number"
     fi
 
     line_number=$(first_match_line 'retry|rollback|restore|compensat' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        report_match "CC-PHASE6-COMPENSATION" "$file" "$line_number"
+        report_match "CC-TRASH-COMPENSATION" "$file" "$line_number"
     fi
 
     line_number=$(first_match_line 'ReceiptPort|UserDefaults|historyWriter' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        report_match "CC-PHASE6-PERSISTENCE" "$file" "$line_number"
+        report_match "CC-TRASH-PERSISTENCE" "$file" "$line_number"
     fi
 
     line_number=$(first_match_line 'emptyTrash|removeItem[[:space:]]*\(|trashItem[[:space:]]*\(' "$file" || true)
     if [[ -n "$line_number" ]]; then
-        report_match "CC-PHASE6-MUTATION" "$file" "$line_number"
+        report_match "CC-TRASH-MUTATION" "$file" "$line_number"
     fi
 }
 
-scan_phase6_authority_owners() {
+scan_trash_execution_owners() {
     local execution_root="$package_root/Sources/CleanerCore/Execution"
     local port_file="$package_root/Sources/CleanerCore/Ports/TrashExecutionPort.swift"
     local file
 
-    [[ -d "$execution_root" && -r "$execution_root" ]] || fail "CC-PHASE6-MISSING-SCOPE" "CleanerCore/Sources/CleanerCore/Execution"
-    [[ -f "$port_file" && -r "$port_file" ]] || fail "CC-PHASE6-MISSING-SCOPE" "CleanerCore/Sources/CleanerCore/Ports/TrashExecutionPort.swift"
+    [[ -d "$execution_root" && -r "$execution_root" ]] || fail "CC-TRASH-MISSING-SCOPE" "CleanerCore/Sources/CleanerCore/Execution"
+    [[ -f "$port_file" && -r "$port_file" ]] || fail "CC-TRASH-MISSING-SCOPE" "CleanerCore/Sources/CleanerCore/Ports/TrashExecutionPort.swift"
 
     while IFS= read -r -d '' file; do
-        scan_phase6_execution_file "$file"
+        scan_trash_execution_file "$file"
     done < <(/usr/bin/find "$execution_root" -type f -name '*.swift' -print0)
-    scan_phase6_execution_file "$port_file"
+    scan_trash_execution_file "$port_file"
 }
 
 require_sole_trash_adapter() {
@@ -546,16 +527,16 @@ require_sole_trash_adapter() {
     local file
     local trash_count
 
-    [[ -f "$adapter" && -r "$adapter" ]] || fail "CC-PHASE6-SOLE-CALL" "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift"
+    [[ -f "$adapter" && -r "$adapter" ]] || fail "CC-TRASH-SOLE-CALL" "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift"
     trash_count=$(/usr/bin/grep -c 'trashItem[[:space:]]*(' "$adapter" || true)
-    [[ "$trash_count" -eq 1 ]] || fail "CC-PHASE6-SOLE-CALL" "$(location_for "$adapter")"
+    [[ "$trash_count" -eq 1 ]] || fail "CC-TRASH-SOLE-CALL" "$(location_for "$adapter")"
 
     while IFS= read -r -d '' file; do
         if [[ "$(basename "$file")" == "FoundationTrashAdapter.swift" ]]; then
             continue
         fi
         if /usr/bin/grep -q 'trashItem[[:space:]]*(' "$file"; then
-            fail "CC-PHASE6-SOLE-CALL" "$(location_for "$file")"
+            fail "CC-TRASH-SOLE-CALL" "$(location_for "$file")"
         fi
     done < <(/usr/bin/find "$package_root/Sources" -type f -name '*.swift' -print0)
 }
@@ -595,24 +576,13 @@ recognize_planned_receipt_adapters() {
     local planned=(
         "$package_root/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift"
         "$package_root/Sources/CleanerCoreFoundation/DarwinReceiptLease.swift"
-        "$package_root/Sources/CleanerCoreFoundation/FinderReceiptRevealAdapter.swift"
     )
 
     for file in "${planned[@]}"; do
         [[ -f "$file" ]] || continue
         scan_foundation_source_file "$file"
         if /usr/bin/grep -q 'trashItem[[:space:]]*(' "$file"; then
-            fail "CC-PHASE6-SOLE-CALL" "$(location_for "$file")"
-        fi
-        if [[ "$(basename "$file")" == "FinderReceiptRevealAdapter.swift" ]]; then
-            local reveal_count
-            reveal_count=$(/usr/bin/grep -c 'activateFileViewerSelecting' "$file" || true)
-            if [[ "$reveal_count" -ne 1 ]]; then
-                fail "CC-FINDER-REVEAL-OWNER" "$(location_for "$file")"
-            fi
-            if /usr/bin/grep -Eq 'NSAppleScript|Process[[:space:]]*\(|restore|compensat|retry|emptyTrash|URLSession' "$file"; then
-                fail "CC-FINDER-REVEAL-OWNER" "$(location_for "$file")"
-            fi
+            fail "CC-TRASH-SOLE-CALL" "$(location_for "$file")"
         fi
     done
 }
@@ -662,11 +632,11 @@ scan_tree_as_target() {
             privacy)
                 scan_privacy_file "$file" "$(location_for "$file")"
                 ;;
-            phase5)
-                scan_phase5_authority_file "$file"
+            plan)
+                scan_plan_authority_file "$file"
                 ;;
-            phase6)
-                scan_phase6_execution_file "$file"
+            trash-execution)
+                scan_trash_execution_file "$file"
                 ;;
             model)
                 scan_model_inventory_file "$file"
@@ -859,9 +829,9 @@ run_product_contract() {
     scan_model_inventory_scope
     validate_bridge_boundary
     validate_update_owner_boundary
-    scan_phase5_authority_owners
+    scan_plan_authority_owners
     require_cryptokit_plan_digest_adapter
-    scan_phase6_authority_owners
+    scan_trash_execution_owners
     require_sole_trash_adapter
     scan_receipt_core_owners
     recognize_planned_receipt_adapters
@@ -882,7 +852,7 @@ while [[ $# -gt 0 ]]; do
         --fixture-target)
             [[ $# -ge 2 ]] || fail "CC-UNKNOWN-MODE"
             case "$2" in
-                pure|foundation|content-adapter|darwin|privacy|model|phase5|phase6)
+                pure|foundation|content-adapter|darwin|privacy|model|plan|trash-execution)
                     fixture_target="$2"
                     ;;
                 *)

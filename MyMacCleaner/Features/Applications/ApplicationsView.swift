@@ -79,6 +79,9 @@ struct ApplicationsView: View {
             // Start background discovery when view appears
             viewModel.startBackgroundDiscovery()
         }
+        .onDisappear {
+            viewModel.stopWork()
+        }
     }
 
     // MARK: - Header Section
@@ -128,21 +131,21 @@ struct ApplicationsView: View {
                 isLoading: viewModel.discoveryState == .discovering
             )
 
-            // System Apps Card
+            // /Applications Card
             InfoCard(
-                icon: "gearshape.fill",
+                icon: "folder.fill",
                 iconColor: .orange,
-                title: "\(systemAppsCount)",
-                subtitle: L("applications.stats.systemApps"),
+                title: "\(inApplicationsCount)",
+                subtitle: L("applications.stats.inApplications"),
                 isLoading: viewModel.discoveryState == .discovering
             )
 
-            // User Apps Card
+            // ~/Applications Card
             InfoCard(
                 icon: "person.fill",
                 iconColor: .purple,
-                title: "\(userAppsCount)",
-                subtitle: L("applications.stats.userApps"),
+                title: "\(inUserApplicationsCount)",
+                subtitle: L("applications.stats.inUserApplications"),
                 isLoading: viewModel.discoveryState == .discovering
             )
 
@@ -151,17 +154,17 @@ struct ApplicationsView: View {
                 icon: viewModel.analysisState == .analyzing ? "arrow.triangle.2.circlepath" : "chart.bar.fill",
                 iconColor: .green,
                 title: viewModel.analysisState == .analyzing ? "\(Int(viewModel.analysisProgress * 100))%" : L("applications.stats.ready"),
-                subtitle: viewModel.analysisState == .analyzing ? L("applications.stats.analyzing") : L("applications.stats.toAnalyze"),
+                subtitle: viewModel.analysisState == .analyzing ? L("applications.stats.analyzing") : L("applications.stats.notMeasured"),
                 isLoading: viewModel.analysisState == .analyzing
             )
         }
     }
 
-    private var systemAppsCount: Int {
+    private var inApplicationsCount: Int {
         viewModel.applications.filter { $0.url.path.hasPrefix("/Applications") }.count
     }
 
-    private var userAppsCount: Int {
+    private var inUserApplicationsCount: Int {
         viewModel.applications.filter { !$0.url.path.hasPrefix("/Applications") }.count
     }
 
@@ -436,16 +439,14 @@ struct ApplicationsView: View {
                 icon: "arrow.up.arrow.down",
                 title: viewModel.sortOrder.localizedName
             ) {
-                ForEach(ApplicationsViewModel.SortOrder.allCases, id: \.self) { order in
-                    Button(action: { viewModel.sortOrder = order }) {
-                        HStack {
-                            Text(order.localizedName)
-                            if viewModel.sortOrder == order {
-                                Image(systemName: "checkmark")
-                            }
-                        }
+                // An inline Picker gives the menu native check marks that VoiceOver reads.
+                Picker("", selection: $viewModel.sortOrder) {
+                    ForEach(ApplicationsViewModel.SortOrder.allCases, id: \.self) { order in
+                        Text(order.localizedName).tag(order)
                     }
                 }
+                .pickerStyle(.inline)
+                .labelsHidden()
             }
 
             // Refresh button

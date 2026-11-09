@@ -13,7 +13,7 @@ than the row below.
 | Adaptive catalog/IDs (CLT) | **Locally verified** | `bash scripts/verify-adaptive-experience.sh` |
 | Full-Xcode app build | **Verified** | Local full Xcode; hosted PR Checks Build, Unit Tests and Archive Test green on public `a873d7d` (2026-10-06) |
 | XCUITest | **Hosted green (advisory)** | PR Checks UI Tests job green on `a873d7d` |
-| VoiceOver / keyboard / Reduce Motion / Increase Contrast | **Pending** | 08-04 `ui_proof: human_needed` |
+| VoiceOver / keyboard / Reduce Motion / Increase Contrast | **Pending** | Manual walk not yet recorded |
 | Hosted safety-contract workflow | **Verified** | Safety Contract workflow green on `a873d7d` (2026-10-06) |
 | Developer ID signing | **Pending** | No signing identity in this environment; do not store secrets in the repo |
 | Notarization / stapling | **Pending** | Not run |
@@ -22,19 +22,19 @@ than the row below.
 | Public sanitized repository | **Done** | `mlvpatel/MyMacCleaner` is public; local planning files are excluded |
 | Website retirement | **Done** | `website/` and its deploy workflow deleted 2026-10-02 |
 
-## Local commands (this environment)
+## Local commands
+
+`bash scripts/verify-all.sh` runs what the Safety Contract workflow runs. The PR
+Checks gates below need full Xcode; Command Line Tools cannot run them. See
+[CONTRIBUTING.md](../CONTRIBUTING.md#local-gates).
 
 ```bash
-bash scripts/verify-safety-contract.sh
-bash scripts/verify-adaptive-experience.sh
-CODEX_SANDBOX=1 bash scripts/verify-cleanercore.sh
-```
-
-Command Line Tools cannot run:
-
-```bash
-xcodebuild -project MyMacCleaner.xcodeproj -scheme MyMacCleaner build
-xcodebuild test -project MyMacCleaner.xcodeproj -scheme MyMacCleaner
+bash scripts/verify-all.sh
+xcodebuild test -project MyMacCleaner.xcodeproj -scheme MyMacCleaner \
+  -destination 'platform=macOS' -only-testing:MyMacCleanerTests \
+  -enableCodeCoverage YES -resultBundlePath build/TestResults.xcresult
+bash scripts/check-app-coverage.sh build/TestResults.xcresult   # app coverage ratchet
+swiftlint lint                                                  # CI pins SwiftLint 0.65.1
 ```
 
 ## Signing configuration
@@ -60,4 +60,4 @@ them with `spctl`, and creates only a draft release from a `release/v<version>` 
 - "Signed and notarized" without notary and stapler evidence
 - "Gatekeeper passed" without `spctl` assessment of the shipped artifact
 - "CI green" without a recorded hosted run SHA
-- "08-04 complete" without full-Xcode XCUITest and assistive walks
+- "Accessibility audit complete" without full-Xcode XCUITest and assistive walks

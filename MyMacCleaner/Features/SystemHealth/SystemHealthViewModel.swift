@@ -48,13 +48,13 @@ class SystemHealthViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Initialization
+    // MARK: - Public Methods
 
-    init() {
+    /// Runs the first health check on the page's first appearance instead of at app launch.
+    func loadIfNeeded() {
+        guard lastUpdated == nil, !isLoading else { return }
         runHealthCheck()
     }
-
-    // MARK: - Public Methods
 
     func runHealthCheck() {
         isLoading = true
@@ -67,7 +67,7 @@ class SystemHealthViewModel: ObservableObject {
             await checkBattery()
             await checkDiskHealth()
             await checkStartupItems()
-            await checkSystemUpdates()
+            healthChecks.append(Self.macOSVersionCheck(ProcessInfo.processInfo.operatingSystemVersion))
 
             // Calculate overall score
             calculateHealthScore()
@@ -92,7 +92,9 @@ class SystemHealthViewModel: ObservableObject {
         // Get disk space
         let fileManager = FileManager.default
         if let homeURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first,
-           let values = try? homeURL.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey]) {
+           let values = try? homeURL.resourceValues(forKeys: [
+               .volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey, .volumeLocalizedNameKey
+           ]) {
 
             let available = values.volumeAvailableCapacityForImportantUsage ?? 0
             let total = Int64(values.volumeTotalCapacity ?? 0)
@@ -111,7 +113,7 @@ class SystemHealthViewModel: ObservableObject {
 
             // Store disk info
             let info = DiskInfo(
-                name: "Macintosh HD",
+                name: values.volumeLocalizedName ?? L("systemHealth.disk.startup"),
                 totalSpace: total,
                 availableSpace: available,
                 usedPercent: usedPercent
@@ -132,34 +134,16 @@ class SystemHealthViewModel: ObservableObject {
         )
         healthChecks.append(check)
 
-        // Get memory info using host_statistics64
-        var stats = vm_statistics64()
-        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
+        if let memory = SystemStatsProvider.memoryUsage(), memory.total > 0 {
+            let usage = Double(memory.used) / Double(memory.total)
+            let percentFormatted = String(format: "%.0f%%", usage * 100)
 
-        let result = withUnsafeMutablePointer(to: &stats) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
-            }
-        }
-
-        if result == KERN_SUCCESS {
-            let pageSize = UInt64(getpagesize())
-            let active = UInt64(stats.active_count) * pageSize
-            // inactive is not used in calculation (excluded from "used" memory)
-            _ = UInt64(stats.inactive_count) * pageSize
-            let wired = UInt64(stats.wire_count) * pageSize
-            let compressed = UInt64(stats.compressor_page_count) * pageSize
-
-            let used = active + wired + compressed
-            let total = ProcessInfo.processInfo.physicalMemory
-            let usedPercent = Double(used) / Double(total) * 100
-            let percentFormatted = String(format: "%.0f%%", usedPercent)
-
-            if usedPercent < 70 {
+            switch StatusLevel.memory(usage) {
+            case .normal:
                 updateCheck(id: "memory", status: .passed, description: LFormat("systemHealth.check.memory.passed %@", percentFormatted))
-            } else if usedPercent < 85 {
+            case .warning:
                 updateCheck(id: "memory", status: .warning, description: LFormat("systemHealth.check.memory.warning %@", percentFormatted))
-            } else {
+            case .critical:
                 updateCheck(id: "memory", status: .failed, description: LFormat("systemHealth.check.memory.failed %@", percentFormatted))
             }
         } else {
@@ -228,15 +212,17 @@ class SystemHealthViewModel: ObservableObject {
         )
         healthChecks.append(check)
 
-        switch await readRootDiskInfo() {
-        case .verified:
-            updateCheck(id: "disk_health", status: .passed, description: L("systemHealth.check.diskHealth.verified"))
-        case .notSupported:
-            updateCheck(id: "disk_health", status: .passed, description: L("systemHealth.check.diskHealth.ssd"))
-        case .unknown:
-            updateCheck(id: "disk_health", status: .warning, description: L("systemHealth.check.diskHealth.unknown"))
-        case .unavailable:
-            updateCheck(id: "disk_health", status: .passed, description: L("systemHealth.check.diskHealth.healthy"))
+        let result = Self.diskHealthResult(await readRootDiskInfo())
+        updateCheck(id: "disk_health", status: result.status, description: L(result.key))
+    }
+
+    /// A diskutil failure is unavailable, never healthy. Internal for tests.
+    nonisolated static func diskHealthResult(_ health: RootDiskHealth) -> (status: HealthCheck.Status, key: String) {
+        switch health {
+        case .verified: (.passed, "systemHealth.check.diskHealth.verified")
+        case .notSupported: (.passed, "systemHealth.check.diskHealth.ssd")
+        case .unknown: (.warning, "systemHealth.check.diskHealth.unknown")
+        case .unavailable: (.unavailable, "systemHealth.check.diskHealth.unavailable")
         }
     }
 
@@ -268,29 +254,17 @@ class SystemHealthViewModel: ObservableObject {
         }
     }
 
-    private func checkSystemUpdates() async {
-        let check = HealthCheck(
-            id: "updates",
-            title: L("systemHealth.check.updates"),
-            description: L("systemHealth.check.updates.checking"),
-            icon: "arrow.down.circle.fill",
-            status: .checking
-        )
-        healthChecks.append(check)
-
-        // Check macOS version
-        let version = ProcessInfo.processInfo.operatingSystemVersion
+    /// The installed macOS version, shown for reference. The app can't check for updates, so this
+    /// row never claims "up to date" and never counts toward the score. Internal for tests.
+    nonisolated static func macOSVersionCheck(_ version: OperatingSystemVersion) -> HealthCheck {
         let versionString = "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
-
-        // For simplicity, we'll just report the current version
-        // A full implementation would check software update
-        if version.majorVersion >= 14 {
-            updateCheck(id: "updates", status: .passed, description: LFormat("systemHealth.check.updates.passed %@", versionString))
-        } else if version.majorVersion >= 13 {
-            updateCheck(id: "updates", status: .warning, description: LFormat("systemHealth.check.updates.warning %@", versionString))
-        } else {
-            updateCheck(id: "updates", status: .failed, description: LFormat("systemHealth.check.updates.failed %@", versionString))
-        }
+        return HealthCheck(
+            id: "macos_version",
+            title: L("systemHealth.check.macOSVersion"),
+            description: LFormat("systemHealth.check.macOSVersion.info %@", versionString),
+            icon: "apple.logo",
+            status: .info
+        )
     }
 
     // MARK: - Helper Methods
@@ -308,8 +282,10 @@ class SystemHealthViewModel: ObservableObject {
         healthStatus = result.status
     }
 
-    /// Passed checks count 100%, warnings 50%, anything else 0%. Internal for tests.
-    nonisolated static func healthScore(for statuses: [HealthCheck.Status]) -> (score: Int, status: HealthStatus) {
+    /// Passed checks count 100%, warnings 50%, anything else 0%, so a check that couldn't run keeps
+    /// the score below Excellent. Informational rows don't count. Internal for tests.
+    nonisolated static func healthScore(for allStatuses: [HealthCheck.Status]) -> (score: Int, status: HealthStatus) {
+        let statuses = allStatuses.filter { $0 != .info }
         guard !statuses.isEmpty else { return (0, .unknown) }
 
         let passedCount = statuses.filter { $0 == .passed }.count
@@ -324,6 +300,25 @@ class SystemHealthViewModel: ObservableObject {
         }
     }
 
+    /// The sentence under the score. It never calls the Mac healthy when a check couldn't run.
+    /// Internal for tests.
+    nonisolated static func summary(for statuses: [HealthCheck.Status]) -> String {
+        let passed = statuses.filter { $0 == .passed }.count
+        let warnings = statuses.filter { $0 == .warning }.count
+        let failed = statuses.filter { $0 == .failed }.count
+        let unavailable = statuses.filter { $0 == .unavailable }.count
+
+        if failed > 0 {
+            return LFormat("systemHealth.summary.failed %lld", failed)
+        } else if warnings > 0 {
+            return LFormat("systemHealth.summary.warnings %lld %lld", passed, warnings)
+        } else if unavailable > 0 {
+            return LFormat("systemHealth.summary.incomplete %lld %lld", passed, unavailable)
+        } else {
+            return LFormat("systemHealth.summary.passed %lld", passed)
+        }
+    }
+
     enum RootDiskHealth {
         case verified
         case notSupported
@@ -333,32 +328,12 @@ class SystemHealthViewModel: ObservableObject {
 
     // SAFETY-AUDIT: fixed read-only process adapter — /usr/sbin/diskutil info /
     private func readRootDiskInfo() async -> RootDiskHealth {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
-                process.arguments = ["info", "/"]
-                let output = Pipe()
-                process.standardOutput = output
-                process.standardError = FileHandle.nullDevice
-
-                guard (try? process.run()) != nil else {
-                    continuation.resume(returning: .unavailable)
-                    return
-                }
-
-                process.waitUntilExit()
-                let data = output.fileHandleForReading.readDataToEndOfFile()
-                guard process.terminationStatus == 0,
-                      let text = String(data: data, encoding: .utf8)
-                else {
-                    continuation.resume(returning: .unavailable)
-                    return
-                }
-
-                continuation.resume(returning: SystemHealthViewModel.parseDiskInfo(text))
-            }
+        guard let data = await ReadOnlyProcess.run(.rootDiskInfo),
+              let text = String(data: data, encoding: .utf8)
+        else {
+            return .unavailable
         }
+        return Self.parseDiskInfo(text)
     }
 
     /// Classifies `diskutil info /` output. Internal for tests.
@@ -387,6 +362,10 @@ struct HealthCheck: Identifiable {
         case passed
         case warning
         case failed
+        /// A fact shown for reference; never part of the score.
+        case info
+        /// The check couldn't run, so its result is unknown.
+        case unavailable
 
         var color: Color {
             switch self {
@@ -394,6 +373,8 @@ struct HealthCheck: Identifiable {
             case .passed: return .green
             case .warning: return .orange
             case .failed: return .red
+            case .info: return .blue
+            case .unavailable: return .gray
             }
         }
 
@@ -403,6 +384,8 @@ struct HealthCheck: Identifiable {
             case .passed: return "checkmark.circle.fill"
             case .warning: return "exclamationmark.triangle.fill"
             case .failed: return "xmark.circle.fill"
+            case .info: return "info.circle.fill"
+            case .unavailable: return "questionmark.circle.fill"
             }
         }
     }

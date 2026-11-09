@@ -13,10 +13,7 @@ struct PermissionCategoryCard: View {
         VStack(spacing: 0) {
             // Header (always visible)
             headerRow
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    onToggleExpand()
-                }
+                .expandButton(isExpanded: category.isExpanded, action: onToggleExpand)
 
             // Expandable folder list
             if category.isExpanded {

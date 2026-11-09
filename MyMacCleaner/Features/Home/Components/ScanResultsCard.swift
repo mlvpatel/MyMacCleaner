@@ -3,24 +3,16 @@ import SwiftUI
 // MARK: - Scan Results Card
 
 struct ScanResultsCard: View {
-    @Binding var results: [ScanResult]
-    let onReviewSelection: () -> Void
+    let results: [ScanResult]
+    let onOpenExperience: () -> Void
 
-    @State private var isHovered = false
     @State private var isVisible = false
     @State private var expandedCategories: Set<ScanCategory> = []
     @State private var allExpanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var totalSize: Int64 {
         results.reduce(0) { $0 + $1.totalSize }
-    }
-
-    var selectedSize: Int64 {
-        results.filter { $0.isSelected }.reduce(0) { $0 + $1.totalSize }
-    }
-
-    var selectedCount: Int {
-        results.filter { $0.isSelected }.count
     }
 
     var body: some View {
@@ -31,15 +23,17 @@ struct ScanResultsCard: View {
             // Category breakdown
             categoryBreakdown
 
-            // Action buttons
+            // Expand / collapse
             actionButtons
+
+            ExperienceHandoffCard(openExperience: onOpenExperience)
         }
         .padding(Theme.Spacing.lg)
         .glassCardProminent()
         .opacity(isVisible ? 1 : 0)
-        .offset(y: isVisible ? 0 : 20)
+        .offset(y: isVisible || reduceMotion ? 0 : 20)
         .onAppear {
-            withAnimation(Theme.Animation.springSmooth) {
+            withAnimation(Theme.Animation.motion(Theme.Animation.springSmooth, reduce: reduceMotion)) {
                 isVisible = true
             }
         }
@@ -62,11 +56,11 @@ struct ScanResultsCard: View {
 
             // Total size badge
             VStack(alignment: .trailing, spacing: Theme.Spacing.xxs) {
-                Text(ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file))
+                Text(ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file))
                     .font(Theme.Typography.title)
                     .foregroundStyle(.orange)
 
-                Text(selectedCount == results.count ? L("safety.notice.reviewable") : LFormat("scanResults.selectedCount %lld", selectedCount))
+                Text(L("scanResults.found"))
                     .font(Theme.Typography.caption)
                     .foregroundStyle(.secondary)
             }
@@ -78,27 +72,22 @@ struct ScanResultsCard: View {
     private var categoryBreakdown: some View {
         VStack(spacing: Theme.Spacing.xs) {
             // Sort results by size and iterate safely using stable identifiers
-            ForEach(sortedResultIndices, id: \.self) { resultIndex in
+            ForEach(results.sorted { $0.totalSize > $1.totalSize }) { result in
                 ScanResultRow(
-                    result: $results[resultIndex],
-                    isExpanded: expandedCategories.contains(results[resultIndex].category),
+                    result: result,
+                    isExpanded: expandedCategories.contains(result.category),
                     onToggleExpand: {
                         withAnimation(Theme.Animation.spring) {
-                            if expandedCategories.contains(results[resultIndex].category) {
-                                expandedCategories.remove(results[resultIndex].category)
+                            if expandedCategories.contains(result.category) {
+                                expandedCategories.remove(result.category)
                             } else {
-                                expandedCategories.insert(results[resultIndex].category)
+                                expandedCategories.insert(result.category)
                             }
                         }
                     }
                 )
             }
         }
-    }
-
-    /// Computed property to get sorted indices safely - avoids re-sorting during iteration
-    private var sortedResultIndices: [Int] {
-        results.indices.sorted { results[$0].totalSize > results[$1].totalSize }
     }
 
     // MARK: - Action Buttons
@@ -127,51 +116,7 @@ struct ScanResultsCard: View {
             }
             .buttonStyle(.plain)
 
-            // Select all / Deselect all button
-            Button(action: {
-                withAnimation(Theme.Animation.spring) {
-                    let allSelected = results.allSatisfy { $0.isSelected }
-                    for index in results.indices {
-                        results[index].isSelected = !allSelected
-                    }
-                }
-            }) {
-                HStack(spacing: Theme.Spacing.xs) {
-                    Image(systemName: results.allSatisfy({ $0.isSelected }) ? "checkmark.circle.fill" : "circle")
-                    Text(results.allSatisfy({ $0.isSelected }) ? L("scanResults.deselectAll") : L("scanResults.selectAll"))
-                }
-                .font(Theme.Typography.subheadline)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, Theme.Spacing.md)
-                .padding(.vertical, Theme.Spacing.sm)
-                .glassCardSubtle()
-            }
-            .buttonStyle(.plain)
-
             Spacer()
-
-            // Review notice button
-            Button(action: onReviewSelection) {
-                HStack(spacing: Theme.Spacing.xs) {
-                    Image(systemName: "info.circle.fill")
-                    Text(LFormat("safety.notice.reviewSelected %@", ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)))
-                }
-                .font(Theme.Typography.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.vertical, Theme.Spacing.sm)
-                .background(
-                    LinearGradient(
-                        colors: selectedSize > 0 ? [.blue, .blue.opacity(0.8)] : [.gray, .gray.opacity(0.8)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium))
-            }
-            .buttonStyle(.plain)
-            .disabled(selectedSize == 0)
-            .shadow(color: selectedSize > 0 ? .blue.opacity(0.3) : .clear, radius: 8, y: 4)
         }
     }
 }
@@ -179,7 +124,7 @@ struct ScanResultsCard: View {
 // MARK: - Scan Result Row
 
 struct ScanResultRow: View {
-    @Binding var result: ScanResult
+    let result: ScanResult
     let isExpanded: Bool
     let onToggleExpand: () -> Void
 
@@ -189,52 +134,23 @@ struct ScanResultRow: View {
         VStack(spacing: 0) {
             // Main row content
             HStack(spacing: 0) {
-                // Checkbox for selection - separate hit area
-                Button(action: {
-                    withAnimation(Theme.Animation.fast) {
-                        result.isSelected.toggle()
-                    }
-                }) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.xs)
-                            .stroke(result.isSelected ? result.category.color : Color.secondary.opacity(0.5), lineWidth: 2)
-                            .frame(width: 22, height: 22)
-
-                        if result.isSelected {
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.xs)
-                                .fill(result.category.color)
-                                .frame(width: 22, height: 22)
-
-                            Image(systemName: "checkmark")
-                                .font(Theme.Typography.size12Bold)
-                                .foregroundStyle(.white)
-                        }
-                    }
-                    .padding(.leading, Theme.Spacing.sm)
-                    .padding(.trailing, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.sm)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                // Expandable area - everything else
                 HStack(spacing: Theme.Spacing.md) {
                     // Category icon
                     ZStack {
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.small)
-                            .fill(result.category.color.opacity(result.isSelected ? 0.15 : 0.08))
+                            .fill(result.category.color.opacity(0.15))
                             .frame(width: 36, height: 36)
 
                         Image(systemName: result.category.icon)
                             .font(Theme.Typography.size14Semibold)
-                            .foregroundStyle(result.isSelected ? result.category.color : result.category.color.opacity(0.5))
+                            .foregroundStyle(result.category.color)
                     }
 
                     // Category info
                     VStack(alignment: .leading, spacing: Theme.Spacing.tiny) {
                         Text(result.category.localizedName)
                             .font(Theme.Typography.body)
-                            .foregroundStyle(result.isSelected ? .primary : .secondary)
+                            .foregroundStyle(.primary)
 
                         Text(LFormat("scanResults.items %lld", result.itemCount))
                             .font(Theme.Typography.caption)
@@ -246,7 +162,7 @@ struct ScanResultRow: View {
                     // Size
                     Text(ByteCountFormatter.string(fromByteCount: result.totalSize, countStyle: .file))
                         .font(Theme.Typography.subheadline.monospacedDigit())
-                        .foregroundStyle(result.isSelected ? .secondary : .tertiary)
+                        .foregroundStyle(.secondary)
 
                     // Expand/Collapse chevron
                     Image(systemName: "chevron.right")
@@ -254,16 +170,13 @@ struct ScanResultRow: View {
                         .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
-                .padding(.trailing, Theme.Spacing.sm)
+                .padding(.horizontal, Theme.Spacing.sm)
                 .padding(.vertical, Theme.Spacing.sm)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    onToggleExpand()
-                }
+                .expandButton(isExpanded: isExpanded, cornerRadius: Theme.CornerRadius.medium, action: onToggleExpand)
             }
             .background(
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.medium)
-                    .fill(isHovered ? Color.white.opacity(0.05) : Color.clear)
+                    .fill(isHovered ? Theme.Colors.surfaceLight : Color.clear)
             )
             .onHover { hovering in
                 withAnimation(Theme.Animation.fast) {
@@ -294,10 +207,10 @@ struct ScanResultRow: View {
                                 .padding(.vertical, Theme.Spacing.sm)
                             Spacer()
                         }
-                        .background(Color.white.opacity(0.02))
+                        .background(Theme.Colors.subtleFill)
                     }
                 }
-                .background(Color.white.opacity(0.02))
+                .background(Theme.Colors.subtleFill)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
                 .padding(.horizontal, Theme.Spacing.sm)
                 .padding(.bottom, Theme.Spacing.sm)
@@ -345,7 +258,7 @@ struct ScanFileItemRow: View {
                 .foregroundStyle(.tertiary)
                 .frame(width: 70, alignment: .trailing)
 
-            // Reveal in Finder button
+            // Always present, so the keyboard and VoiceOver can reach it; hover only brightens it.
             Button(action: {
                 NSWorkspace.shared.selectFile(item.path.path, inFileViewerRootedAtPath: item.path.deletingLastPathComponent().path)
             }) {
@@ -354,12 +267,14 @@ struct ScanFileItemRow: View {
                     .foregroundStyle(.tertiary)
             }
             .buttonStyle(.plain)
-            .opacity(isHovered ? 1 : 0)
+            .focusRing(cornerRadius: Theme.CornerRadius.small)
+            .opacity(isHovered ? 1 : 0.6)
             .help(L("common.showInFinder"))
+            .accessibilityLabel(L("common.showInFinder"))
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.xxxs)
-        .background(isHovered ? Color.white.opacity(0.03) : Color.clear)
+        .background(isHovered ? Theme.Colors.subtleFill : Color.clear)
         .onHover { hovering in
             withAnimation(Theme.Animation.fast) {
                 isHovered = hovering
@@ -385,35 +300,35 @@ struct ScanFileItemRow: View {
 
 #Preview {
     struct PreviewWrapper: View {
-        @State var results: [ScanResult] = [
+        let results: [ScanResult] = [
             ScanResult(
-                category: .userCache,
+                category: .caches,
                 items: [
                     CleanableItem(
                         name: "test.cache",
                         path: URL(fileURLWithPath: "/tmp/test"),
                         size: 1024 * 1024 * 500,
                         modificationDate: Date(),
-                        category: .userCache
+                        category: .caches
                     ),
                     CleanableItem(
                         name: "another.cache",
                         path: URL(fileURLWithPath: "/tmp/another"),
                         size: 1024 * 1024 * 100,
                         modificationDate: Date().addingTimeInterval(-86400),
-                        category: .userCache
+                        category: .caches
                     )
                 ]
             ),
             ScanResult(
-                category: .xcodeData,
+                category: .downloads,
                 items: [
                     CleanableItem(
                         name: "DerivedData",
                         path: URL(fileURLWithPath: "/tmp/derived"),
                         size: 1024 * 1024 * 1024 * 2,
                         modificationDate: Date(),
-                        category: .xcodeData
+                        category: .downloads
                     )
                 ]
             )
@@ -421,8 +336,8 @@ struct ScanFileItemRow: View {
 
         var body: some View {
             ScanResultsCard(
-                results: $results,
-                onReviewSelection: {}
+                results: results,
+                onOpenExperience: {}
             )
         }
     }

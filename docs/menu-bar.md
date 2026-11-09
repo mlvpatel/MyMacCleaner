@@ -29,11 +29,13 @@ Choose how information appears in the menu bar:
 
 In compact mode, colored indicators show status at a glance:
 
-| Color | CPU/RAM Usage |
-|-------|---------------|
-| 🟢 Green | 0-50% (Normal) |
-| 🟡 Yellow | 50-80% (Elevated) |
-| 🔴 Red | 80-100% (High) |
+The menu bar, Home and Performance share one set of thresholds (`Theme.Thresholds`), so the same reading has the same color everywhere:
+
+| Level | CPU | Memory | Disk |
+|-------|-----|--------|------|
+| 🟢 Normal | up to 50% | up to 80% | up to 75% |
+| 🟡 High | above 50% | above 80% | above 75% |
+| 🔴 Critical | above 80% | above 90% | above 90% |
 
 ## Menu Bar Popover
 
@@ -47,9 +49,9 @@ Click the menu bar item to see detailed information:
 ### Memory Section
 - Used vs Total RAM (e.g., "8.2 GB / 16 GB")
 - Memory usage progress bar
-- Memory pressure indicator:
+- Memory level, shown as an icon and text from the same reading:
   - **Normal** - System running smoothly
-  - **Elevated** - Consider closing some apps
+  - **High** - Consider closing some apps
   - **Critical** - System may slow down
 
 ### Disk Section
@@ -58,8 +60,8 @@ Click the menu bar item to see detailed information:
 - Color indicates available space
 
 ### Quick Actions
-- **Smart Scan** - Opens app and starts a full scan
-- **Open App** - Brings MyMacCleaner to the foreground
+- **Scan** - Opens the main window (reopening it if you closed it), switches to Home and starts Smart Scan. Without Full Disk Access, Home first asks whether to grant access or continue with a limited scan.
+- **Open MyMacCleaner** - Brings the main window to the foreground, or reopens it if it was closed
 
 ### Footer
 - Shows "Live monitoring" status
@@ -89,6 +91,8 @@ The menu bar icon will disappear, but the app continues to run normally.
 
 The menu bar monitor is designed to be lightweight:
 - Updates every 2 seconds (not continuously)
+- In Icon mode, which shows no numbers, sampling pauses while the popover is closed
+- Disk use is read off the main thread at most every 30 seconds
 - Minimal CPU overhead (~0.1%)
 - Small memory footprint
 - No impact on battery life

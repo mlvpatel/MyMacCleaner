@@ -100,32 +100,31 @@ struct MenuBarView: View {
     }
 
     private var cpuColor: Color {
-        let usage = statsProvider.stats.cpuUsage
-        if usage > 80 { return .red }
-        if usage > 50 { return .orange }
-        return .green
+        StatusLevel.cpu(statsProvider.stats.cpuUsage / 100).color
     }
 
     // MARK: - Memory Section
 
     private var memorySection: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let level = StatusLevel.memory(statsProvider.stats.memoryUsagePercent / 100)
+        return VStack(alignment: .leading, spacing: 0) {
             MenuBarRow(
                 icon: "memorychip",
-                iconColor: memoryColor,
+                iconColor: level.color,
                 title: L("menuBar.memory"),
                 value: "\(statsProvider.stats.formattedMemory) / \(statsProvider.stats.formattedMemoryTotal)",
-                valueColor: memoryColor,
+                valueColor: level.color,
                 progress: statsProvider.stats.memoryUsagePercent / 100,
-                progressColor: memoryColor
+                progressColor: level.color
             )
 
-            // Memory pressure indicator
+            // Memory level: the icon, its color and the text all come from the same reading
             HStack(spacing: Theme.Spacing.xxxs) {
-                Circle()
-                    .fill(memoryColor)
-                    .frame(width: 8, height: 8)
-                Text(memoryPressureText)
+                Image(systemName: level.icon)
+                    .font(.caption)
+                    .foregroundStyle(level.color)
+                    .accessibilityHidden(true)
+                Text(level.label)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -134,64 +133,21 @@ struct MenuBarView: View {
         }
     }
 
-    private var memoryColor: Color {
-        let usage = statsProvider.stats.memoryUsagePercent
-        if usage > 80 { return .red }
-        if usage > 60 { return .orange }
-        return .green
-    }
-
-    private var memoryPressureText: String {
-        let pressure = statsProvider.stats.memoryPressure
-        if pressure > 0.8 { return L("menuBar.memory.pressure.critical") }
-        if pressure > 0.6 { return L("menuBar.memory.pressure.warning") }
-        return L("menuBar.memory.pressure.normal")
-    }
-
     // MARK: - Disk Section
 
+    /// Disk use comes with the stats tick (read off the main thread), never from this body.
     private var diskSection: some View {
-        MenuBarRow(
+        let stats = statsProvider.stats
+        let color = StatusLevel.disk(stats.diskUsageFraction).color
+        return MenuBarRow(
             icon: "internaldrive",
-            iconColor: diskColor,
+            iconColor: color,
             title: L("menuBar.disk"),
-            value: diskUsageText,
-            valueColor: diskColor,
-            progress: diskUsagePercent,
-            progressColor: diskColor
+            value: stats.formattedDisk,
+            valueColor: color,
+            progress: stats.diskUsageFraction,
+            progressColor: color
         )
-    }
-
-    private var diskUsageText: String {
-        let (used, total) = getDiskUsage()
-        let usedFormatted = ByteCountFormatter.string(fromByteCount: used, countStyle: .file)
-        let totalFormatted = ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
-        return "\(usedFormatted) / \(totalFormatted)"
-    }
-
-    private var diskUsagePercent: Double {
-        let (used, total) = getDiskUsage()
-        guard total > 0 else { return 0 }
-        return Double(used) / Double(total)
-    }
-
-    private var diskColor: Color {
-        let percent = diskUsagePercent
-        if percent > 0.9 { return .red }
-        if percent > 0.7 { return .orange }
-        return .green
-    }
-
-    private func getDiskUsage() -> (used: Int64, total: Int64) {
-        let homeURL = FileManager.default.homeDirectoryForCurrentUser
-        do {
-            let values = try homeURL.resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey])
-            let total = Int64(values.volumeTotalCapacity ?? 0)
-            let available = Int64(values.volumeAvailableCapacityForImportantUsage ?? 0)
-            return (total - available, total)
-        } catch {
-            return (0, 0)
-        }
     }
 
     // MARK: - Display Mode Section
@@ -249,18 +205,16 @@ struct MenuBarView: View {
         .padding(.vertical, Theme.Spacing.xxs)
     }
 
+    /// Brings the main window forward, or reopens it when it was closed. Any other visible
+    /// window (the popover itself, Settings) is never mistaken for it.
     private func openMainApp() {
         NSApp.activate(ignoringOtherApps: true)
 
-        for window in NSApp.windows {
-            if window.title == "MyMacCleaner" || window.contentView?.subviews.first is NSHostingView<ContentView> {
-                window.makeKeyAndOrderFront(nil)
-                return
-            }
-        }
-
-        if let mainWindow = NSApp.windows.first(where: { $0.isVisible }) {
+        if let mainWindow = NSApp.windows.first(where: MyMacCleanerApp.isMainWindow) {
+            mainWindow.deminiaturize(nil)
             mainWindow.makeKeyAndOrderFront(nil)
+        } else {
+            MyMacCleanerApp.reopenMainWindow()
         }
     }
 

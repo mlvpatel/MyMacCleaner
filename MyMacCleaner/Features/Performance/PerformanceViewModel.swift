@@ -12,6 +12,9 @@ final class PerformanceViewModel: ObservableObject {
     @Published var cpuUsage: Double = 0
     @Published var isMonitoring = false
 
+    /// Set by Home's Memory Guide link, so the page that opens next starts at the guidance.
+    private var isGuidanceRequested = false
+
     private let memoryObserver: any MemoryObservationPort
     private let pressureLifecycle: (any MemoryPressureSourceLifecycle)?
     private let workloadEvidence: any WorkloadEvidencePort
@@ -60,6 +63,16 @@ final class PerformanceViewModel: ObservableObject {
         releaseCPUInfo(previousCPUInfo, count: previousCPUInfoCount)
     }
 
+    func requestGuidance() {
+        isGuidanceRequested = true
+    }
+
+    /// True once after `requestGuidance()`; the page reads it when it appears.
+    func consumeGuidanceRequest() -> Bool {
+        defer { isGuidanceRequested = false }
+        return isGuidanceRequested
+    }
+
     func startMonitoring() {
         guard !isMonitoring else { return }
 
@@ -74,6 +87,8 @@ final class PerformanceViewModel: ObservableObject {
                 self?.updateCPUUsage()
             }
         }
+        // 20 % of the interval lets macOS coalesce the wakeup with other work
+        monitorTimer?.tolerance = 0.4
     }
 
     func stopMonitoring() {

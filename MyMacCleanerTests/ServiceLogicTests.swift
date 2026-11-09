@@ -189,6 +189,33 @@ struct SystemHealthLogicTests {
             #expect(result.status == status, "status for \(statuses)")
         }
     }
+
+    @Test("The macOS version row is a fact for reference and never moves the score")
+    func macOSVersionIsInformational() {
+        let check = SystemHealthViewModel.macOSVersionCheck(OperatingSystemVersion(majorVersion: 14, minorVersion: 1, patchVersion: 0))
+
+        #expect(check.status == .info)
+        #expect(check.description == LFormat("systemHealth.check.macOSVersion.info %@", "14.1.0"))
+        let withVersion = SystemHealthViewModel.healthScore(for: [.passed, .warning, check.status])
+        #expect(withVersion.score == SystemHealthViewModel.healthScore(for: [.passed, .warning]).score)
+    }
+
+    @Test("A diskutil failure reads as unavailable, never as healthy")
+    func diskutilFailureIsUnavailable() {
+        let result = SystemHealthViewModel.diskHealthResult(.unavailable)
+
+        #expect(result.status == .unavailable)
+        #expect(result.key == "systemHealth.check.diskHealth.unavailable")
+    }
+
+    @Test("A check that couldn't run keeps the verdict from saying healthy")
+    func unavailableCheckBlocksHealthyVerdict() {
+        let statuses: [HealthCheck.Status] = [.passed, .passed, .passed, .passed, .unavailable, .info]
+
+        #expect(SystemHealthViewModel.healthScore(for: statuses).status != .excellent)
+        #expect(SystemHealthViewModel.summary(for: statuses) == LFormat("systemHealth.summary.incomplete %lld %lld", 4, 1))
+        #expect(SystemHealthViewModel.summary(for: [.passed, .info]) == LFormat("systemHealth.summary.passed %lld", 1))
+    }
 }
 
 // MARK: - Orphaned Files Heuristic Tests
@@ -287,6 +314,54 @@ struct BrowserInventoryTests {
         try Data(repeating: 1, count: 8_192).write(to: directory.appendingPathComponent("cache.bin"))
         #expect((service.getDirectorySize(at: directory.path) ?? 0) > 0)
     }
+
+    @Test("A browser whose data folder exists but will not open is unreadable; a missing folder is not")
+    func reportsRefusedDataFolders() throws {
+        let home = try TemporaryDirectory.make()
+        defer { try? FileManager.default.removeItem(at: home) }
+        for browser in [BrowserType.safari, .firefox] {
+            try FileManager.default.createDirectory(
+                at: home.appendingPathComponent(browser.dataFolder),
+                withIntermediateDirectories: true
+            )
+        }
+        // Safari's folder is refused, Firefox's opens and Chrome has none.
+        let probe = OpenablePaths([home.appendingPathComponent(BrowserType.firefox.dataFolder).path])
+
+        let unreadable = BrowserCleanerService.unreadableBrowsers(BrowserType.allCases, home: home.path, probe: probe)
+
+        #expect(unreadable == [.safari])
+    }
+
+    @Test("Browser Privacy keeps the browsers its scan could not read")
+    @MainActor
+    func viewModelKeepsUnreadableBrowsers() async {
+        let viewModel = BrowserPrivacyViewModel(scanBrowsers: {
+            BrowserScan(items: [], unreadableBrowsers: [.safari])
+        })
+
+        viewModel.scan()
+        for _ in 0..<200 where !viewModel.hasScanned {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        #expect(viewModel.hasScanned)
+        #expect(viewModel.items.isEmpty)
+        #expect(viewModel.unreadableBrowsers == [.safari])
+    }
+}
+
+/// A path "opens" only when it is listed, so permission refusals can be tested without real ones.
+private struct OpenablePaths: PermissionProbing {
+    let paths: Set<String>
+
+    init(_ paths: Set<String>) {
+        self.paths = paths
+    }
+
+    func canOpenForReading(atPath path: String) -> Bool {
+        paths.contains(path)
+    }
 }
 
 // MARK: - Trash Inventory Tests
@@ -316,17 +391,63 @@ struct TrashInventoryTests {
     }
 }
 
-// MARK: - System Stats Tests
+// MARK: - Directory Size Tests
 
-@Suite("System Stats Tests")
-struct SystemStatsTests {
-    @Test("A live snapshot reports physical memory and a bounded CPU percentage")
-    @MainActor
-    func snapshotIsPlausible() {
-        let stats = SystemStatsProvider.shared.getSnapshot()
+@Suite("Directory Size Tests")
+struct DirectorySizeTests {
+    private static let payload = Data(repeating: 1, count: 8_192)
 
-        #expect(stats.memoryTotal > 0)
-        #expect(stats.memoryUsed <= stats.memoryTotal)
-        #expect((0.0...100.0).contains(stats.cpuUsage))
+    private func allocatedBytes(of file: URL) throws -> Int64 {
+        Int64(try #require(try file.resourceValues(forKeys: [.totalFileAllocatedSizeKey]).totalFileAllocatedSize))
+    }
+
+    @Test("Regular files are summed, hidden ones included, and symlinks are never followed")
+    func sumsRegularFilesOnly() throws {
+        let directory = try TemporaryDirectory.make()
+        let outside = try TemporaryDirectory.make()
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            try? FileManager.default.removeItem(at: outside)
+        }
+        let visible = directory.appendingPathComponent("cache.bin")
+        let hidden = directory.appendingPathComponent(".index")
+        try Self.payload.write(to: visible)
+        try Self.payload.write(to: hidden)
+        try Data(repeating: 2, count: 65_536).write(to: outside.appendingPathComponent("big.bin"))
+        try FileManager.default.createSymbolicLink(at: directory.appendingPathComponent("link"), withDestinationURL: outside)
+
+        let total = DirectorySize.allocatedBytes(at: directory)
+
+        #expect(total == (try allocatedBytes(of: visible)) + (try allocatedBytes(of: hidden)))
+    }
+
+    @Test("Sizing stops at the entry cap")
+    func capIsRespected() throws {
+        let directory = try TemporaryDirectory.make()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        for name in ["a.bin", "b.bin", "c.bin"] {
+            try Self.payload.write(to: directory.appendingPathComponent(name))
+        }
+
+        let full = try #require(DirectorySize.allocatedBytes(at: directory))
+        let capped = try #require(DirectorySize.allocatedBytes(at: directory, maxEntries: 2))
+
+        #expect(full > 0)
+        #expect(capped * 3 == full * 2)
+    }
+
+    @Test("Sizing stops once its task is cancelled")
+    func honoursCancellation() async throws {
+        let directory = try TemporaryDirectory.make()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try Self.payload.write(to: directory.appendingPathComponent("a.bin"))
+
+        let task = Task { () -> Int64? in
+            withUnsafeCurrentTask { $0?.cancel() }
+            return DirectorySize.allocatedBytes(at: directory)
+        }
+
+        #expect(await task.value == 0)
+        #expect((DirectorySize.allocatedBytes(at: directory) ?? 0) > 0)
     }
 }

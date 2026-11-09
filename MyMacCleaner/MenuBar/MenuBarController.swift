@@ -16,6 +16,17 @@ final class MenuBarController: NSObject, ObservableObject {
     @Published var displayMode: DisplayMode = .cpuAndRam
 
     private let statsProvider = SystemStatsProvider.shared
+    private var statsTask: Task<Void, Never>?
+    /// What the status item currently shows; it is redrawn only when this changes.
+    private var shownContent: ButtonContent?
+
+    private static let sampleInterval: TimeInterval = 2.0
+
+    private struct ButtonContent: Equatable {
+        let mode: DisplayMode
+        let cpuPercent: Int?
+        let memoryPercent: Int?
+    }
 
     enum DisplayMode: String, CaseIterable {
         case cpuOnly = "CPU"
@@ -57,16 +68,17 @@ final class MenuBarController: NSObject, ObservableObject {
         popover?.contentSize = NSSize(width: 280, height: 480)
         popover?.behavior = .transient
         popover?.animates = true
+        popover?.delegate = self
 
         // Set popover content
         let menuBarView = MenuBarView()
         popover?.contentViewController = NSHostingController(rootView: menuBarView)
 
-        // Start monitoring
-        statsProvider.startMonitoring(interval: 2.0)
+        // Start monitoring (not in icon mode, which shows no numbers until the popover opens)
+        updateSampling()
 
-        // Observe stats changes
-        Task { @MainActor in
+        // Observe stats changes; cancelled in teardown so toggling the menu bar never adds a loop
+        statsTask = Task { @MainActor in
             for await _ in statsProvider.$stats.values {
                 self.updateButtonDisplay()
             }
@@ -79,6 +91,9 @@ final class MenuBarController: NSObject, ObservableObject {
     }
 
     func teardown() {
+        statsTask?.cancel()
+        statsTask = nil
+        shownContent = nil
         statsProvider.stopMonitoring()
 
         if let statusItem = statusItem {
@@ -97,6 +112,15 @@ final class MenuBarController: NSObject, ObservableObject {
         guard let button = statusItem?.button else { return }
 
         let stats = statsProvider.stats
+        let showsCPU = displayMode == .cpuOnly || displayMode == .cpuAndRam
+        let showsMemory = displayMode == .ramOnly || displayMode == .cpuAndRam
+        let content = ButtonContent(
+            mode: displayMode,
+            cpuPercent: showsCPU ? Int(stats.cpuUsage) : nil,
+            memoryPercent: showsMemory ? Int(stats.memoryUsagePercent) : nil
+        )
+        guard content != shownContent else { return }
+        shownContent = content
 
         // Reset button state
         button.image = nil
@@ -176,7 +200,24 @@ final class MenuBarController: NSObject, ObservableObject {
     func setDisplayMode(_ mode: DisplayMode) {
         displayMode = mode
         updateButtonDisplay()
+        updateSampling()
         UserDefaults.standard.set(mode.rawValue, forKey: "menuBarDisplayMode")
+    }
+
+    // MARK: - Sampling
+
+    /// Icon mode shows no numbers, so stats are needed there only while the popover is open.
+    static func needsSampling(mode: DisplayMode, isPopoverShown: Bool) -> Bool {
+        mode != .icon || isPopoverShown
+    }
+
+    private func updateSampling() {
+        guard statusItem != nil else { return }
+        if Self.needsSampling(mode: displayMode, isPopoverShown: popover?.isShown == true) {
+            statsProvider.startMonitoring(interval: Self.sampleInterval)
+        } else {
+            statsProvider.stopMonitoring()
+        }
     }
 
     func loadSavedDisplayMode() {
@@ -200,6 +241,7 @@ final class MenuBarController: NSObject, ObservableObject {
 
     private func showPopover() {
         if let button = statusItem?.button {
+            statsProvider.startMonitoring(interval: Self.sampleInterval)
             popover?.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
     }
@@ -223,5 +265,14 @@ final class MenuBarController: NSObject, ObservableObject {
             NSEvent.removeMonitor(eventMonitor)
         }
         eventMonitor = nil
+    }
+}
+
+// MARK: - Popover Delegate
+
+extension MenuBarController: NSPopoverDelegate {
+    /// Covers every way the popover closes, including the transient outside click.
+    func popoverDidClose(_ notification: Notification) {
+        updateSampling()
     }
 }

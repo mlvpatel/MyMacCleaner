@@ -6,6 +6,8 @@ Port Management is an offline, read-only inventory of TCP listening and establis
 
 Each row can include the process name and PID, local address and port, remote endpoint when present, TCP state, and protocol. The inventory is collected locally with a fixed system query and is not sent anywhere.
 
+The list is read the first time you open the page and again each time you choose **Refresh**; the header says when it was read. If the system query fails, the page says **Couldn't Read Connections** instead of showing an empty list. When nothing is listening or connected, it says **No Connections Found**.
+
 The page groups connections as:
 
 | Filter | Meaning |
@@ -23,6 +25,6 @@ The page groups connections as:
 
 For example, search for `3000` to identify the local process currently associated with that port before deciding what to do outside MyMacCleaner.
 
-## Phase-0 limitation
+## What this page does not do
 
 Port Management is observational. It has no controls for processes, network connections, services, or system configuration.

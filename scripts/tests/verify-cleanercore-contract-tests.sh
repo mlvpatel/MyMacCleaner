@@ -85,23 +85,22 @@ fixture_success "darwin observation-only fixture" "$fixtures/safe/darwin" darwin
 fixture_success "content adapter safe fixture" "$fixtures/safe/content-adapter" content-adapter
 fixture_success "privacy safe fixture" "$fixtures/safe/privacy" privacy
 fixture_success "model inventory safe fixture" "$fixtures/safe/model-inventory" model
-fixture_success "phase5 policy/plan safe fixture" "$fixtures/safe/phase5" phase5
-fixture_failure "phase5 execution port fixture" "CC-PHASE5-EXECUTION-RECEIPT" "$fixtures/unsafe/phase5-execution" phase5
-fixture_failure "phase5 public candidate fixture" "CC-PHASE5-PUBLIC-CANDIDATE" "$fixtures/unsafe/phase5-candidate" phase5
-fixture_failure "phase5 persistent approval fixture" "CC-PHASE5-PERSISTENT-APPROVAL" "$fixtures/unsafe/phase5-approval" phase5
-fixture_failure "phase5 mutation fixture" "CC-PHASE5-MUTATION" "$fixtures/unsafe/phase5-mutation" phase5
-fixture_success "phase6 execution safe fixture" "$fixtures/safe/phase6" phase6
-fixture_success "phase6 sole-call adapter fixture" "$fixtures/safe/foundation-adapter" foundation
-fixture_success "phase7 finder reveal owner fixture" "$fixtures/safe/phase7" foundation
-fixture_failure "phase6 second trashItem fixture" "CC-PHASE6-SOLE-CALL" "$fixtures/unsafe/phase6-second-call" foundation
-fixture_failure "phase7 second finder reveal fixture" "CC-FINDER-REVEAL-OWNER" "$fixtures/unsafe/phase7-second-reveal" foundation
-fixture_failure "phase6 public URL input fixture" "CC-PHASE6-PUBLIC-INPUT" "$fixtures/unsafe/phase6-url-input" phase6
-fixture_failure "phase6 public operation fixture" "CC-PHASE6-PUBLIC-OPERATION" "$fixtures/unsafe/phase6-public-init" phase6
-fixture_failure "phase6 decoded operation fixture" "CC-PHASE6-DECODED-OPERATION" "$fixtures/unsafe/phase6-codable" phase6
-fixture_failure "phase6 parallel fixture" "CC-PHASE6-PARALLEL" "$fixtures/unsafe/phase6-parallel" phase6
-fixture_failure "phase6 compensation fixture" "CC-PHASE6-COMPENSATION" "$fixtures/unsafe/phase6-compensation" phase6
-fixture_failure "phase6 persistence fixture" "CC-PHASE6-PERSISTENCE" "$fixtures/unsafe/phase6-persistence" phase6
-fixture_failure "phase6 mutation fixture" "CC-PHASE6-MUTATION" "$fixtures/unsafe/phase6-mutation" phase6
+fixture_success "review plan safe fixture" "$fixtures/safe/plan" plan
+fixture_failure "review plan execution port fixture" "CC-PLAN-EXECUTION-RECEIPT" "$fixtures/unsafe/plan-execution" plan
+fixture_failure "review plan public candidate fixture" "CC-PLAN-PUBLIC-CANDIDATE" "$fixtures/unsafe/plan-candidate" plan
+fixture_failure "review plan persistent approval fixture" "CC-PLAN-PERSISTENT-APPROVAL" "$fixtures/unsafe/plan-approval" plan
+fixture_failure "review plan mutation fixture" "CC-PLAN-MUTATION" "$fixtures/unsafe/plan-mutation" plan
+fixture_success "Trash execution safe fixture" "$fixtures/safe/trash-execution" trash-execution
+fixture_success "Trash sole-call adapter fixture" "$fixtures/safe/foundation-adapter" foundation
+fixture_failure "Trash second trashItem fixture" "CC-TRASH-SOLE-CALL" "$fixtures/unsafe/trash-second-call" foundation
+fixture_failure "retired finder reveal AppKit fixture" "CC-FORBIDDEN-IMPORT" "$fixtures/unsafe/retired-finder-reveal" foundation
+fixture_failure "Trash execution public URL input fixture" "CC-TRASH-PUBLIC-INPUT" "$fixtures/unsafe/trash-url-input" trash-execution
+fixture_failure "Trash execution public operation fixture" "CC-TRASH-PUBLIC-OPERATION" "$fixtures/unsafe/trash-public-init" trash-execution
+fixture_failure "Trash execution decoded operation fixture" "CC-TRASH-DECODED-OPERATION" "$fixtures/unsafe/trash-codable" trash-execution
+fixture_failure "Trash execution parallel fixture" "CC-TRASH-PARALLEL" "$fixtures/unsafe/trash-parallel" trash-execution
+fixture_failure "Trash execution compensation fixture" "CC-TRASH-COMPENSATION" "$fixtures/unsafe/trash-compensation" trash-execution
+fixture_failure "Trash execution persistence fixture" "CC-TRASH-PERSISTENCE" "$fixtures/unsafe/trash-persistence" trash-execution
+fixture_failure "Trash execution mutation fixture" "CC-TRASH-MUTATION" "$fixtures/unsafe/trash-mutation" trash-execution
 manifest_success "exact local manifest fixture" "$fixtures/safe/manifest/Package.swift"
 manifest_success "content package fixture" "$fixtures/safe/package/Package.swift"
 
