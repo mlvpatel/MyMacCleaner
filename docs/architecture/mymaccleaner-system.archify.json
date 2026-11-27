@@ -1,0 +1,1023 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "MyMacCleaner system architecture",
+    "locale": "en",
+    "output": "docs/architecture/mymaccleaner-system.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/mlvpatel/MyMacCleaner",
+      "revision": "2095f154f4b0c9c40ddac13353afa96942420add",
+      "link_mode": "local-only"
+    }
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "Mac user",
+      "sublabel": "reviews evidence",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Features/AdaptiveExperience/AdaptiveExperienceViewModel.swift",
+          "line": 194,
+          "end_line": 204,
+          "label": "approval request and confirm"
+        }
+      ]
+    },
+    {
+      "id": "app-state",
+      "type": "backend",
+      "label": "AppState",
+      "sublabel": "holds the 13 view models",
+      "tag": "builds SharedScanStore + TrustSession",
+      "pos": [
+        320,
+        40
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/AppState.swift",
+          "line": 16,
+          "end_line": 94,
+          "label": "view models and wiring"
+        }
+      ]
+    },
+    {
+      "id": "app-shell",
+      "type": "frontend",
+      "label": "MyMacCleanerApp",
+      "sublabel": "WindowGroup → ContentView",
+      "tag": "App/ · SwiftUI entry",
+      "pos": [
+        570,
+        40
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/App/MyMacCleanerApp.swift",
+          "line": 3,
+          "end_line": 84,
+          "label": "@main scene, menu bar setup"
+        },
+        {
+          "path": "MyMacCleaner/App/ContentView.swift",
+          "line": 389,
+          "end_line": 426,
+          "label": "section routing"
+        }
+      ]
+    },
+    {
+      "id": "menu-bar",
+      "type": "frontend",
+      "label": "MenuBar",
+      "sublabel": "status item + popover",
+      "tag": "MenuBarController",
+      "pos": [
+        1070,
+        40
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/MenuBar/MenuBarController.swift",
+          "line": 6,
+          "end_line": 23
+        },
+        {
+          "path": "MyMacCleaner/MenuBar/MenuBarController.swift",
+          "line": 209,
+          "end_line": 221,
+          "label": "startMonitoring every 2 s, not in icon mode"
+        }
+      ]
+    },
+    {
+      "id": "stats-provider",
+      "type": "backend",
+      "label": "SystemStatsProvider",
+      "sublabel": "CPU + RAM samples",
+      "tag": "Core/Services",
+      "pos": [
+        1320,
+        40
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/SystemStatsProvider.swift",
+          "line": 152,
+          "end_line": 187,
+          "label": "host_processor_info"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/SystemStatsProvider.swift",
+          "line": 195,
+          "end_line": 216,
+          "label": "host_statistics64"
+        }
+      ]
+    },
+    {
+      "id": "adaptive-experience",
+      "type": "frontend",
+      "label": "AdaptiveExperience",
+      "sublabel": "review → approve → run",
+      "tag": "only UI path that moves files",
+      "pos": [
+        40,
+        220
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Features/AdaptiveExperience/AdaptiveExperienceViewModel.swift",
+          "line": 200,
+          "end_line": 204,
+          "label": "confirm approval"
+        },
+        {
+          "path": "MyMacCleaner/Features/AdaptiveExperience/AdaptiveExperienceViewModel.swift",
+          "line": 327,
+          "end_line": 339,
+          "label": "runDisplayedPlan"
+        }
+      ]
+    },
+    {
+      "id": "storage-features",
+      "type": "frontend",
+      "label": "Home + DiskCleaner",
+      "sublabel": "Smart Scan, review only",
+      "tag": "Features/ · read-only",
+      "pos": [
+        320,
+        220
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Features/Home/HomeViewModel.swift",
+          "line": 40,
+          "end_line": 63,
+          "label": "shared scan, permissions, notices"
+        },
+        {
+          "path": "MyMacCleaner/Features/Home/HomeViewModel.swift",
+          "line": 133,
+          "end_line": 159,
+          "label": "SharedScanStore.refresh"
+        },
+        {
+          "path": "MyMacCleaner/Features/DiskCleaner/DiskCleanerViewModel.swift",
+          "line": 58,
+          "end_line": 82
+        }
+      ]
+    },
+    {
+      "id": "safety-contract",
+      "type": "security",
+      "label": "SafetyContract",
+      "sublabel": "DisabledOperationGateway",
+      "tag": "+ RedactingDiagnostic · local pkg",
+      "pos": [
+        570,
+        220
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "SafetyContract/Sources/SafetyContract/DisabledOperationGateway.swift",
+          "line": 13,
+          "end_line": 53,
+          "label": "every request closed or deferred"
+        },
+        {
+          "path": "SafetyContract/Sources/SafetyContract/RedactingDiagnostic.swift",
+          "line": 43,
+          "end_line": 56
+        },
+        {
+          "path": "MyMacCleaner/Core/Design/SafetyNoticePresenter.swift",
+          "line": 35,
+          "end_line": 66,
+          "label": "empty-Trash notice requests"
+        }
+      ]
+    },
+    {
+      "id": "inventory-features",
+      "type": "frontend",
+      "label": "Inventory sections",
+      "sublabel": "Duplicates · Orphaned · Apps · Startup · Ports · Health · Performance · Space Lens",
+      "tag": "+ Permissions · read-only view models",
+      "pos": [
+        820,
+        220
+      ],
+      "size": [
+        420,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift",
+          "line": 94,
+          "end_line": 102,
+          "label": "lsof -iTCP"
+        },
+        {
+          "path": "MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift",
+          "line": 329,
+          "end_line": 337,
+          "label": "diskutil info /"
+        },
+        {
+          "path": "MyMacCleaner/Features/Duplicates/DuplicatesViewModel.swift",
+          "line": 180,
+          "end_line": 182,
+          "label": "scanner"
+        }
+      ]
+    },
+    {
+      "id": "trust-session",
+      "type": "security",
+      "label": "AdaptiveTrustSession",
+      "sublabel": "+ AdaptiveExecutionControl",
+      "tag": "actor · approval, revalidation",
+      "pos": [
+        40,
+        400
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 7,
+          "end_line": 253,
+          "label": "plan, approval, rescan, run"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 459,
+          "end_line": 506,
+          "label": "recorder → Trash adapter"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveExecutionControl.swift",
+          "line": 8,
+          "end_line": 37,
+          "label": "digest binding, cancellation"
+        }
+      ]
+    },
+    {
+      "id": "live-scan",
+      "type": "backend",
+      "label": "CleanerCoreLiveScan",
+      "sublabel": "+ CleanerCoreBridge",
+      "tag": "OpenFileActivityObserver (lsof)",
+      "pos": [
+        320,
+        400
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreLiveScan.swift",
+          "line": 5,
+          "end_line": 43,
+          "label": "six roots, scan session"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreBridge.swift",
+          "line": 19,
+          "end_line": 38,
+          "label": "legacy ScanResult projection"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/OpenFileActivityObserver.swift",
+          "line": 31,
+          "end_line": 50,
+          "label": "lsof -Fn snapshot"
+        }
+      ]
+    },
+    {
+      "id": "permissions",
+      "type": "security",
+      "label": "PermissionsService",
+      "sublabel": "PermissionProbe open/close",
+      "tag": "FDA signal, reads no bytes",
+      "pos": [
+        570,
+        400
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/PermissionProbe.swift",
+          "line": 19,
+          "end_line": 29
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/PermissionProbe.swift",
+          "line": 51,
+          "end_line": 68
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/PermissionsService.swift",
+          "line": 7,
+          "end_line": 31
+        }
+      ]
+    },
+    {
+      "id": "diagnostic-logger",
+      "type": "backend",
+      "label": "SafetyDiagnosticLogger",
+      "sublabel": "OSLog, redacted records",
+      "pos": [
+        820,
+        400
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/SafetyDiagnosticLogger.swift",
+          "line": 4,
+          "end_line": 21
+        }
+      ]
+    },
+    {
+      "id": "readonly-scanners",
+      "type": "backend",
+      "label": "Read-only scanners",
+      "sublabel": "Duplicate · Orphaned · Startup",
+      "tag": "+ HomebrewService (no brew launch)",
+      "pos": [
+        1070,
+        400
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/StartupItemsService.swift",
+          "line": 82,
+          "end_line": 117,
+          "label": "sfltool, launchctl, log emit"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/HomebrewService.swift",
+          "line": 35,
+          "end_line": 64
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/DuplicateScanner.swift",
+          "line": 209,
+          "end_line": 240
+        }
+      ]
+    },
+    {
+      "id": "process-adapters",
+      "type": "external",
+      "label": "Allowlisted processes",
+      "sublabel": "lsof ×2 · sfltool · launchctl",
+      "tag": "+ diskutil · via ReadOnlyProcess",
+      "pos": [
+        1320,
+        400
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "scripts/read-only-process-allowlist.txt",
+          "line": 1,
+          "end_line": 6,
+          "label": "five fixed read-only commands"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/ReadOnlyProcess.swift",
+          "line": 3,
+          "end_line": 45,
+          "label": "closed ReadOnlyCommand enum, 10 s deadline"
+        }
+      ]
+    },
+    {
+      "id": "trash-adapter",
+      "type": "security",
+      "label": "FoundationTrashAdapter",
+      "sublabel": "in CleanerCoreFoundation",
+      "tag": "sole FileManager.trashItem caller",
+      "pos": [
+        40,
+        600
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift",
+          "line": 32,
+          "end_line": 87,
+          "label": "revalidate, probe, trashItem"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationReceiptExecutionAdapter.swift",
+          "line": 4,
+          "end_line": 27
+        }
+      ]
+    },
+    {
+      "id": "cleaner-core",
+      "type": "backend",
+      "label": "CleanerCore",
+      "sublabel": "scan, policy, plans, receipts",
+      "tag": "pure core target, no deps",
+      "pos": [
+        320,
+        600
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Package.swift",
+          "line": 28,
+          "end_line": 29,
+          "label": "target without dependencies"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluator.swift",
+          "line": 117,
+          "end_line": 170,
+          "label": "only eligible path"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Receipts/ReceiptHistoryCoordinator.swift",
+          "line": 47,
+          "end_line": 108,
+          "label": "intent, transitions, execute"
+        }
+      ]
+    },
+    {
+      "id": "core-foundation",
+      "type": "backend",
+      "label": "CleanerCoreFoundation",
+      "sublabel": "FS walk, receipts, SHA-256",
+      "tag": "GeneralMacFilesystemAdapter",
+      "pos": [
+        570,
+        600
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/GeneralMacFilesystemAdapter.swift",
+          "line": 92,
+          "end_line": 146,
+          "label": "read-only lazy walk"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 121,
+          "end_line": 188,
+          "label": "receipt publish, 0700 root"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/CryptoKitPlanDigestAdapter.swift",
+          "line": 1,
+          "end_line": 11
+        }
+      ]
+    },
+    {
+      "id": "content-adapter",
+      "type": "backend",
+      "label": "CleanerCoreContentAdapter",
+      "sublabel": "not linked into the app",
+      "tag": "content evidence · tests only",
+      "pos": [
+        820,
+        600
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Package.swift",
+          "line": 34,
+          "end_line": 37
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreContentAdapter/StreamingContentEvidenceAdapter.swift",
+          "line": 187,
+          "end_line": 195
+        },
+        {
+          "path": "MyMacCleaner.xcodeproj/project.pbxproj",
+          "line": 630,
+          "end_line": 651,
+          "label": "app links 4 products, not this"
+        }
+      ]
+    },
+    {
+      "id": "core-darwin",
+      "type": "backend",
+      "label": "CleanerCoreDarwin",
+      "sublabel": "DarwinMemoryObservationAdapter",
+      "tag": "memory pressure, process info",
+      "pos": [
+        1070,
+        600
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreDarwin/DarwinMemoryObservationAdapter.swift",
+          "line": 8,
+          "end_line": 22
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreDarwin/SystemDarwinMemorySystem.swift",
+          "line": 174,
+          "end_line": 182,
+          "label": "host_statistics64"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreDarwin/SystemDarwinMemorySystem.swift",
+          "line": 220,
+          "end_line": 225,
+          "label": "proc_listpids"
+        }
+      ]
+    },
+    {
+      "id": "darwin-host",
+      "type": "external",
+      "label": "Darwin host APIs",
+      "sublabel": "host_statistics64 · libproc",
+      "tag": "host_processor_info · sysctl",
+      "pos": [
+        1320,
+        600
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/SystemStatsProvider.swift",
+          "line": 67,
+          "end_line": 74
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreDarwin/SystemDarwinMemorySystem.swift",
+          "line": 174,
+          "end_line": 182
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreDarwin/SystemDarwinMemorySystem.swift",
+          "line": 200,
+          "end_line": 225,
+          "label": "sysctl, proc_listpids"
+        }
+      ]
+    },
+    {
+      "id": "user-trash",
+      "type": "database",
+      "label": "~/.Trash",
+      "sublabel": "user Trash folder",
+      "tag": "trashItem destination",
+      "pos": [
+        40,
+        800
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift",
+          "line": 54,
+          "end_line": 58,
+          "label": "FileManager.trashItem"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/TrashInventoryReader.swift",
+          "line": 17,
+          "end_line": 19,
+          "label": "read-only size"
+        }
+      ]
+    },
+    {
+      "id": "receipts",
+      "type": "database",
+      "label": "App Support receipts",
+      "sublabel": "MyMacCleaner/Receipts, 0700",
+      "tag": "app-private JSON, no backup",
+      "pos": [
+        320,
+        800
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 158,
+          "end_line": 188,
+          "label": "0700 root, excluded from backup"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 277,
+          "end_line": 311,
+          "label": "prune: rename to tombstone, then remove"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 21,
+          "end_line": 40,
+          "label": "store and receipts.lock lease"
+        }
+      ]
+    },
+    {
+      "id": "scan-roots",
+      "type": "database",
+      "label": "Six general-Mac roots",
+      "sublabel": "Caches · Logs · temp dir",
+      "tag": "+ Downloads, Desktop, Documents",
+      "pos": [
+        570,
+        800
+      ],
+      "size": [
+        170,
+        72
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Detectors/GeneralMac/GeneralMacScopeCatalog.swift",
+          "line": 53,
+          "end_line": 64
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreLiveScan.swift",
+          "line": 243,
+          "end_line": 261,
+          "label": "root URLs"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "CleanerCore package (local SwiftPM)",
+      "wraps": [
+        "trash-adapter",
+        "cleaner-core",
+        "core-foundation",
+        "content-adapter",
+        "core-darwin"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "macOS · user files",
+      "wraps": [
+        "user-trash",
+        "receipts",
+        "scan-roots"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "macOS · host",
+      "wraps": [
+        "process-adapters",
+        "darwin-host"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-approves",
+      "from": "user",
+      "to": "adaptive-experience",
+      "label": "approves",
+      "variant": "emphasis"
+    },
+    {
+      "id": "app-owns-state",
+      "from": "app-shell",
+      "to": "app-state",
+      "label": "owns"
+    },
+    {
+      "id": "app-sets-up-menu",
+      "from": "app-shell",
+      "to": "menu-bar",
+      "label": "setup()"
+    },
+    {
+      "id": "menu-polls-stats",
+      "from": "menu-bar",
+      "to": "stats-provider",
+      "label": "2 s poll"
+    },
+    {
+      "id": "stats-reads-host",
+      "from": "stats-provider",
+      "to": "darwin-host",
+      "label": "CPU + VM stats",
+      "fromSide": "right",
+      "toSide": "right",
+      "via": [
+        [
+          1570,
+          76
+        ],
+        [
+          1570,
+          636
+        ]
+      ]
+    },
+    {
+      "id": "state-wires-adaptive",
+      "from": "app-state",
+      "to": "adaptive-experience",
+      "label": "wires trust closures",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "state-retains-storage",
+      "from": "app-state",
+      "to": "storage-features",
+      "label": "retains VMs"
+    },
+    {
+      "id": "state-retains-inventory",
+      "from": "app-state",
+      "to": "inventory-features",
+      "label": "retains VMs",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "adaptive-executes",
+      "from": "adaptive-experience",
+      "to": "trust-session",
+      "label": "makeSource · execute(digest)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "trust-moves",
+      "from": "trust-session",
+      "to": "trash-adapter",
+      "label": "revalidateAndMove",
+      "variant": "emphasis"
+    },
+    {
+      "id": "adapter-trashes",
+      "from": "trash-adapter",
+      "to": "user-trash",
+      "label": "FileManager.trashItem",
+      "variant": "emphasis"
+    },
+    {
+      "id": "trust-rescans",
+      "from": "trust-session",
+      "to": "live-scan",
+      "label": "rescan roots"
+    },
+    {
+      "id": "trust-plans",
+      "from": "trust-session",
+      "to": "cleaner-core",
+      "label": "plan · run",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "storage-scans",
+      "from": "storage-features",
+      "to": "live-scan",
+      "label": "SharedScanStore.refresh"
+    },
+    {
+      "id": "storage-permissions",
+      "from": "storage-features",
+      "to": "permissions",
+      "label": "FDA status",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "storage-notice",
+      "from": "storage-features",
+      "to": "safety-contract",
+      "label": "request"
+    },
+    {
+      "id": "inventory-scans",
+      "from": "inventory-features",
+      "to": "readonly-scanners",
+      "label": "scan, list"
+    },
+    {
+      "id": "inventory-processes",
+      "from": "inventory-features",
+      "to": "process-adapters",
+      "label": "lsof -iTCP · diskutil",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "livescan-session",
+      "from": "live-scan",
+      "to": "cleaner-core",
+      "label": "AdaptiveScanSession"
+    },
+    {
+      "id": "livescan-open-files",
+      "from": "live-scan",
+      "to": "process-adapters",
+      "label": "lsof -Fn (open files)",
+      "fromSide": "right",
+      "toSide": "bottom"
+    },
+    {
+      "id": "scanners-log",
+      "from": "readonly-scanners",
+      "to": "diagnostic-logger",
+      "label": "emit"
+    },
+    {
+      "id": "scanners-launch",
+      "from": "readonly-scanners",
+      "to": "process-adapters",
+      "label": "launches"
+    },
+    {
+      "id": "core-ports",
+      "from": "cleaner-core",
+      "to": "core-foundation",
+      "label": "ports"
+    },
+    {
+      "id": "foundation-walks",
+      "from": "core-foundation",
+      "to": "scan-roots",
+      "label": "read-only walk"
+    },
+    {
+      "id": "foundation-receipts",
+      "from": "core-foundation",
+      "to": "receipts",
+      "label": "write · prune"
+    },
+    {
+      "id": "darwin-reads-host",
+      "from": "core-darwin",
+      "to": "darwin-host",
+      "label": "proc, VM"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "The single mutation path",
+      "items": [
+        "Approve: AdaptiveExperienceViewModel sends the reviewed plan digest (AdaptiveExperienceViewModel.swift:194-204, 327-339).",
+        "AdaptiveTrustSession builds the approval at run time, so only the digest match and plan expiry can fail; the session, version and target checks compare the plan with itself (AdaptiveTrustSession.swift:200-217; ApprovalValidity.swift:57-73).",
+        "Fresh rescan of only the plan's roots, never the shared display scan; only regular files in ~/Library/Caches/com.apple.iconservices.store get fresh evidence (AdaptiveTrustSession.swift:7-13, 112-119, 222-241).",
+        "ReceiptHistoryCoordinator persists the intent and each transition, and calls the session's recorder for each move (ReceiptHistoryCoordinator.swift:68-98; AdaptiveTrustSession.swift:459-506).",
+        "FoundationTrashAdapter re-checks device, inode, size, mtime, link count 1 and symlinks, then calls FileManager.trashItem; a short check-to-use gap remains (FoundationTrashAdapter.swift:32-33, 61-87, 116-165)."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Eligibility lives in the pure core",
+      "items": [
+        "Only PolicyEvaluator.evaluateCache returns .eligible, and only inside one named folder, ~/Library/Caches/com.apple.iconservices.store: cache category, rebuildable, low risk, observed bytes (PolicyEvaluator.swift:117-170; PolicyEvaluation.swift:42-43, 88-98).",
+        "The file must be unmodified for at least 15 minutes (PolicyEvaluation.swift:78-86; PolicyEvaluator.swift:65-75).",
+        "A file a process holds open (lsof snapshot) is forced to in-use; if the listing fails, every ~/Library/Caches file counts as open (PolicyEvaluator.swift:18-22; OpenFileActivityObserver.swift:6-28).",
+        "Owner catalog entries can relabel or narrow a cache, never make it eligible (PolicyEvaluator.swift:122-126)."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Everything else is read-only",
+      "items": [
+        "Empty-Trash requests from Home and DiskCleaner go through SafetyNoticePresenter to DisabledOperationGateway, which answers disabled or deferred (SafetyNoticePresenter.swift:35-66; DisabledOperationGateway.swift:24-53).",
+        "Besides the Trash move, the code writes only its own receipts in Application Support: intent and transition JSON, receipts.lock, and pruning of old receipts by rename + removeItem, plus UserDefaults settings (AppSupportReceiptStore.swift:21-40, 121-188, 277-311; ReceiptHistoryCoordinator.swift:129-150).",
+        "Process() appears only in ReadOnlyProcess.swift: a closed ReadOnlyCommand enum of the five allowlisted commands, fixed arguments, a 10 s deadline (ReadOnlyProcess.swift:3-45; scripts/read-only-process-allowlist.txt).",
+        "No network code in source: verify-safety-contract.sh fails on URLSession, URLRequest or Sparkle anywhere in the app (verify-safety-contract.sh:958-967), and UpdateCapability has the single case .unavailable (UpdateCapability.swift:3-8). The app is not sandboxed (MyMacCleaner.entitlements:5-6), so macOS does not enforce this."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Scan scope",
+      "items": [
+        "Roots: ~/Library/Caches, ~/Library/Logs, the temporary directory, Downloads, Desktop, Documents (GeneralMacScopeCatalog.swift:54-64; CleanerCoreLiveScan.swift:243-261).",
+        "Per-root caps: depth 8, 25,000 entries, 10,000 findings (GeneralMacScopeCatalog.swift:16-24).",
+        "GeneralMacFilesystemAdapter is a read-only, lazy walk: one entry per call (GeneralMacFilesystemAdapter.swift:92-93).",
+        "Adaptive Experience also lists the Hugging Face and Ollama model stores, a folder the user picks, and developer-tool presence, read-only (CleanerCoreLiveScan.swift:45-56, 70-150)."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Not drawn as arrows",
+      "items": [
+        "AdaptiveTrustSession also uses PermissionProbe for permission gaps and DarwinMemoryObservationAdapter for memory evidence (AdaptiveTrustSession.swift:43-45, 164-177).",
+        "PerformanceViewModel uses CleanerCoreDarwin for memory observation (PerformanceViewModel.swift:31-39).",
+        "DiskCleaner sizes ~/.Trash read-only through TrashInventoryReader (DiskCleanerViewModel.swift:161-170).",
+        "CleanerCoreFoundation, CleanerCoreContentAdapter and CleanerCoreDarwin each depend only on CleanerCore (Package.swift:28-41); the app target links SafetyContract, CleanerCore, CleanerCoreDarwin and CleanerCoreFoundation (project.pbxproj:630-651)."
+      ]
+    }
+  ]
+}

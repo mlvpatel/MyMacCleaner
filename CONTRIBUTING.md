@@ -2,10 +2,12 @@
 
 Thanks for contributing.
 
-This repository is a private development tree that is being prepared for
-open-source review. Maintainer identity is a **neutral placeholder** until
-publication. Use [SECURITY.md](SECURITY.md) for vulnerability reports and
-[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community standards.
+MyMacCleaner is developed in the open at
+[github.com/mlvpatel/MyMacCleaner](https://github.com/mlvpatel/MyMacCleaner).
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md),
+not in public issues. [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) sets the
+community standards. `CLAUDE.md` describes the current architecture and the
+safety contract.
 
 ## License of contributions
 
@@ -13,19 +15,38 @@ By submitting a pull request or other contribution, you agree to license your
 contribution under GNU AGPLv3 or later, the same license as the project
 ([LICENSE](LICENSE)).
 
-## Local gates (Command Line Tools)
+## Local gates
 
-From the repository root:
+From the repository root, run what CI runs before you push:
 
 ```bash
-bash scripts/verify-safety-contract.sh
-bash scripts/verify-adaptive-experience.sh
-CODEX_SANDBOX=1 bash scripts/verify-cleanercore.sh
+bash scripts/verify-all.sh          # the Safety Contract workflow, step for step
+bash scripts/verify-all.sh --fast   # source contracts and self-tests only; skips Swift tests and coverage
 ```
 
-These prove SafetyContract, Adaptive catalog/identifier contracts, CleanerCore
-tests, and 80% line coverage per production target. They do **not** prove a
-full-Xcode app build, XCUITest, VoiceOver, signing, notarization, or hosted CI.
+`verify-all.sh` runs the SafetyContract tests and coverage gate, the CleanerCore
+tests with 80% line coverage per production target, the CleanerCore source
+contract, both Adaptive Experience verifiers, and every verifier self-test. A
+failure starts with a rule ID; [docs/VERIFIER-RULES.md](docs/VERIFIER-RULES.md)
+explains each one.
+
+The PR Checks workflow also runs these, which need full Xcode:
+
+```bash
+xcodebuild test -project MyMacCleaner.xcodeproj -scheme MyMacCleaner \
+  -destination 'platform=macOS' -only-testing:MyMacCleanerTests \
+  -enableCodeCoverage YES -resultBundlePath build/TestResults.xcresult
+bash scripts/check-app-coverage.sh build/TestResults.xcresult   # app coverage ratchet
+swiftlint lint                                                  # CI pins SwiftLint 0.65.1
+```
+
+Delete `build/TestResults.xcresult` before running the tests again. PR Checks
+also fails on Swift files over 800 lines and on `#unavailable`.
+
+In a sandbox where the default Swift module cache is not writable, set
+`CODEX_SANDBOX=1`. The test runners (`run-safety-tests.sh`,
+`run-cleanercore-tests.sh`) then keep their module caches under `$TMPDIR` and
+pass `--disable-sandbox` to SwiftPM.
 
 Architecture and trust docs:
 
@@ -40,14 +61,15 @@ Architecture and trust docs:
 
 1. Create a branch from `main`.
 2. Add tests for trust-core or safety behavior you change.
-3. Run the local gates above.
+3. Run the local gates above (`bash scripts/verify-all.sh` at least).
 4. Do not restore `FileScanner` mutation, privileged shell, `rm`, Empty Trash,
    or memory purge.
 5. Do not commit secrets, signing material, or `.env` files.
-6. Open a pull request. Hosted GitHub Actions is not claimed green until a
-   recorded run exists.
+6. Open a pull request. CI runs the PR Checks and Safety Contract workflows on
+   every pull request; both should pass before merge.
 
 ## Full Xcode
 
 App scheme build, UI tests, and assistive-technology walks require full Xcode
-on macOS. Command Line Tools success is not a substitute.
+on macOS. Command Line Tools success is not a substitute. Use Xcode 26 or
+later. CI tests with Xcode 26 (the newest 26.x on GitHub's `macos-26` runners).

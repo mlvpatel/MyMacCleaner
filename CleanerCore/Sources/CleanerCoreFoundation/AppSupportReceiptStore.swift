@@ -18,6 +18,28 @@ public struct ApplicationSupportLocator: Sendable {
     }
 }
 
+extension ReceiptHistoryCoordinator {
+    /// The only place that knows where receipt history lives. The store and its lease come from
+    /// one hardened `Application Support/MyMacCleaner` folder, and the lease file sits beside
+    /// `Receipts`, never inside the folder the store enumerates.
+    public static func live(
+        fileManager: FileManager,
+        locator: ApplicationSupportLocator = .live,
+        clock: ReceiptClock,
+        execute: any ReceiptExecutionConsuming
+    ) -> Result<ReceiptHistoryCoordinator, ReceiptPersistenceError> {
+        let store = AppSupportReceiptStore(fileManager: fileManager, locator: locator)
+        return store.leaseFile().map { lockFile in
+            ReceiptHistoryCoordinator(
+                store: store,
+                lease: DarwinReceiptLease(lockFile: lockFile),
+                clock: clock,
+                execute: execute
+            )
+        }
+    }
+}
+
 public struct AppSupportReceiptStore: ReceiptStorePort, @unchecked Sendable {
     private let fileManager: FileManager
     private let locator: ApplicationSupportLocator
@@ -91,16 +113,9 @@ public struct AppSupportReceiptStore: ReceiptStorePort, @unchecked Sendable {
         }
     }
 
-    public func privateMovedDestination(
-        receipt: ReceiptID,
-        item: ReceiptItemID
-    ) async -> Result<URL, ReceiptPersistenceError> {
-        switch validatedRoot() {
-        case let .failure(error):
-            return .failure(error)
-        case let .success(root):
-            return resolveMovedDestination(receipt: receipt, item: item, root: root)
-        }
+    /// Hardens the receipt root, then names the lease file in its validated parent.
+    func leaseFile() -> Result<URL, ReceiptPersistenceError> {
+        validatedRoot().map { $0.deletingLastPathComponent().appendingPathComponent("receipts.lock") }
     }
 
     private func publish<Value: Encodable>(
@@ -185,11 +200,40 @@ public struct AppSupportReceiptStore: ReceiptStorePort, @unchecked Sendable {
         }
         var records: [LoadedReceiptRecord] = []
         for item in contents.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-            if item.lastPathComponent == "lock" { continue }
+            if isPlainFile(item) { continue }
             if item.lastPathComponent.hasPrefix(".deleting-") { continue }
+            if holdsOnlyJournalTemporaries(item) { continue }
             records.append(loadReceipt(at: item))
         }
         return .success(records)
+    }
+
+    /// Receipts are folders. A plain file here, such as the `history.lock` lease older builds
+    /// kept here or a stray file, is not a receipt. Symlinks and unreadable entries still load (as unreadable).
+    private func isPlainFile(_ url: URL) -> Bool {
+        do {
+            let values = try url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            return values.isDirectory == false && values.isSymbolicLink == false
+        } catch {
+            return false
+        }
+    }
+
+    /// A crash while publishing the intent leaves a folder holding only journal temp files.
+    /// The intent never landed, so nothing ran there and it is not a receipt.
+    private func holdsOnlyJournalTemporaries(_ directory: URL) -> Bool {
+        if publisher.isSymlink(directory.path) { return false }
+        do {
+            let names = try fileManager.contentsOfDirectory(atPath: directory.path)
+            return !names.isEmpty && names.allSatisfy(Self.isJournalTemporary)
+        } catch {
+            return false
+        }
+    }
+
+    /// `nativePublish` stages every journal file as `.<name>.<pid>.<random>.tmp`, then renames it.
+    private static func isJournalTemporary(_ name: String) -> Bool {
+        name.hasPrefix(".") && name.hasSuffix(".tmp")
     }
 
     private func loadReceipt(at directory: URL) -> LoadedReceiptRecord {
@@ -206,12 +250,18 @@ public struct AppSupportReceiptStore: ReceiptStorePort, @unchecked Sendable {
         }
         let files: [URL]
         do {
-            files = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            files = try fileManager.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )
         } catch {
             return .unreadable
         }
+        // Only `*.json` transitions are journal entries; temp files and `.DS_Store` are not.
+        let journal = files.filter { $0.pathExtension == "json" && $0.lastPathComponent != "intent.json" }
         var transitions: [ReceiptItemTransition] = []
-        for file in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where file.lastPathComponent != "intent.json" {
+        for file in journal.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
             guard let data = fileManager.contents(atPath: file.path) else {
                 return .unreadable
             }
@@ -286,6 +336,58 @@ public struct AppSupportReceiptStore: ReceiptStorePort, @unchecked Sendable {
                 continue
             }
         }
+        return sweepInterruptedWrites(in: root)
+    }
+
+    /// Runs under the history lease, so no publish is in flight and every journal temp file is
+    /// debris from a crash. Only folders the store would itself delete are touched; the loader
+    /// already ignores temp files everywhere else.
+    private func sweepInterruptedWrites(in root: URL) -> Result<Void, ReceiptPersistenceError> {
+        let names: [String]
+        do {
+            names = try fileManager.contentsOfDirectory(atPath: root.path)
+        } catch {
+            return .failure(.readbackFailed)
+        }
+        for name in names {
+            guard case let (id, folder)? = ownedReceiptFolder(named: name, root: root) else { continue }
+            let swept = holdsOnlyJournalTemporaries(folder)
+                ? deleteValidated(id: id, root: root)
+                : removeJournalTemporaries(in: folder)
+            if case let .failure(error) = swept {
+                return .failure(error)
+            }
+        }
+        return .success(())
+    }
+
+    /// Nil for anything that is not a receipt folder the store owns (hidden, tombstone, symlink,
+    /// plain file, foreign owner or mode): those are left alone.
+    private func ownedReceiptFolder(named name: String, root: URL) -> (ReceiptID, URL)? {
+        do {
+            let id = try ReceiptID(name)
+            return (id, try validatedChildDirectory(id: id, root: root).get())
+        } catch {
+            return nil
+        }
+    }
+
+    private func removeJournalTemporaries(in folder: URL) -> Result<Void, ReceiptPersistenceError> {
+        let names: [String]
+        do {
+            names = try fileManager.contentsOfDirectory(atPath: folder.path)
+        } catch {
+            return .failure(.readbackFailed)
+        }
+        for name in names where Self.isJournalTemporary(name) {
+            let file = folder.appendingPathComponent(name)
+            guard isPlainFile(file) else { continue }
+            do {
+                try fileManager.removeItem(at: file)
+            } catch {
+                return .failure(.writeFailed)
+            }
+        }
         return .success(())
     }
 
@@ -343,37 +445,6 @@ public struct AppSupportReceiptStore: ReceiptStorePort, @unchecked Sendable {
             return .failure(.deletionRefused)
         }
         return .success(standardized)
-    }
-
-    private func resolveMovedDestination(
-        receipt: ReceiptID,
-        item: ReceiptItemID,
-        root: URL
-    ) -> Result<URL, ReceiptPersistenceError> {
-        switch validatedChildDirectory(id: receipt, root: root) {
-        case let .failure(error):
-            return .failure(error)
-        case let .success(directory):
-            switch loadReceipt(at: directory) {
-            case .unreadable, .futureSchema:
-                return .failure(.readbackFailed)
-            case let .durable(intent, transitions):
-                let reconciled = ReceiptReconciliation().reconcile(
-                    .durable(intent: intent, transitions: transitions),
-                    observedAt: intent.createdAt
-                )
-                guard !reconciled.isQuarantined,
-                      reconciled.item(item)?.state == .moved else {
-                    return .failure(.unknownReceipt)
-                }
-                guard let destination = reconciled.item(item)?.privateDestination,
-                      let url = URL(string: destination.token),
-                      url.isFileURL else {
-                    return .failure(.unknownReceipt)
-                }
-                return .success(url)
-            }
-        }
     }
 }
 

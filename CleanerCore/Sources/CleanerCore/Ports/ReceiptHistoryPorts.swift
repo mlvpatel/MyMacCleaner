@@ -47,11 +47,6 @@ public protocol ReceiptExecutionConsuming: Sendable {
     ) -> TrashItemOutcome<PrivateRecoveryDestination>
 }
 
-public enum ReceiptRevealOutcome: Equatable, Sendable {
-    case revealRequested
-    case unavailable
-}
-
 public struct RedactedReceiptSummary: Equatable, Sendable {
     public let id: ReceiptID
     public let createdAt: WallClockInstant

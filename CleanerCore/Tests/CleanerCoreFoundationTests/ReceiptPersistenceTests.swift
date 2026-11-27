@@ -27,6 +27,68 @@ struct ReceiptStoreAdapterTests {
     }
 
     @Test
+    func plainFilesInTheReceiptsFolderAreNotLoadedAsReceipts() async throws {
+        let fixture = try SupportFixture()
+        defer { fixture.tearDown() }
+        let store = fixture.store()
+        #expect(await store.persistIntent(try persistenceIntent()).isSuccess)
+        let receipts = fixture.support
+            .appendingPathComponent("MyMacCleaner", isDirectory: true)
+            .appendingPathComponent("Receipts", isDirectory: true)
+        // The lease file older builds kept here ("history.lock") and any stray file are not receipts.
+        for name in ["history.lock", "lock", "notes.txt"] {
+            try Data().write(to: receipts.appendingPathComponent(name))
+        }
+        // A receipt folder left without an intent still fails closed as unreadable.
+        try FileManager.default.createDirectory(
+            at: receipts.appendingPathComponent("interrupted-write", isDirectory: true),
+            withIntermediateDirectories: false
+        )
+
+        let loaded = try await store.loadAll().get()
+
+        #expect(loaded.count == 2)
+        #expect(loaded.filter { $0 == .unreadable }.count == 1)
+        #expect(loaded.contains { record in
+            if case .durable = record { return true }
+            return false
+        })
+    }
+
+    @Test
+    func liveHistoryBuildsTheStoreAndTheLeaseFromOneValidatedParent() async throws {
+        let fixture = try SupportFixture()
+        defer { fixture.tearDown() }
+        let history = try ReceiptHistoryCoordinator.live(
+            fileManager: FileManager(),
+            locator: ApplicationSupportLocator { _ in fixture.support },
+            clock: ReceiptClock { .init(unixNanoseconds: 9) },
+            execute: ScriptedPersistence()
+        ).get()
+        let app = fixture.support.appendingPathComponent("MyMacCleaner", isDirectory: true)
+        let receipts = app.appendingPathComponent("Receipts", isDirectory: true)
+        let lockFile = app.appendingPathComponent("receipts.lock")
+        #expect(posixMode(app) == 0o700)
+        #expect(posixMode(receipts) == 0o700)
+
+        // Holding the lock file beside Receipts makes the live history busy: it is the same lease.
+        let held = await DarwinReceiptLease(lockFile: lockFile).withExclusiveAccess {
+            await history.listRedacted()
+        }
+        #expect(held.error == .historyBusy)
+        #expect(try await history.listRedacted().get().isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: receipts.path).isEmpty)
+
+        let unlocatable = ReceiptHistoryCoordinator.live(
+            fileManager: FileManager(),
+            locator: ApplicationSupportLocator { _ in throw CocoaError(.fileNoSuchFile) },
+            clock: ReceiptClock { .init(unixNanoseconds: 9) },
+            execute: ScriptedPersistence()
+        )
+        #expect(unlocatable.error == .rootInvalid)
+    }
+
+    @Test
     func symlinkRootFailsClosed() async throws {
         let fixture = try SupportFixture()
         defer { fixture.tearDown() }

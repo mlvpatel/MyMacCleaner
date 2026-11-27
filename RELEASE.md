@@ -52,8 +52,8 @@ file. It does not notarize, push, or create a release. Without `--notes`, GitHub
 
 1. Refuses to run off `main`, when `main` differs from `origin/main`, with a dirty or untracked
    tree, or when the tag, release branch, or GitHub release already exists.
-2. Runs the unit tests and every verifier (`verify-safety-contract.sh`, `verify-cleanercore.sh`,
-   `verify-cleanercore-contract.sh`, and the Adaptive Experience verifiers).
+2. Runs the unit tests and `scripts/verify-all.sh` (every verifier and verifier self-test, as the
+   Safety Contract workflow runs them).
 3. Bumps `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`. Any later failure restores the project file.
 4. Archives and exports with Developer ID, then checks `codesign --verify --deep --strict`, the
    hardened runtime flag, the team identifier, the shipped architectures, and that no Sparkle

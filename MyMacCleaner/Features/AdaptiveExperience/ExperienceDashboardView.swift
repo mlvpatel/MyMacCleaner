@@ -10,11 +10,17 @@ struct ExperienceDashboardView: View {
             LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 header
                 if let failure = viewModel.failure {
-                    AdaptiveFailureBanner(failure: failure) {
+                    AdaptiveFailureBanner(failure: failure, onOpenReceipts: viewModel.presentReceipts) {
                         viewModel.dispatch(.dismissFailure)
                     }
                 }
                 section(titleKey: "adaptive.section.opportunities", identifier: "adaptive.section.opportunities") {
+                    // "Learn why" on the Home and Disk Cleaner Trash notices lands here.
+                    Text(L("adaptive.trash.why"))
+                        .font(Theme.Typography.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("adaptive.trash.why")
                     opportunityCards
                 }
                 warningBanner
@@ -54,32 +60,38 @@ struct ExperienceDashboardView: View {
                     .accessibilityLabel(L("adaptive.dashboard.refreshing"))
                     .accessibilityIdentifier("adaptive.scan.progress")
             }
+            AdaptiveRunStatus(
+                isExecuting: viewModel.isExecuting,
+                summary: viewModel.lastRunSummary,
+                identifier: "adaptive.dashboard.execution"
+            ) {
+                viewModel.presentReceipts()
+            }
             Text(viewModel.snapshot?.explanationKeys.first.map { L($0) } ?? L("adaptive.dashboard.empty"))
                 .foregroundStyle(.secondary)
         }
     }
 
+    /// Only the plan's items are cards; findings outside the plan collapse into one count.
     private var opportunityCards: some View {
-        let identities = viewModel.snapshot?.authority.evidenceIdentities ?? []
+        let authority = viewModel.snapshot?.authority
+        let items = authority?.planItems ?? []
+        let reviewOnly = authority?.reviewOnlyFindingCount ?? 0
         return Group {
-            if identities.isEmpty {
-                Text(L("adaptive.opportunities.empty"))
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("adaptive.opportunities.empty")
-            } else {
-                let (shown, hidden) = AdaptiveListLimit.split(identities)
-                ForEach(shown, id: \.self) { identity in
-                    Button {
-                        viewModel.dispatch(.focus(opaqueID: identity))
+            if let authority, !items.isEmpty {
+                Text(AdaptivePlanText.total(itemCount: items.count, bytes: authority.expectedConservativeBytes))
+                    .font(Theme.Typography.subheadline)
+                    .accessibilityIdentifier("adaptive.plan.total")
+                let (shown, hidden) = AdaptiveListLimit.split(items)
+                ForEach(shown, id: \.identity) { item in
+                    TrustStateCardButton(
+                        title: item.name,
+                        detail: AdaptivePlanText.detail(item),
+                        identifier: "adaptive.card.\(item.identity)"
+                    ) {
+                        viewModel.dispatch(.focus(opaqueID: item.identity))
                         viewModel.presentReview()
-                    } label: {
-                        TrustStateCard(
-                            title: L("adaptive.opportunity.title"),
-                            detail: identity,
-                            identifier: "adaptive.card.\(identity)"
-                        )
                     }
-                    .buttonStyle(.plain)
                     .accessibilityHint(L("adaptive.opportunity.open.hint"))
                 }
                 if hidden > 0 {
@@ -87,6 +99,15 @@ struct ExperienceDashboardView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("adaptive.opportunities.more")
                 }
+            } else {
+                Text(L("adaptive.opportunities.empty"))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("adaptive.opportunities.empty")
+            }
+            if reviewOnly > 0 {
+                Text(LFormat("adaptive.opportunities.reviewOnly", reviewOnly))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("adaptive.opportunities.reviewOnly")
             }
         }
     }
@@ -142,10 +163,12 @@ struct ExperienceDashboardView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("adaptive.modelInventory.envPrompt.\(name)")
             }
-            Button(action: selectModelFolder) {
-                Text(L("adaptive.modelInventory.addRoot"))
-            }
-            .buttonStyle(.plain)
+            GlassActionButton(
+                L("adaptive.modelInventory.addRoot"),
+                icon: "folder.badge.plus",
+                color: NavigationSection.adaptiveExperience.color,
+                action: selectModelFolder
+            )
             .accessibilityIdentifier("adaptive.modelInventory.addRoot")
         }
     }
@@ -236,16 +259,12 @@ struct ExperienceDashboardView: View {
     }
 
     private var historyCard: some View {
-        Button {
-            viewModel.presentReceipts()
-        } label: {
-            TrustStateCard(
-                title: L("adaptive.section.history"),
-                detail: L("adaptive.history.open"),
-                identifier: "adaptive.history.card"
-            )
-        }
-        .buttonStyle(.plain)
+        TrustStateCardButton(
+            title: L("adaptive.section.history"),
+            detail: L("adaptive.history.open"),
+            identifier: "adaptive.history.card",
+            action: viewModel.presentReceipts
+        )
         .accessibilityIdentifier("adaptive.history.open")
         .accessibilityHint(L("adaptive.history.open.hint"))
     }
@@ -297,7 +316,49 @@ struct ExperienceDashboardView: View {
 enum AdaptiveListLimit {
     static let rows = 50
 
-    static func split(_ items: [String], limit: Int = rows) -> (shown: [String], hidden: Int) {
+    static func split<Item>(_ items: [Item], limit: Int = rows) -> (shown: [Item], hidden: Int) {
         (Array(items.prefix(limit)), max(0, items.count - limit))
+    }
+}
+
+/// Plain-language plan text shared by the dashboard, the review sheet and the confirmation.
+enum AdaptivePlanText {
+    /// The confirmation names at most this many items, then counts the rest.
+    static let confirmationNameLimit = 10
+
+    static func bytes(_ total: AdaptiveByteTotal) -> String {
+        switch total {
+        case .observed(let bytes):
+            return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        case .unavailable, .overflowing:
+            return L("adaptive.plan.size.unavailable")
+        }
+    }
+
+    static func total(itemCount: Int, bytes total: AdaptiveByteTotal) -> String {
+        LFormat("adaptive.plan.total", itemCount, bytes(total))
+    }
+
+    /// Parent folder, conservative size and recovery path, e.g. "In com.example · 12 KB · Rebuildable".
+    static func detail(_ item: AdaptivePlanItem) -> String {
+        [
+            item.parentName.map { LFormat("adaptive.plan.item.parent", $0) },
+            ByteCountFormatter.string(fromByteCount: item.conservativeBytes, countStyle: .file),
+            L("adaptive.review.recovery.\(item.recoveryPath.rawValue)")
+        ]
+        .compactMap { $0 }
+        .joined(separator: " · ")
+    }
+
+    static func approvalTitle(itemCount: Int, total: AdaptiveByteTotal) -> String {
+        itemCount == 1
+            ? LFormat("adaptive.approval.title.one", bytes(total))
+            : LFormat("adaptive.approval.title", itemCount, bytes(total))
+    }
+
+    static func approvalMessage(names: [String]) -> String {
+        let (shown, hidden) = AdaptiveListLimit.split(names, limit: confirmationNameLimit)
+        let more = hidden > 0 ? [LFormat("adaptive.opportunities.more", hidden)] : []
+        return (shown + more + [L("adaptive.approval.message")]).joined(separator: "\n")
     }
 }

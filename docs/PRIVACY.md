@@ -32,7 +32,8 @@ unavailable rather than guessed.
 
 Production diagnostics use closed event codes and counts. Paths, project/model
 names, credentials, command text, appcast bodies, and receipt payloads are not
-retained in production logs. See SafetyContract redaction tests.
+retained in production logs. Records go out at notice or error level, which the
+unified log keeps. See SafetyContract redaction tests.
 
 ## Update-network boundary
 

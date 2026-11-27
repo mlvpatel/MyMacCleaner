@@ -8,7 +8,8 @@
 #   1. Refuses to run unless on an up-to-date `main` with a completely clean tree (untracked files included)
 #   2. Runs unit tests and every verifier gate
 #   3. Bumps the version on a new `release/v<version>` branch (never commits to main)
-#   4. Archives and exports with the Developer ID identity, verifies signature and hardened runtime
+#   4. Archives and exports with the Developer ID identity, verifies signature, hardened runtime
+#      and that no code-injection entitlement is present (scripts/check-signed-entitlements.sh)
 #   5. Notarizes and staples the app and DMG, then checks both with Gatekeeper (spctl)
 #   6. Pushes the release branch and creates a DRAFT GitHub release with the DMG, ZIP and SHA256SUMS
 #
@@ -121,11 +122,7 @@ run_gates() {
     xcodebuild test -project "$APP_NAME.xcodeproj" -scheme "$APP_NAME" -destination 'platform=macOS' \
         -only-testing:MyMacCleanerTests 2>&1 | /usr/bin/tee "$build_dir/unit-tests.log" >/dev/null
     log "Running verifier gates"
-    bash scripts/verify-safety-contract.sh
-    bash scripts/verify-cleanercore.sh
-    bash scripts/verify-cleanercore-contract.sh
-    bash scripts/verify-adaptive-bridge.sh
-    bash scripts/verify-adaptive-experience.sh
+    bash scripts/verify-all.sh
 }
 
 # MARK: - Version
@@ -184,6 +181,8 @@ verify_app_signature() {
         || fail "hardened runtime is not enabled"
     codesign --display --verbose=4 "$app" 2>&1 | /usr/bin/grep -q "TeamIdentifier=$team_id" \
         || fail "app is not signed by team $team_id"
+    bash "$script_dir/check-signed-entitlements.sh" "$app" \
+        || fail "app is signed with an entitlement that allows code injection"
     [[ ! -e "$app/Contents/Frameworks/Sparkle.framework" ]] || fail "Sparkle must not ship"
     printf 'Architectures: %s\n' "$(lipo -archs "$executable")"
 }

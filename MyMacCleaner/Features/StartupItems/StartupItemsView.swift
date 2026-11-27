@@ -17,9 +17,11 @@ struct StartupItemsView: View {
                     headerSection
                         .staggeredAnimation(index: 0, isActive: isVisible)
 
-                    // Stats cards
-                    statsSection
-                        .staggeredAnimation(index: 1, isActive: isVisible)
+                    // Stats cards, only once a scan has found items; before that the scan prompt shows
+                    if !viewModel.items.isEmpty {
+                        statsSection
+                            .staggeredAnimation(index: 1, isActive: isVisible)
+                    }
 
                     // Content
                     if viewModel.items.isEmpty && !viewModel.isLoading {
@@ -44,21 +46,8 @@ struct StartupItemsView: View {
                 .padding(.top, Theme.Spacing.pageTopPadding)
             }
 
-            // Toast
-            if viewModel.showToast {
-                VStack {
-                    ToastView(
-                        message: viewModel.toastMessage,
-                        type: viewModel.toastType,
-                        onDismiss: viewModel.dismissToast
-                    )
-                    .padding(.top, Theme.Spacing.lg)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
+            ToastOverlay(presenter: viewModel.toasts)
         }
-        .animation(Theme.Animation.spring, value: viewModel.showToast)
         .onAppear {
             withAnimation(Theme.Animation.springSmooth) {
                 isVisible = true
@@ -119,7 +108,7 @@ struct StartupItemsView: View {
         HStack(spacing: Theme.Spacing.md) {
             StartupStatCard(
                 title: L("startupItems.stats.total"),
-                value: "\(viewModel.items.filter { !$0.isSystemItem }.count)",
+                value: "\(viewModel.totalCount)",
                 icon: "list.bullet",
                 color: .cyan
             )
@@ -226,28 +215,18 @@ struct StartupItemsView: View {
                 icon: viewModel.selectedType?.icon ?? "line.3.horizontal.decrease.circle",
                 title: viewModel.selectedType?.localizedName ?? L("startupItems.filter.allTypes")
             ) {
-                Button(action: { viewModel.selectedType = nil }) {
-                    HStack {
-                        Text(L("startupItems.filter.allTypes"))
-                        if viewModel.selectedType == nil {
-                            Image(systemName: "checkmark")
-                        }
+                // An inline Picker gives the menu native check marks that VoiceOver reads.
+                Picker("", selection: $viewModel.selectedType) {
+                    Text(L("startupItems.filter.allTypes")).tag(StartupItemType?.none)
+
+                    Divider()
+
+                    ForEach(StartupItemType.allCases, id: \.self) { type in
+                        Label(type.localizedName, systemImage: type.icon).tag(StartupItemType?.some(type))
                     }
                 }
-
-                Divider()
-
-                ForEach(StartupItemType.allCases, id: \.self) { type in
-                    Button(action: { viewModel.selectedType = type }) {
-                        HStack {
-                            Image(systemName: type.icon)
-                            Text(type.localizedName)
-                            if viewModel.selectedType == type {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
+                .pickerStyle(.inline)
+                .labelsHidden()
             }
 
             // Sort order
@@ -255,17 +234,13 @@ struct StartupItemsView: View {
                 icon: "arrow.up.arrow.down",
                 title: viewModel.sortOrder.localizedName
             ) {
-                ForEach(StartupItemsViewModel.SortOrder.allCases, id: \.self) { order in
-                    Button(action: { viewModel.sortOrder = order }) {
-                        HStack {
-                            Image(systemName: order.icon)
-                            Text(order.localizedName)
-                            if viewModel.sortOrder == order {
-                                Image(systemName: "checkmark")
-                            }
-                        }
+                Picker("", selection: $viewModel.sortOrder) {
+                    ForEach(StartupItemsViewModel.SortOrder.allCases, id: \.self) { order in
+                        Label(order.localizedName, systemImage: order.icon).tag(order)
                     }
                 }
+                .pickerStyle(.inline)
+                .labelsHidden()
             }
 
             Spacer()
@@ -313,13 +288,12 @@ struct StartupItemsView: View {
 
 // MARK: - Startup Stat Card
 
+/// Non-interactive status: no hover effect.
 struct StartupStatCard: View {
     let title: String
     let value: String
     let icon: String
     let color: Color
-
-    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -347,8 +321,6 @@ struct StartupStatCard: View {
         .padding(Theme.Spacing.md)
         .frame(maxWidth: .infinity)
         .glassCard()
-        .hoverEffect(isHovered: isHovered)
-        .onHover { isHovered = $0 }
     }
 }
 
@@ -365,85 +337,93 @@ struct StartupItemRow: View {
         VStack(spacing: 0) {
             // Main row
             HStack(spacing: Theme.Spacing.md) {
-                // Type icon with status indicator
-                ZStack {
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.medium)
-                        .fill(item.typeColor.opacity(0.15))
-                        .frame(width: 44, height: 44)
+                // The summary is the disclosure button; Show in Finder stays its own button.
+                HStack(spacing: Theme.Spacing.md) {
+                    // Type icon with status indicator
+                    ZStack {
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.medium)
+                            .fill(item.typeColor.opacity(0.15))
+                            .frame(width: 44, height: 44)
 
-                    Image(systemName: item.icon)
-                        .font(Theme.Typography.size18Semibold)
-                        .foregroundStyle(item.typeColor)
+                        Image(systemName: item.icon)
+                            .font(Theme.Typography.size18Semibold)
+                            .foregroundStyle(item.typeColor)
 
-                    // Running indicator
-                    if item.isRunning {
-                        Circle()
-                            .fill(.green)
-                            .frame(width: 10, height: 10)
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.black.opacity(0.2), lineWidth: 1)
-                            )
-                            .offset(x: 16, y: -16)
+                        // Running indicator
+                        if item.isRunning {
+                            Circle()
+                                .fill(.green)
+                                .frame(width: 10, height: 10)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.black.opacity(0.2), lineWidth: 1)
+                                )
+                                .offset(x: 16, y: -16)
+                        }
                     }
-                }
 
-                // Info
-                VStack(alignment: .leading, spacing: Theme.Spacing.tiny) {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Text(item.displayName)
-                            .font(Theme.Typography.subheadline.weight(.medium))
+                    // Info
+                    VStack(alignment: .leading, spacing: Theme.Spacing.tiny) {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            Text(item.displayName)
+                                .font(Theme.Typography.subheadline.weight(.medium))
+                                .lineLimit(1)
+
+                            if item.isSystemItem {
+                                Text(L("startupItems.badge.system"))
+                                    .font(Theme.Typography.size9Medium)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, Theme.Spacing.xxxs)
+                                    .padding(.vertical, Theme.Spacing.tiny)
+                                    .background(Color.secondary.opacity(0.2))
+                                    .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny))
+                            }
+                        }
+
+                        Text(item.label)
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(.tertiary)
                             .lineLimit(1)
 
-                        if item.isSystemItem {
-                            Text(L("startupItems.badge.system"))
-                                .font(Theme.Typography.size9Medium)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, Theme.Spacing.xxxs)
-                                .padding(.vertical, Theme.Spacing.tiny)
-                                .background(Color.secondary.opacity(0.2))
-                                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny))
+                        if let developer = item.developer {
+                            HStack(spacing: Theme.Spacing.xxs) {
+                                Image(systemName: "building.2")
+                                    .font(Theme.Typography.size9)
+                                Text(developer)
+                                    .font(Theme.Typography.caption)
+                            }
+                            .foregroundStyle(.secondary)
                         }
                     }
 
-                    Text(item.label)
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
+                    Spacer()
 
-                    if let developer = item.developer {
-                        HStack(spacing: Theme.Spacing.xxs) {
-                            Image(systemName: "building.2")
-                                .font(Theme.Typography.size9)
-                            Text(developer)
-                                .font(Theme.Typography.caption)
-                        }
-                        .foregroundStyle(.secondary)
+                    // Type badge
+                    Text(item.type.localizedName)
+                        .font(Theme.Typography.size10Medium)
+                        .foregroundStyle(item.typeColor)
+                        .padding(.horizontal, Theme.Spacing.xs)
+                        .padding(.vertical, Theme.Spacing.xxs)
+                        .background(item.typeColor.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny))
+
+                    // Status indicator
+                    HStack(spacing: Theme.Spacing.xxs) {
+                        Circle()
+                            .fill(item.isEnabled ? Color.green : Color.orange)
+                            .frame(width: 8, height: 8)
+
+                        Text(item.isEnabled ? L("startupItems.status.enabled") : L("startupItems.status.disabled"))
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(width: 80)
+                }
+                .expandButton(isExpanded: isExpanded, cornerRadius: Theme.CornerRadius.medium) {
+                    withAnimation(Theme.Animation.spring) {
+                        isExpanded.toggle()
                     }
                 }
-
-                Spacer()
-
-                // Type badge
-                Text(item.type.localizedName)
-                    .font(Theme.Typography.size10Medium)
-                    .foregroundStyle(item.typeColor)
-                    .padding(.horizontal, Theme.Spacing.xs)
-                    .padding(.vertical, Theme.Spacing.xxs)
-                    .background(item.typeColor.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny))
-
-                // Status indicator
-                HStack(spacing: Theme.Spacing.xxs) {
-                    Circle()
-                        .fill(item.isEnabled ? Color.green : Color.orange)
-                        .frame(width: 8, height: 8)
-
-                    Text(item.isEnabled ? L("startupItems.status.enabled") : L("startupItems.status.disabled"))
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(width: 80)
 
                 Button(action: onReveal) {
                     Image(systemName: "folder")
@@ -455,13 +435,7 @@ struct StartupItemRow: View {
                 .opacity(isHovered ? 1 : 0.6)
             }
             .padding(Theme.Spacing.md)
-            .background(isHovered ? Color.white.opacity(0.03) : Color.clear)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                withAnimation(Theme.Animation.spring) {
-                    isExpanded.toggle()
-                }
-            }
+            .background(isHovered ? Theme.Colors.subtleFill : Color.clear)
             .onHover { isHovered = $0 }
 
             // Expanded details
@@ -480,7 +454,7 @@ struct StartupItemRow: View {
                     }
                 }
                 .padding(Theme.Spacing.md)
-                .background(Color.white.opacity(0.02))
+                .background(Theme.Colors.subtleFill)
             }
         }
         .glassCard()

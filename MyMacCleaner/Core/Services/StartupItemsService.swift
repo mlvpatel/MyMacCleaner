@@ -81,91 +81,39 @@ actor StartupItemsService {
 
     // SAFETY-AUDIT: fixed read-only process adapter — /usr/bin/sfltool dumpbtm
     private nonisolated static func parseBackgroundItems() async -> [StartupItem] {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/sfltool")
-                process.arguments = ["dumpbtm"]
-                let output = Pipe()
-                process.standardOutput = output
-                process.standardError = FileHandle.nullDevice
-
-                guard (try? process.run()) != nil else {
-                    SafetyDiagnosticLogger.emit(
-                        RedactingDiagnostic.record(
-                            event: .startupBackgroundItemsUnavailable,
-                            sensitiveClasses: [.command, .error]
-                        )
-                    )
-                    continuation.resume(returning: [])
-                    return
-                }
-
-                process.waitUntilExit()
-                let data = output.fileHandleForReading.readDataToEndOfFile()
-                guard process.terminationStatus == 0,
-                      let text = String(data: data, encoding: .utf8)
-                else {
-                    SafetyDiagnosticLogger.emit(
-                        RedactingDiagnostic.record(
-                            event: .startupBackgroundItemsUnavailable,
-                            sensitiveClasses: [.command, .error]
-                        )
-                    )
-                    continuation.resume(returning: [])
-                    return
-                }
-
-                continuation.resume(returning: parseBTMOutput(text))
-            }
+        guard let data = await ReadOnlyProcess.run(.backgroundItems),
+              let text = String(data: data, encoding: .utf8)
+        else {
+            SafetyDiagnosticLogger.emit(
+                RedactingDiagnostic.record(
+                    event: .startupBackgroundItemsUnavailable,
+                    sensitiveClasses: [.command, .error]
+                )
+            )
+            return []
         }
+        return parseBTMOutput(text)
     }
 
     // SAFETY-AUDIT: fixed read-only process adapter — /bin/launchctl list
     private nonisolated static func parseLaunchctlItems() async -> Set<String> {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-                process.arguments = ["list"]
-                let output = Pipe()
-                process.standardOutput = output
-                process.standardError = FileHandle.nullDevice
-
-                guard (try? process.run()) != nil else {
-                    SafetyDiagnosticLogger.emit(
-                        RedactingDiagnostic.record(
-                            event: .startupLaunchctlItemsUnavailable,
-                            sensitiveClasses: [.command, .error]
-                        )
-                    )
-                    continuation.resume(returning: [])
-                    return
-                }
-
-                process.waitUntilExit()
-                let data = output.fileHandleForReading.readDataToEndOfFile()
-                guard process.terminationStatus == 0,
-                      let text = String(data: data, encoding: .utf8)
-                else {
-                    SafetyDiagnosticLogger.emit(
-                        RedactingDiagnostic.record(
-                            event: .startupLaunchctlItemsUnavailable,
-                            sensitiveClasses: [.command, .error]
-                        )
-                    )
-                    continuation.resume(returning: [])
-                    return
-                }
-
-                let labels: [String] = text.split(separator: "\n").dropFirst().compactMap { line in
-                    let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
-                    guard fields.count >= 3, !fields[2].isEmpty else { return nil }
-                    return String(fields[2])
-                }
-                continuation.resume(returning: Set(labels))
-            }
+        guard let data = await ReadOnlyProcess.run(.launchServices),
+              let text = String(data: data, encoding: .utf8)
+        else {
+            SafetyDiagnosticLogger.emit(
+                RedactingDiagnostic.record(
+                    event: .startupLaunchctlItemsUnavailable,
+                    sensitiveClasses: [.command, .error]
+                )
+            )
+            return []
         }
+        let labels: [String] = text.split(separator: "\n").dropFirst().compactMap { line in
+            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard fields.count >= 3, !fields[2].isEmpty else { return nil }
+            return String(fields[2])
+        }
+        return Set(labels)
     }
 
     private func scanLaunchAgentDirectories(runningLabels: Set<String>) -> [StartupItem] {

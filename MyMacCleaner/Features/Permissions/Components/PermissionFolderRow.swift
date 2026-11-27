@@ -73,21 +73,23 @@ struct PermissionFolderRow: View {
     private var actionButton: some View {
         switch folder.status {
         case .accessible:
-            // Show revoke button when accessible
-            Button(action: onRevokeAccess) {
-                HStack(spacing: Theme.Spacing.xxs) {
-                    Image(systemName: "minus.circle.fill")
-                        .font(Theme.Typography.size10)
-                    Text(L("permissions.folder.revoke"))
-                        .font(Theme.Typography.size11Medium)
+            // Only Full Disk Access and Files and Folders access can be changed, in System Settings
+            if folder.isAccessManagedInSystemSettings {
+                Button(action: onRevokeAccess) {
+                    HStack(spacing: Theme.Spacing.xxs) {
+                        Image(systemName: "gear")
+                            .font(Theme.Typography.size10)
+                        Text(L("permissions.folder.manageInSystemSettings"))
+                            .font(Theme.Typography.size11Medium)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Theme.Spacing.xs)
+                    .padding(.vertical, Theme.Spacing.xxs)
+                    .background(Color.gray)
+                    .clipShape(Capsule())
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, Theme.Spacing.xs)
-                .padding(.vertical, Theme.Spacing.xxs)
-                .background(Color.red.opacity(0.8))
-                .clipShape(Capsule())
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
         case .denied:
             // Show grant button when denied

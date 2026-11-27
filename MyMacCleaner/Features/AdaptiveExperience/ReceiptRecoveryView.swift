@@ -10,21 +10,42 @@ struct ReceiptRecoveryView: View {
                 .font(Theme.Typography.title2)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("adaptive.receipts.title")
-            let ids = viewModel.snapshot?.authority.receiptIDs ?? []
-            if ids.isEmpty {
+            let unrecorded = viewModel.unrecordedMoveLocations
+            if !unrecorded.isEmpty {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Text(L("adaptive.receipts.unrecorded"))
+                    ForEach(Array(unrecorded.enumerated()), id: \.offset) { _, location in
+                        Text(location)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("adaptive.receipts.unrecorded")
+            }
+            let rows = viewModel.snapshot?.authority.receipts ?? []
+            if let failure = viewModel.receiptHistoryFailure {
+                Text(L(failure.receiptsUnavailableKey))
+                    .accessibilityIdentifier("adaptive.receipts.unavailable")
+            } else if rows.isEmpty {
                 Text(L("adaptive.receipts.empty"))
                     .accessibilityIdentifier("adaptive.receipts.empty")
             } else {
-                ForEach(ids, id: \.self) { id in
-                    TrustStateCard(
-                        title: L("adaptive.receipts.item"),
-                        detail: id,
-                        identifier: "adaptive.receipt.\(id)"
-                    )
-                }
-                ForEach(Array((viewModel.snapshot?.authority.receiptRecoveryMarkers ?? []).enumerated()), id: \.offset) { index, marker in
-                    Text(L(marker))
-                        .accessibilityIdentifier("adaptive.recovery.\(ids.indices.contains(index) ? ids[index] : "marker")")
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        ForEach(rows, id: \.id) { row in
+                            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                                TrustStateCard(
+                                    title: LFormat("adaptive.receipts.item", Self.dateText(row.createdAtUnixNanoseconds)),
+                                    detail: L(row.statusMarker) + " · " + LFormat("adaptive.receipts.itemCount", row.itemCount),
+                                    identifier: "adaptive.receipt.\(row.id)"
+                                )
+                                Text(L(row.recoveryMarker))
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("adaptive.recovery.\(row.id)")
+                            }
+                        }
+                    }
                 }
             }
             Button(L("adaptive.receipts.close")) {
@@ -36,6 +57,12 @@ struct ReceiptRecoveryView: View {
         }
         .padding(Theme.Spacing.lg)
         .frame(minWidth: 520, minHeight: 360)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("adaptive.receipts")
+    }
+
+    private static func dateText(_ unixNanoseconds: Int64) -> String {
+        Date(timeIntervalSince1970: TimeInterval(unixNanoseconds) / 1_000_000_000)
+            .formatted(date: .abbreviated, time: .shortened)
     }
 }

@@ -23,39 +23,6 @@
         }
       }
     },
-    "permissions.banner.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Some features require Full Disk Access to work properly"
-          }
-        }
-      }
-    },
-    "permissions.banner.grant": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Grant Access"
-          }
-        }
-      }
-    },
-    "permissions.banner.limited": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Limited access - some features require Full Disk Access"
-          }
-        }
-      }
-    },
     "permissions.category.applicationData.description": {
       "extractionState": "manual",
       "localizations": {
@@ -183,18 +150,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyMacCleaner needs Full Disk Access to scan and clean system files effectively."
-          }
-        }
-      }
-    },
-    "permissions.fda.feature.appLogs": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Application logs and crash reports"
+            "value": "MyMacCleaner needs Full Disk Access to read protected folders and report them completely."
           }
         }
       }
@@ -205,18 +161,40 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Application leftovers detection"
+            "value": "Leftovers inside protected app containers in Orphaned Files"
           }
         }
       }
     },
-    "permissions.fda.feature.mailAttachments": {
+    "permissions.fda.feature.personalFolders": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mail attachments cleanup"
+            "value": "Desktop, Documents and Downloads in Smart Scan, without a macOS prompt for each"
+          }
+        }
+      }
+    },
+    "permissions.fda.feature.protectedCaches": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cache and log folders that macOS protects"
+          }
+        }
+      }
+    },
+    "permissions.fda.feature.safari": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Safari history and website data in Browser Privacy"
           }
         }
       }
@@ -228,17 +206,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Complete Space Lens analysis"
-          }
-        }
-      }
-    },
-    "permissions.fda.feature.systemCaches": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "System caches and temporary files"
           }
         }
       }
@@ -276,6 +243,17 @@
         }
       }
     },
+    "permissions.fda.limitedScan.folders": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A limited scan reads your Desktop, Documents and Downloads folders. macOS may ask you to allow access to each one. The scan only reads files and changes nothing."
+          }
+        }
+      }
+    },
     "permissions.fda.openSettings": {
       "extractionState": "manual",
       "localizations": {
@@ -293,7 +271,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Required for complete system cleaning"
+            "value": "Required for a complete scan"
           }
         }
       }
@@ -353,6 +331,17 @@
         }
       }
     },
+    "permissions.folder.manageInSystemSettings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage in System Settings"
+          }
+        }
+      }
+    },
     "permissions.folder.notExists": {
       "extractionState": "manual",
       "localizations": {
@@ -375,13 +364,13 @@
         }
       }
     },
-    "permissions.folder.revoke": {
+    "permissions.folder.stillDenied %@": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Revoke"
+            "value": "macOS didn't give access to %@ and won't ask again. System Settings is open at Privacy & Security > Files and Folders, where you can turn it on."
           }
         }
       }

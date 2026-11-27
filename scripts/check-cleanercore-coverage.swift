@@ -89,7 +89,8 @@ private func fail(_ error: CoverageGateError) -> Never {
         rule = "CC-COVERAGE-BELOW-MINIMUM: \(target) \(covered)/\(executable) required=\(minimum).00%"
     }
 
-    FileHandle.standardError.write(Data("\(rule)\n".utf8))
+    let ruleID = rule.prefix { $0 != ":" }.lowercased()
+    FileHandle.standardError.write(Data("\(rule)\n  see docs/VERIFIER-RULES.md#\(ruleID)\n".utf8))
     exit(1)
 }
 

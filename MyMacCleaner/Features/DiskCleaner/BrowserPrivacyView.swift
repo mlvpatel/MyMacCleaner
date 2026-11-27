@@ -2,20 +2,24 @@ import SwiftUI
 
 // MARK: - Browser Privacy View Model
 
+/// Read-only browser-data inventory: it lists what each browser stores and never changes it.
 @MainActor
 class BrowserPrivacyViewModel: ObservableObject {
     @Published var isScanning = false
     @Published var hasScanned = false
 
     @Published var items: [BrowserDataItem] = []
-    @Published var showToast = false
-    @Published var toastMessage = ""
-    @Published var toastType: ToastType = .success
-    @Published private(set) var latestSafetyNotice: SafetyNoticeState?
+    /// Installed browsers the last scan could not read, so an empty list is never called clean.
+    @Published private(set) var unreadableBrowsers: [BrowserType] = []
 
-    private let service = BrowserCleanerService.shared
-    private let safetyNoticePresenter = SafetyNoticePresenter()
-    private var toastPresentationID = UUID()
+    private let scanBrowsers: @Sendable () async -> BrowserScan
+    private var scanTask: Task<Void, Never>?
+
+    init(scanBrowsers: @escaping @Sendable () async -> BrowserScan = {
+        await BrowserCleanerService.shared.scanAllBrowsers()
+    }) {
+        self.scanBrowsers = scanBrowsers
+    }
 
     // MARK: - Computed Properties
 
@@ -23,126 +27,35 @@ class BrowserPrivacyViewModel: ObservableObject {
         BrowserType.allCases.filter { $0.isInstalled }
     }
 
-    var totalSize: Int64 {
-        items.reduce(0) { $0 + $1.size }
-    }
-
-    var selectedSize: Int64 {
-        items.filter { $0.isSelected }.reduce(0) { $0 + $1.size }
-    }
-
-    var selectedCount: Int {
-        items.filter { $0.isSelected }.count
-    }
-
-    var formattedTotalSize: String {
-        ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
-    }
-
-    var formattedSelectedSize: String {
-        ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)
-    }
-
     var itemsByBrowser: [BrowserType: [BrowserDataItem]] {
         Dictionary(grouping: items, by: { $0.browser })
-    }
-
-    var hasWarningItems: Bool {
-        items.filter { $0.isSelected }.contains { $0.dataType.warningLevel != .low }
     }
 
     // MARK: - Actions
 
     func scan() {
+        guard !isScanning else { return }
+        // The last results stay until this scan finishes, so a stopped rescan keeps them.
         isScanning = true
-        hasScanned = false
 
-        Task {
-            let scannedItems = await service.scanAllBrowsers()
-            items = scannedItems
+        scanTask = Task { [scanBrowsers] in
+            let scan = await scanBrowsers()
+            // A cancelled scan stopped part-way; never present it.
+            guard !Task.isCancelled else { return }
+            items = scan.items
+            unreadableBrowsers = scan.unreadableBrowsers
             hasScanned = true
             isScanning = false
+            scanTask = nil
         }
     }
 
-    func toggleSelection(_ item: BrowserDataItem) {
-        if let index = items.firstIndex(where: { $0.id == item.id }) {
-            items[index].isSelected.toggle()
-        }
-    }
-
-    func selectAllForBrowser(_ browser: BrowserType) {
-        // Create a mutable copy to ensure @Published triggers properly
-        var updatedItems = items
-        for i in updatedItems.indices where updatedItems[i].browser == browser {
-            updatedItems[i].isSelected = true
-        }
-        items = updatedItems
-    }
-
-    func deselectAllForBrowser(_ browser: BrowserType) {
-        // Create a mutable copy to ensure @Published triggers properly
-        var updatedItems = items
-        for i in updatedItems.indices where updatedItems[i].browser == browser {
-            updatedItems[i].isSelected = false
-        }
-        items = updatedItems
-    }
-
-    func selectAll() {
-        // Create a mutable copy to ensure @Published triggers properly
-        var updatedItems = items
-        for i in updatedItems.indices {
-            updatedItems[i].isSelected = true
-        }
-        items = updatedItems
-    }
-
-    func deselectAll() {
-        // Create a mutable copy to ensure @Published triggers properly
-        var updatedItems = items
-        for i in updatedItems.indices {
-            updatedItems[i].isSelected = false
-        }
-        items = updatedItems
-    }
-
-    func explainBrowserStorageReview() {
-        guard selectedCount > 0 else {
-            showToastMessage(L("safety.notice.noSelection"), type: .info)
-            return
-        }
-
-        publishSafetyNotice(safetyNoticePresenter.browserPrivacyReviewNotice())
-    }
-
-    func dismissToast() {
-        showToast = false
-        latestSafetyNotice = nil
-    }
-
-    private func publishSafetyNotice(_ notice: SafetyNoticeState) {
-        latestSafetyNotice = notice
-        presentToast(notice.message, type: .info)
-    }
-
-    private func showToastMessage(_ message: String, type: ToastType) {
-        latestSafetyNotice = nil
-        presentToast(message, type: type)
-    }
-
-    private func presentToast(_ message: String, type: ToastType) {
-        let presentationID = UUID()
-        toastPresentationID = presentationID
-        toastMessage = message
-        toastType = type
-        showToast = true
-
-        Task {
-            try? await Task.sleep(for: .seconds(3))
-            guard toastPresentationID == presentationID else { return }
-            dismissToast()
-        }
+    /// Stops an in-flight scan, for example when the page goes away.
+    func cancelScan() {
+        guard isScanning else { return }
+        scanTask?.cancel()
+        scanTask = nil
+        isScanning = false
     }
 }
 
@@ -150,12 +63,24 @@ class BrowserPrivacyViewModel: ObservableObject {
 
 struct BrowserPrivacyView: View {
     @ObservedObject var viewModel: BrowserPrivacyViewModel
+    let openExperience: () -> Void
+    let openPermissions: () -> Void
     @State private var expandedBrowser: BrowserType?
 
     private let privacyColor = Color.orange
 
     var body: some View {
         VStack(spacing: Theme.Spacing.lg) {
+            if viewModel.hasScanned && !viewModel.unreadableBrowsers.isEmpty {
+                ScanCoverageNotice(
+                    deniedText: LFormat(
+                        "privacy.coverage.denied %@",
+                        viewModel.unreadableBrowsers.map(\.rawValue).joined(separator: ", ")
+                    ),
+                    openPermissions: openPermissions
+                )
+            }
+
             if !viewModel.hasScanned && !viewModel.isScanning {
                 scanPromptSection
             } else if viewModel.items.isEmpty && viewModel.hasScanned {
@@ -163,35 +88,22 @@ struct BrowserPrivacyView: View {
             } else {
                 browserListSection
                 if !viewModel.items.isEmpty {
-                    reviewButtonSection
+                    ExperienceHandoffCard(openExperience: openExperience)
                 }
             }
         }
         .overlay {
             if viewModel.isScanning {
                 ScanningOverlay(
-                    progress: 0.5,
+                    progress: nil,
                     category: L("privacy.scanning"),
                     accentColor: privacyColor
                 )
             }
         }
-        .overlay {
-            if viewModel.showToast {
-                VStack {
-                    ToastView(
-                        message: viewModel.toastMessage,
-                        type: viewModel.toastType,
-                        safetyNotice: viewModel.latestSafetyNotice,
-                        onDismiss: viewModel.dismissToast
-                    )
-                    .padding(.top, Theme.Spacing.lg)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
+        .onDisappear {
+            viewModel.cancelScan()
         }
-        .animation(Theme.Animation.spring, value: viewModel.showToast)
     }
 
     // MARK: - Scan Prompt
@@ -257,17 +169,20 @@ struct BrowserPrivacyView: View {
 
     // MARK: - Empty State
 
+    /// No green check when a browser could not be read: the empty list may only be what was readable.
     private var emptyStateSection: some View {
-        VStack(spacing: Theme.Spacing.lg) {
-            Image(systemName: "checkmark.circle.fill")
+        let isComplete = viewModel.unreadableBrowsers.isEmpty
+        return VStack(spacing: Theme.Spacing.lg) {
+            Image(systemName: isComplete ? "checkmark.circle.fill" : "tray")
                 .font(Theme.Typography.size48)
-                .foregroundStyle(.green)
+                .foregroundStyle(isComplete ? .green : .secondary)
+                .accessibilityHidden(true)
 
             VStack(spacing: Theme.Spacing.xs) {
                 Text(L("privacy.empty.title"))
                     .font(Theme.Typography.size20Semibold)
 
-                Text(L("privacy.empty.description"))
+                Text(L(isComplete ? "privacy.empty.description" : "privacy.empty.incomplete"))
                     .font(Theme.Typography.size14)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -296,23 +211,6 @@ struct BrowserPrivacyView: View {
 
                 Spacer()
 
-                Button(L("diskCleaner.selectAll")) {
-                    viewModel.selectAll()
-                }
-                .buttonStyle(.plain)
-                .font(Theme.Typography.size12Medium)
-                .foregroundStyle(privacyColor)
-
-                Text("·")
-                    .foregroundStyle(.tertiary)
-
-                Button(L("diskCleaner.deselectAll")) {
-                    viewModel.deselectAll()
-                }
-                .buttonStyle(.plain)
-                .font(Theme.Typography.size12Medium)
-                .foregroundStyle(privacyColor)
-
                 Button(action: viewModel.scan) {
                     HStack(spacing: Theme.Spacing.xxs) {
                         Image(systemName: "arrow.clockwise")
@@ -340,52 +238,11 @@ struct BrowserPrivacyView: View {
                                 expandedBrowser = expandedBrowser == browser ? nil : browser
                             }
                         },
-                        onToggleItem: { item in
-                            viewModel.toggleSelection(item)
-                        },
-                        onToggleAll: {
-                            // If all selected, deselect all; otherwise select all
-                            let allSelected = browserItems.allSatisfy { $0.isSelected }
-                            if allSelected {
-                                viewModel.deselectAllForBrowser(browser)
-                            } else {
-                                viewModel.selectAllForBrowser(browser)
-                            }
-                        },
                         accentColor: privacyColor
                     )
                 }
             }
         }
-    }
-
-    // MARK: - Review Button
-
-    private var reviewButtonSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                Text(LFormat("diskCleaner.selected %@", viewModel.formattedSelectedSize))
-                    .font(Theme.Typography.size15Semibold)
-
-                Text(LFormat("diskCleaner.itemCount %lld", Int64(viewModel.selectedCount)))
-                    .font(Theme.Typography.size11)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            GlassActionButton(
-                LFormat("safety.notice.reviewSelected %@", viewModel.formattedSelectedSize),
-                icon: "info.circle.fill",
-                color: .blue,
-                disabled: viewModel.selectedCount == 0
-            ) {
-                viewModel.explainBrowserStorageReview()
-            }
-        }
-        .padding(Theme.Spacing.lg)
-        .glassCard()
-        .shadow(color: Color.blue.opacity(0.2), radius: 15, y: 5)
     }
 }
 
@@ -396,63 +253,16 @@ struct BrowserDataCard: View {
     let items: [BrowserDataItem]
     let isExpanded: Bool
     let onToggleExpand: () -> Void
-    let onToggleItem: (BrowserDataItem) -> Void
-    let onToggleAll: () -> Void
     let accentColor: Color
 
     var totalSize: Int64 {
         items.reduce(0) { $0 + $1.size }
     }
 
-    var selectedSize: Int64 {
-        items.filter { $0.isSelected }.reduce(0) { $0 + $1.size }
-    }
-
-    var allSelected: Bool {
-        items.allSatisfy { $0.isSelected }
-    }
-
-    var someSelected: Bool {
-        items.contains { $0.isSelected } && !allSelected
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack(spacing: 0) {
-                // Checkbox for selecting all - separate hit area
-                Button(action: onToggleAll) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                            .stroke(allSelected || someSelected ? accentColor : Color.secondary.opacity(0.5), lineWidth: 1.5)
-                            .frame(width: 20, height: 20)
-
-                        if allSelected {
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                                .fill(accentColor)
-                                .frame(width: 20, height: 20)
-
-                            Image(systemName: "checkmark")
-                                .font(Theme.Typography.size10Bold)
-                                .foregroundStyle(.white)
-                        } else if someSelected {
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                                .fill(accentColor.opacity(0.5))
-                                .frame(width: 20, height: 20)
-
-                            Image(systemName: "minus")
-                                .font(Theme.Typography.size10Bold)
-                                .foregroundStyle(.white)
-                        }
-                    }
-                    .padding(.leading, Theme.Spacing.md)
-                    .padding(.trailing, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                // Expandable area - everything else
                 HStack(spacing: Theme.Spacing.md) {
                     // Browser icon
                     ZStack {
@@ -478,27 +288,18 @@ struct BrowserDataCard: View {
                     Spacer()
 
                     // Size
-                    VStack(alignment: .trailing, spacing: Theme.Spacing.tiny) {
-                        Text(ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file))
-                            .font(Theme.Typography.size14Semibold)
-                            .foregroundStyle(accentColor)
-
-                        if selectedSize > 0 && selectedSize < totalSize {
-                            Text(LFormat("privacy.selected %@", ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)))
-                                .font(Theme.Typography.size11)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    Text(ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file))
+                        .font(Theme.Typography.size14Semibold)
+                        .foregroundStyle(accentColor)
 
                     // Expand indicator
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(Theme.Typography.size12Semibold)
                         .foregroundStyle(.tertiary)
                 }
-                .padding(.trailing, Theme.Spacing.md)
+                .padding(.horizontal, Theme.Spacing.md)
                 .padding(.vertical, Theme.Spacing.md)
-                .contentShape(Rectangle())
-                .onTapGesture(perform: onToggleExpand)
+                .expandButton(isExpanded: isExpanded, action: onToggleExpand)
             }
 
             // Expanded content
@@ -508,11 +309,7 @@ struct BrowserDataCard: View {
 
                 VStack(spacing: 0) {
                     ForEach(items) { item in
-                        BrowserDataItemRow(
-                            item: item,
-                            onToggle: { onToggleItem(item) },
-                            accentColor: accentColor
-                        )
+                        BrowserDataItemRow(item: item, accentColor: accentColor)
                     }
                 }
                 .padding(.vertical, Theme.Spacing.sm)
@@ -526,74 +323,52 @@ struct BrowserDataCard: View {
 
 struct BrowserDataItemRow: View {
     let item: BrowserDataItem
-    let onToggle: () -> Void
     let accentColor: Color
 
     var body: some View {
-        Button(action: onToggle) {
-            HStack(spacing: Theme.Spacing.sm) {
-                // Checkbox
-                ZStack {
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                        .stroke(item.isSelected ? accentColor : Color.white.opacity(0.3), lineWidth: 1.5)
-                        .frame(width: 18, height: 18)
+        HStack(spacing: Theme.Spacing.sm) {
+            // Icon
+            Image(systemName: item.dataType.icon)
+                .font(Theme.Typography.size14)
+                .foregroundStyle(accentColor.opacity(0.8))
+                .frame(width: 24)
 
-                    if item.isSelected {
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                            .fill(accentColor)
-                            .frame(width: 18, height: 18)
+            // Info
+            VStack(alignment: .leading, spacing: Theme.Spacing.tiny) {
+                HStack(spacing: Theme.Spacing.xxxs) {
+                    Text(item.dataType.rawValue)
+                        .font(Theme.Typography.size13Medium)
 
-                        Image(systemName: "checkmark")
-                            .font(Theme.Typography.size10Bold)
-                            .foregroundStyle(.white)
+                    // Warning indicator
+                    if let warning = item.dataType.warningLevel.message {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(Theme.Typography.size10)
+                            .foregroundStyle(.orange)
+                            .help(warning)
                     }
                 }
 
-                // Icon
-                Image(systemName: item.dataType.icon)
-                    .font(Theme.Typography.size14)
-                    .foregroundStyle(accentColor.opacity(0.8))
-                    .frame(width: 24)
-
-                // Info
-                VStack(alignment: .leading, spacing: Theme.Spacing.tiny) {
-                    HStack(spacing: Theme.Spacing.xxxs) {
-                        Text(item.dataType.rawValue)
-                            .font(Theme.Typography.size13Medium)
-
-                        // Warning indicator
-                        if let warning = item.dataType.warningLevel.message {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(Theme.Typography.size10)
-                                .foregroundStyle(.orange)
-                                .help(warning)
-                        }
-                    }
-
-                    Text(item.dataType.description)
-                        .font(Theme.Typography.size11)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                // Size
-                Text(item.formattedSize)
-                    .font(Theme.Typography.size12.monospacedDigit())
+                Text(item.dataType.description)
+                    .font(Theme.Typography.size11)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.vertical, Theme.Spacing.xs)
-            .contentShape(Rectangle())
+
+            Spacer()
+
+            // Size
+            Text(item.formattedSize)
+                .font(Theme.Typography.size12.monospacedDigit())
+                .foregroundStyle(.secondary)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.xs)
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    BrowserPrivacyView(viewModel: BrowserPrivacyViewModel())
+    BrowserPrivacyView(viewModel: BrowserPrivacyViewModel(), openExperience: {}, openPermissions: {})
         .frame(width: 600, height: 500)
 }

@@ -2,11 +2,28 @@ import SwiftUI
 
 // MARK: - Space Lens View
 
+/// The same content in both entry points: the Space Lens section and the Disk Cleaner tab.
 struct SpaceLensView: View {
     @ObservedObject var viewModel: SpaceLensViewModel
+    let openExperience: () -> Void
     @State private var isVisible = false
 
     var body: some View {
+        VStack(spacing: Theme.Spacing.lg) {
+            if let error = viewModel.errorMessage {
+                ScanErrorNotice(message: error)
+            }
+
+            lensContent
+
+            // Like every read-only list: this map cannot change anything.
+            if viewModel.rootNode != nil {
+                ExperienceHandoffCard(openExperience: openExperience)
+            }
+        }
+    }
+
+    private var lensContent: some View {
         ZStack {
             if viewModel.rootNode == nil && !viewModel.isScanning {
                 startScanSection
@@ -25,7 +42,7 @@ struct SpaceLensView: View {
                     accentColor: .blue,
                     onCancel: viewModel.cancelScan
                 )
-                .transition(.scale.combined(with: .opacity))
+                .motionTransition(.scale.combined(with: .opacity))
             }
         }
         .animation(Theme.Animation.springSmooth, value: viewModel.isScanning)
@@ -33,16 +50,18 @@ struct SpaceLensView: View {
             withAnimation(Theme.Animation.springSmooth) {
                 isVisible = true
             }
+            viewModel.viewDidAppear()
         }
         .onDisappear {
-            viewModel.cancelScan()
+            viewModel.viewDidDisappear()
         }
     }
 
     // MARK: - Main Content
 
     private func mainContent(_ currentNode: FileNode) -> some View {
-        HStack(spacing: 0) {
+        let children = viewModel.currentChildren
+        return HStack(spacing: 0) {
             // Sidebar with file list
             sidebarView(currentNode)
                 .frame(width: 280)
@@ -56,24 +75,30 @@ struct SpaceLensView: View {
 
                 // Bubbles
                 GeometryReader { geometry in
-                    BubblePackingView(
-                        nodes: viewModel.currentChildren,
-                        parentSize: currentNode.size,
-                        size: geometry.size,
-                        onSelect: { node in
-                            if node.isDirectory {
-                                viewModel.navigateTo(node)
-                            }
-                        },
-                        onHover: { viewModel.hoverNode($0) },
-                        highlightedNodeId: viewModel.hoveredNode?.id
-                    )
+                    HoverObserving(hover: viewModel.hover) { hovered in
+                        BubblePackingView(
+                            nodes: children,
+                            parentSize: currentNode.size,
+                            size: geometry.size,
+                            onSelect: { node in
+                                if node.isDirectory {
+                                    viewModel.navigateTo(node)
+                                }
+                            },
+                            onHover: { viewModel.hoverNode($0) },
+                            highlightedNodeId: hovered?.id
+                        )
+                    }
+                    // The file list carries the same items with names, sizes and actions.
+                    .accessibilityHidden(true)
                 }
                 .padding(Theme.Spacing.md)
                 .id("\(viewModel.sizeFilter.rawValue)-\(viewModel.ageFilter.rawValue)") // Force rebuild on filter change
 
                 // Bottom bar
-                bottomBar
+                HoverObserving(hover: viewModel.hover) { hovered in
+                    bottomBar(hovered)
+                }
             }
         }
     }
@@ -107,30 +132,37 @@ struct SpaceLensView: View {
                 Spacer()
             }
             .padding(Theme.Spacing.md)
-            .background(Color.white.opacity(0.03))
+            .background(Theme.Colors.subtleFill)
 
-            // File list
-            ScrollView {
-                LazyVStack(spacing: Theme.Spacing.tiny) {
-                    ForEach(currentNode.children.sorted(by: { $0.size > $1.size })) { child in
-                        SidebarFileRow(
-                            node: child,
-                            isHovered: viewModel.hoveredNode?.id == child.id,
-                            onTap: {
-                                if child.isDirectory {
-                                    viewModel.navigateTo(child)
+            // File list (children are sorted by size when the tree is built)
+            HoverObserving(hover: viewModel.hover) { hovered in
+                ScrollView {
+                    LazyVStack(spacing: Theme.Spacing.tiny) {
+                        ForEach(currentNode.children) { child in
+                            SidebarFileRow(
+                                node: child,
+                                isHovered: hovered?.id == child.id,
+                                onTap: {
+                                    if child.isDirectory {
+                                        viewModel.navigateTo(child)
+                                    }
+                                },
+                                onHover: { hovering in
+                                    // Leaving one row must not clear a row that just gained hover or focus.
+                                    if hovering {
+                                        viewModel.hoverNode(child)
+                                    } else if viewModel.hover.node?.id == child.id {
+                                        viewModel.hoverNode(nil)
+                                    }
+                                },
+                                onInfo: {
+                                    viewModel.revealInFinder(child)
                                 }
-                            },
-                            onHover: { hovering in
-                                viewModel.hoverNode(hovering ? child : nil)
-                            },
-                            onInfo: {
-                                viewModel.revealInFinder(child)
-                            }
-                        )
+                            )
+                        }
                     }
+                    .padding(.vertical, Theme.Spacing.sm)
                 }
-                .padding(.vertical, Theme.Spacing.sm)
             }
         }
     }
@@ -147,11 +179,13 @@ struct SpaceLensView: View {
                         .font(Theme.Typography.size14Semibold)
                         .foregroundStyle(viewModel.navigationStack.count > 1 ? .primary : .tertiary)
                         .frame(width: 32, height: 32)
-                        .background(Color.white.opacity(0.08))
+                        .background(Theme.Colors.surfaceMedium)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
                 }
                 .buttonStyle(.plain)
                 .disabled(viewModel.navigationStack.count <= 1)
+                .help(L("spaceLens.back"))
+                .accessibilityLabel(L("spaceLens.back"))
 
                 Spacer()
 
@@ -187,10 +221,12 @@ struct SpaceLensView: View {
                         .font(Theme.Typography.size12)
                         .foregroundStyle(.secondary)
                         .frame(width: 32, height: 32)
-                        .background(Color.white.opacity(0.08))
+                        .background(Theme.Colors.surfaceMedium)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
                 }
                 .buttonStyle(.plain)
+                .help(L("spaceLens.rescan"))
+                .accessibilityLabel(L("spaceLens.rescan"))
             }
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.vertical, Theme.Spacing.sm)
@@ -203,7 +239,7 @@ struct SpaceLensView: View {
                         .font(Theme.Typography.size10)
                         .foregroundStyle(.secondary)
 
-                    Picker("", selection: $viewModel.sizeFilter) {
+                    Picker(L("spaceLens.filter.size"), selection: $viewModel.sizeFilter) {
                         ForEach(SizeFilter.allCases, id: \.self) { filter in
                             Text(filter.localizedName).tag(filter)
                         }
@@ -214,7 +250,7 @@ struct SpaceLensView: View {
                 }
                 .padding(.horizontal, Theme.Spacing.sm)
                 .padding(.vertical, Theme.Spacing.xxs)
-                .background(viewModel.sizeFilter != .all ? Color.blue.opacity(0.15) : Color.white.opacity(0.05))
+                .background(viewModel.sizeFilter != .all ? Color.blue.opacity(0.15) : Theme.Colors.surfaceLight)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
 
                 // Age filter
@@ -223,7 +259,7 @@ struct SpaceLensView: View {
                         .font(Theme.Typography.size10)
                         .foregroundStyle(.secondary)
 
-                    Picker("", selection: $viewModel.ageFilter) {
+                    Picker(L("spaceLens.filter.age"), selection: $viewModel.ageFilter) {
                         ForEach(AgeFilter.allCases, id: \.self) { filter in
                             Text(filter.localizedName).tag(filter)
                         }
@@ -234,7 +270,7 @@ struct SpaceLensView: View {
                 }
                 .padding(.horizontal, Theme.Spacing.sm)
                 .padding(.vertical, Theme.Spacing.xxs)
-                .background(viewModel.ageFilter != .all ? Color.orange.opacity(0.15) : Color.white.opacity(0.05))
+                .background(viewModel.ageFilter != .all ? Color.orange.opacity(0.15) : Theme.Colors.surfaceLight)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
 
                 // Clear filters button
@@ -268,16 +304,16 @@ struct SpaceLensView: View {
             }
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.vertical, Theme.Spacing.xs)
-            .background(Color.white.opacity(0.02))
+            .background(Theme.Colors.subtleFill)
         }
-        .background(Color.white.opacity(0.03))
+        .background(Theme.Colors.subtleFill)
     }
 
     // MARK: - Bottom Bar
 
-    private var bottomBar: some View {
+    private func bottomBar(_ hovered: FileNode?) -> some View {
         HStack {
-            if let hovered = viewModel.hoveredNode {
+            if let hovered {
                 HStack(spacing: Theme.Spacing.sm) {
                     Image(systemName: hovered.icon)
                         .foregroundStyle(hovered.color)
@@ -332,7 +368,7 @@ struct SpaceLensView: View {
             }
         }
         .padding(Theme.Spacing.md)
-        .background(Color.white.opacity(0.03))
+        .background(Theme.Colors.subtleFill)
     }
 
     private func legendItem(color: Color, label: String) -> some View {
@@ -379,6 +415,13 @@ struct SpaceLensView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 400)
+
+                // Home's Large Files link sets the size filter before any scan.
+                if viewModel.sizeFilter != .all {
+                    Text(LFormat("spaceLens.filter.preset %@", viewModel.sizeFilter.localizedName))
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             GlassActionButton(
@@ -395,9 +438,22 @@ struct SpaceLensView: View {
     }
 }
 
+// MARK: - Hover Observing
+
+/// Re-renders only its content when the hover changes, so a pointer move does not re-render the
+/// whole page (or the Disk Cleaner view that hosts it).
+private struct HoverObserving<Content: View>: View {
+    @ObservedObject var hover: SpaceLensHover
+    @ViewBuilder let content: (FileNode?) -> Content
+
+    var body: some View {
+        content(hover.node)
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
-    SpaceLensView(viewModel: SpaceLensViewModel())
+    SpaceLensView(viewModel: SpaceLensViewModel(), openExperience: {})
         .frame(width: 1000, height: 700)
 }

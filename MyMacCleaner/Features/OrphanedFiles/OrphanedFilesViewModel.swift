@@ -8,17 +8,24 @@ class OrphanedFilesViewModel: ObservableObject {
     @Published var hasScanned = false
     @Published var scanProgress: Double = 0
     @Published var currentScanCategory: String = ""
+    /// True when leaving the page stopped the last scan; cleared by the next scan or result.
+    @Published private(set) var scanStoppedByLeaving = false
 
-    @Published var orphanedFiles: [OrphanedFile] = []
-
-    @Published var showToast = false
-    @Published var toastMessage = ""
-    @Published var toastType: ToastType = .success
-    @Published private(set) var latestSafetyNotice: SafetyNoticeState?
+    @Published var orphanedFiles: [OrphanedFile] = [] {
+        didSet { indexFiles() }
+    }
 
     @Published var expandedCategory: OrphanCategory?
-    @Published var searchText = ""
-    @Published var sortOrder: SortOrder = .sizeDescending
+    @Published var searchText = "" {
+        didSet { scheduleSearch() }
+    }
+    @Published var sortOrder: SortOrder = .sizeDescending {
+        didSet { refreshGroups() }
+    }
+
+    /// Derived from the inputs above when they change, not several times per render.
+    @Published private(set) var filesByCategory: [OrphanCategory: [OrphanedFile]] = [:]
+    @Published private(set) var categoriesWithFiles: [OrphanCategory] = []
 
     // MARK: - Enums
 
@@ -40,18 +47,47 @@ class OrphanedFilesViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Computed Properties
+    // MARK: - Derived Groups
 
-    var filteredFiles: [OrphanedFile] {
+    /// Lower-cased name, app name and bundle ID of each file, built once per scan result.
+    private var searchKeys: [UUID: [String]] = [:]
+    /// The query the groups are filtered with; it trails `searchText` by `Theme.Timing.searchDebounce`.
+    private var appliedQuery = ""
+    /// Readable so tests can await the debounced search instead of sleeping.
+    private(set) var searchTask: Task<Void, Never>?
+
+    private func indexFiles() {
+        searchKeys = Dictionary(uniqueKeysWithValues: orphanedFiles.map { file in
+            (file.id, [file.name, file.suspectedAppName, file.bundleIdPattern].compactMap { $0?.lowercased() })
+        })
+        refreshGroups()
+    }
+
+    /// Waits for typing to pause; clearing the field applies at once.
+    private func scheduleSearch() {
+        searchTask?.cancel()
+        let query = searchText.lowercased()
+        guard !query.isEmpty else {
+            searchTask = nil
+            appliedQuery = query
+            refreshGroups()
+            return
+        }
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Theme.Timing.searchDebounce)
+            guard !Task.isCancelled, let self else { return }
+            self.appliedQuery = query
+            self.refreshGroups()
+        }
+    }
+
+    private func refreshGroups() {
         var result = orphanedFiles
 
         // Apply search filter
-        if !searchText.isEmpty {
-            let query = searchText.lowercased()
-            result = result.filter {
-                $0.name.lowercased().contains(query) ||
-                $0.suspectedAppName.lowercased().contains(query) ||
-                ($0.bundleIdPattern?.lowercased().contains(query) ?? false)
+        if !appliedQuery.isEmpty {
+            result = result.filter { file in
+                searchKeys[file.id]?.contains { $0.contains(appliedQuery) } ?? false
             }
         }
 
@@ -69,23 +105,15 @@ class OrphanedFilesViewModel: ObservableObject {
             result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         }
 
-        return result
+        let grouped = Dictionary(grouping: result, by: \.category)
+        filesByCategory = grouped
+        categoriesWithFiles = OrphanCategory.allCases.filter { grouped[$0]?.isEmpty == false }
     }
 
-    var filesByCategory: [OrphanCategory: [OrphanedFile]] {
-        Dictionary(grouping: filteredFiles, by: { $0.category })
-    }
+    // MARK: - Computed Properties
 
     var totalSize: Int64 {
         orphanedFiles.reduce(0) { $0 + $1.size }
-    }
-
-    var selectedSize: Int64 {
-        orphanedFiles.filter { $0.isSelected }.reduce(0) { $0 + $1.size }
-    }
-
-    var selectedCount: Int {
-        orphanedFiles.filter { $0.isSelected }.count
     }
 
     var totalCount: Int {
@@ -96,43 +124,48 @@ class OrphanedFilesViewModel: ObservableObject {
         ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
     }
 
-    var formattedSelectedSize: String {
-        ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)
-    }
-
-    var categoriesWithFiles: [OrphanCategory] {
-        OrphanCategory.allCases.filter { category in
-            filesByCategory[category]?.isEmpty == false
-        }
+    /// True when there are results but the search hides all of them.
+    var hasNoSearchMatches: Bool {
+        !orphanedFiles.isEmpty && categoriesWithFiles.isEmpty
     }
 
     // MARK: - Scanner
 
-    private let scanner = OrphanedFilesScanner.shared
-    private let safetyNoticePresenter = SafetyNoticePresenter()
-    private var toastPresentationID = UUID()
+    typealias Scan = @Sendable (
+        _ progress: @escaping @Sendable @MainActor (Double, String) -> Void
+    ) async -> [OrphanedFile]
+
+    private let scan: Scan
     /// Readable so tests can await a cancelled scan instead of sleeping.
     private(set) var scanTask: Task<Void, Never>?
+    /// Bumped by every start and cancel, so updates from an older scan are ignored.
+    private var scanGeneration: UInt64 = 0
+
+    init(scan: @escaping Scan = { await OrphanedFilesScanner.shared.scan(progress: $0) }) {
+        self.scan = scan
+    }
 
     // MARK: - Actions
 
     func startScan() {
         guard !isScanning else { return }
 
+        // The last results stay until this scan finishes, so leaving the page or Cancel keeps them.
         isScanning = true
-        hasScanned = false
         scanProgress = 0
-        orphanedFiles = []
+        scanStoppedByLeaving = false
+        scanGeneration &+= 1
+        let generation = scanGeneration
 
-        scanTask = Task { [scanner] in
-            let results = await scanner.scan { progress, category in
+        scanTask = Task { [scan] in
+            let results = await scan { progress, category in
                 Task { @MainActor in
-                    guard self.isScanning else { return }
+                    guard generation == self.scanGeneration else { return }
                     self.scanProgress = progress
                     self.currentScanCategory = category
                 }
             }
-            guard !Task.isCancelled else { return }
+            guard generation == scanGeneration, !Task.isCancelled else { return }
 
             orphanedFiles = results
             hasScanned = true
@@ -140,9 +173,17 @@ class OrphanedFilesViewModel: ObservableObject {
         }
     }
 
-    /// Stops an in-flight scan; nothing is reported as scanned.
+    /// Leaving the page stops a running scan and remembers that it did, so the page can say so.
+    func leavePage() {
+        guard isScanning else { return }
+        cancelScan()
+        scanStoppedByLeaving = true
+    }
+
+    /// Stops an in-flight scan; its partial results are dropped and the last completed ones stay.
     func cancelScan() {
         guard isScanning else { return }
+        scanGeneration &+= 1
         scanTask?.cancel()
         finishScan()
         scanProgress = 0
@@ -151,44 +192,6 @@ class OrphanedFilesViewModel: ObservableObject {
     private func finishScan() {
         scanTask = nil
         isScanning = false
-    }
-
-    func toggleSelection(_ file: OrphanedFile) {
-        if let index = orphanedFiles.firstIndex(where: { $0.id == file.id }) {
-            orphanedFiles[index].isSelected.toggle()
-        }
-    }
-
-    func toggleCategorySelection(_ category: OrphanCategory) {
-        let categoryFiles = orphanedFiles.filter { $0.category == category }
-        let allSelected = categoryFiles.allSatisfy { $0.isSelected }
-
-        // Create a mutable copy to ensure @Published triggers properly
-        var updatedFiles = orphanedFiles
-        for i in updatedFiles.indices {
-            if updatedFiles[i].category == category {
-                updatedFiles[i].isSelected = !allSelected
-            }
-        }
-        orphanedFiles = updatedFiles
-    }
-
-    func selectAll() {
-        // Create a mutable copy to ensure @Published triggers properly and avoid mutation during iteration
-        var updatedFiles = orphanedFiles
-        for i in updatedFiles.indices {
-            updatedFiles[i].isSelected = true
-        }
-        orphanedFiles = updatedFiles
-    }
-
-    func deselectAll() {
-        // Create a mutable copy to ensure @Published triggers properly and avoid mutation during iteration
-        var updatedFiles = orphanedFiles
-        for i in updatedFiles.indices {
-            updatedFiles[i].isSelected = false
-        }
-        orphanedFiles = updatedFiles
     }
 
     func toggleCategoryExpansion(_ category: OrphanCategory) {
@@ -201,47 +204,11 @@ class OrphanedFilesViewModel: ObservableObject {
         }
     }
 
-    func explainOrphanReview() {
-        guard selectedCount > 0 else {
-            showToastMessage(L("safety.notice.noSelection"), type: .info)
-            return
-        }
-
-        publishSafetyNotice(
-            safetyNoticePresenter.orphanedStorageReviewNotice()
-        )
+    func clearSearch() {
+        searchText = ""
     }
 
     func revealInFinder(_ file: OrphanedFile) {
         NSWorkspace.shared.selectFile(file.url.path, inFileViewerRootedAtPath: file.url.deletingLastPathComponent().path)
-    }
-
-    func dismissToast() {
-        showToast = false
-        latestSafetyNotice = nil
-    }
-
-    private func publishSafetyNotice(_ notice: SafetyNoticeState) {
-        latestSafetyNotice = notice
-        presentToast(notice.message, type: .info)
-    }
-
-    private func showToastMessage(_ message: String, type: ToastType) {
-        latestSafetyNotice = nil
-        presentToast(message, type: type)
-    }
-
-    private func presentToast(_ message: String, type: ToastType) {
-        let presentationID = UUID()
-        toastPresentationID = presentationID
-        toastMessage = message
-        toastType = type
-        showToast = true
-
-        Task {
-            try? await Task.sleep(for: .seconds(3))
-            guard toastPresentationID == presentationID else { return }
-            dismissToast()
-        }
     }
 }

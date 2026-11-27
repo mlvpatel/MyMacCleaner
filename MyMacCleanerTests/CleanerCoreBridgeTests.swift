@@ -25,18 +25,16 @@ struct CleanerCoreBridgeTests {
                 from: projection,
                 declaredRootID: rootID,
                 declaredRootURL: rootURL,
-                category: .xcodeData
+                category: .caches
             )
 
-            #expect(snapshot.state == .partial(issues: [.init(issue)]))
             #expect(snapshot.result.items.count == 1)
-            #expect(snapshot.result.isSelected == false)
-            #expect(snapshot.result.items[0].isSelected == false)
             #expect(snapshot.result.items[0].name == "llama.gguf")
             #expect(snapshot.result.items[0].path.path == rootURL.appendingPathComponent("models/llama.gguf").path)
             #expect(snapshot.result.items[0].size == 2048)
-            #expect(snapshot.result.items[0].modificationDate == nil)
-            #expect(snapshot.result.items[0].category == .xcodeData)
+            // The modification instant observed by the scan is shown, not "Unknown".
+            #expect(snapshot.result.items[0].modificationDate == Date(timeIntervalSince1970: 42 / 1_000_000_000))
+            #expect(snapshot.result.items[0].category == .caches)
         }
     }
 
@@ -52,7 +50,7 @@ struct CleanerCoreBridgeTests {
                 from: projection,
                 declaredRootID: rootID,
                 declaredRootURL: FileManager.default.temporaryDirectory,
-                category: .userCache
+                category: .caches
             )
         }
     }
@@ -71,7 +69,7 @@ struct CleanerCoreBridgeTests {
                 from: projection,
                 declaredRootID: rootID,
                 declaredRootURL: URL(string: "https://example.invalid/root")!,
-                category: .userCache
+                category: .caches
             )
         }
 
@@ -82,7 +80,7 @@ struct CleanerCoreBridgeTests {
                     from: projection,
                     declaredRootID: rootID,
                     declaredRootURL: rootURL,
-                    category: .userCache
+                    category: .caches
                 )
             }
         }
@@ -107,7 +105,7 @@ struct CleanerCoreBridgeTests {
                     from: projection,
                     declaredRootID: rootID,
                     declaredRootURL: rootURL.appendingPathComponent("missing-root", isDirectory: true),
-                    category: .userCache
+                    category: .caches
                 )
             }
             #expect(throws: CleanerCoreBridgeError.metadataUnavailable) {
@@ -115,7 +113,7 @@ struct CleanerCoreBridgeTests {
                     from: projection,
                     declaredRootID: rootID,
                     declaredRootURL: rootURL,
-                    category: .userCache
+                    category: .caches
                 )
             }
         }
@@ -162,7 +160,7 @@ struct CleanerCoreBridgeTests {
                 from: projectionForSymlinkRoot,
                 declaredRootID: rootID,
                 declaredRootURL: symlinkRoot,
-                category: .userCache
+                category: .caches
             )
         }
         #expect(throws: CleanerCoreBridgeError.symlinkBoundary) {
@@ -170,7 +168,7 @@ struct CleanerCoreBridgeTests {
                 from: projectionForChildEscape,
                 declaredRootID: rootID,
                 declaredRootURL: realRoot,
-                category: .userCache
+                category: .caches
             )
         }
     }
@@ -207,7 +205,7 @@ struct CleanerCoreBridgeTests {
                 from: projection,
                 declaredRootID: rootID,
                 declaredRootURL: realRoot,
-                category: .userCache
+                category: .caches
             )
         }
     }
@@ -240,10 +238,7 @@ struct CleanerCoreBridgeTests {
                 category: .downloads
             )
 
-            #expect(snapshot.state == .complete)
-            #expect(snapshot.result.isSelected == false)
             #expect(snapshot.result.items.count == 1)
-            #expect(snapshot.result.items[0].isSelected == false)
             #expect(snapshot.result.items[0].path == rootURL.appendingPathComponent("large.bin"))
         }
     }

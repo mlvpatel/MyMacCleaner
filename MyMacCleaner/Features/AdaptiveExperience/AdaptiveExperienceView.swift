@@ -8,6 +8,9 @@ struct AdaptiveExperienceView: View {
     var body: some View {
         ExperienceDashboardView(viewModel: viewModel)
             .accessibilityIdentifier("adaptive.dashboard")
+            .overlay {
+                ToastOverlay(presenter: viewModel.toasts)
+            }
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Picker(L("adaptive.mode.title"), selection: modeBinding) {
@@ -27,7 +30,16 @@ struct AdaptiveExperienceView: View {
                     .disabled(viewModel.isRefreshing)
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    if viewModel.isRefreshing {
+                    // Stop stays reachable after the review sheet is closed.
+                    if viewModel.isExecuting {
+                        Button(L("adaptive.execution.stop")) {
+                            viewModel.dispatch(.cancel)
+                        }
+                        .accessibilityIdentifier("adaptive.toolbar.execution.stop")
+                        .accessibilityHint(L("adaptive.execution.stop.hint"))
+                        .keyboardShortcut(".", modifiers: .command)
+                        .disabled(viewModel.isStopRequested)
+                    } else if viewModel.isRefreshing {
                         Button(L("adaptive.scan.stop")) {
                             viewModel.dispatch(.cancel)
                         }
@@ -41,7 +53,7 @@ struct AdaptiveExperienceView: View {
                         .accessibilityIdentifier("adaptive.evidence.refresh")
                         .accessibilityHint(L("adaptive.refresh.hint"))
                         .keyboardShortcut("r", modifiers: .command)
-                        .disabled(viewModel.isExecuting)
+                        .help(L("adaptive.refresh.hint"))
                     }
                 }
             }
@@ -49,8 +61,17 @@ struct AdaptiveExperienceView: View {
                 sheetView(sheet)
             }
             .animation(reduceMotion ? nil : Theme.Animation.spring, value: viewModel.snapshot?.mode)
-            .task {
-                viewModel.dispatch(.refresh)
+            .onAppear {
+                viewModel.pageAppeared()
+            }
+            .onDisappear {
+                viewModel.pageDisappeared()
+            }
+            .onChange(of: viewModel.showOnboarding) { _, isShowing in
+                // The first load waits for onboarding, then runs as the sheet closes.
+                if !isShowing {
+                    viewModel.pageAppeared()
+                }
             }
     }
 
@@ -84,11 +105,33 @@ struct AdaptiveExperienceView: View {
         case .receipts:
             ReceiptRecoveryView(viewModel: viewModel)
         case .permissionHelp:
-            ProtectedDataNotice(
-                titleKey: "adaptive.permission.title",
-                messageKey: "adaptive.permission.body"
-            )
-            .accessibilityIdentifier("adaptive.warning.permission")
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                ProtectedDataNotice(
+                    titleKey: "adaptive.permission.title",
+                    messageKey: "adaptive.permission.body"
+                )
+                .accessibilityIdentifier("adaptive.warning.permission")
+                HStack(spacing: Theme.Spacing.sm) {
+                    // Full Disk Access covers both gaps: the protected folders and the user Library.
+                    Button(L("adaptive.permission.openSettings")) {
+                        PermissionsService.shared.openFullDiskAccessSettings()
+                        viewModel.dismissSheet()
+                    }
+                    .accessibilityIdentifier("adaptive.permission.openSettings")
+                    .accessibilityHint(L("adaptive.permission.openSettings.hint"))
+                    .keyboardShortcut(.defaultAction)
+                    Button(L("adaptive.permission.close")) {
+                        viewModel.dismissSheet()
+                    }
+                    .accessibilityIdentifier("adaptive.permission.close")
+                    .accessibilityHint(L("adaptive.permission.close.hint"))
+                    .keyboardShortcut(.cancelAction)
+                }
+            }
+            .padding(Theme.Spacing.lg)
+            .frame(minWidth: 420)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("adaptive.permission.sheet")
         }
     }
 }
@@ -129,6 +172,7 @@ struct AdaptiveOnboardingView: View {
         }
         .padding(Theme.Spacing.lg)
         .frame(minWidth: 480, minHeight: 320)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("adaptive.onboarding.sheet")
     }
 }

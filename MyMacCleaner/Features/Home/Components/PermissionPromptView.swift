@@ -7,8 +7,6 @@ struct PermissionPromptView: View {
     let onDismiss: () -> Void
     let onContinueWithoutPermission: () -> Void
 
-    @State private var isVisible = false
-
     var body: some View {
         VStack(spacing: Theme.Spacing.xl) {
             // Icon
@@ -25,14 +23,8 @@ struct PermissionPromptView: View {
         }
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: 500)
-        .glassCardProminent()
-        .opacity(isVisible ? 1 : 0)
-        .scaleEffect(isVisible ? 1 : 0.9)
-        .onAppear {
-            withAnimation(Theme.Animation.springSmooth) {
-                isVisible = true
-            }
-        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home.permission.sheet")
     }
 
     // MARK: - Icon Section
@@ -135,67 +127,22 @@ struct PermissionPromptView: View {
             }
             .buttonStyle(.plain)
 
-            // Dismiss button for later
+            // Said before the scan starts, so the macOS folder prompts are expected.
+            Text(L("permissions.fda.limitedScan.folders"))
+                .font(Theme.Typography.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            // Dismiss button for later; Escape closes the sheet the same way
             Button(action: onDismiss) {
                 Text(L("permissions.fda.later"))
                     .font(Theme.Typography.caption)
                     .foregroundStyle(.tertiary)
             }
             .buttonStyle(.plain)
+            .keyboardShortcut(.cancelAction)
+            .accessibilityIdentifier("home.permission.later")
         }
-    }
-}
-
-// MARK: - Compact Permission Banner
-
-struct PermissionBanner: View {
-    @ObservedObject var permissionsService: PermissionsService
-
-    @State private var isHovered = false
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            // Icon
-            ZStack {
-                RoundedRectangle(cornerRadius: Theme.CornerRadius.medium)
-                    .fill(Color.orange.opacity(0.15))
-                    .frame(width: 44, height: 44)
-
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(Theme.Typography.size18Semibold)
-                    .foregroundStyle(.orange)
-            }
-
-            // Text
-            VStack(alignment: .leading, spacing: Theme.Spacing.tiny) {
-                Text(L("permissions.banner.limited"))
-                    .font(Theme.Typography.subheadline)
-
-                Text(L("permissions.banner.description"))
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            // Grant button
-            GlassActionButton(
-                L("permissions.banner.grant"),
-                icon: nil,
-                color: .orange
-            ) {
-                permissionsService.openFullDiskAccessSettings()
-            }
-        }
-        .padding(Theme.Spacing.md)
-        .glassCard()
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.CornerRadius.large)
-                .strokeBorder(Color.orange.opacity(0.3), lineWidth: 1)
-        )
-        .scaleEffect(isHovered ? 1.01 : 1.0)
-        .animation(Theme.Animation.fast, value: isHovered)
-        .onHover { isHovered = $0 }
     }
 }
 
@@ -213,12 +160,4 @@ struct PermissionBanner: View {
         )
     }
     .frame(width: 600, height: 700)
-}
-
-#Preview("Permission Banner") {
-    VStack {
-        PermissionBanner(permissionsService: PermissionsService.shared)
-    }
-    .padding()
-    .frame(width: 500, height: 200)
 }

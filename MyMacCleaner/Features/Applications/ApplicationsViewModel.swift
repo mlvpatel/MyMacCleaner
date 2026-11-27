@@ -51,6 +51,7 @@ class ApplicationsViewModel: ObservableObject {
     private var discoveryTask: Task<Void, Never>?
     private var analysisTask: Task<Void, Never>?
     private let homebrewService = HomebrewService()
+    private let appFolders: [URL]
 
     // MARK: - Computed Properties
 
@@ -101,8 +102,9 @@ class ApplicationsViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init() {
-        // Don't auto-start - will be triggered by view
+    /// Discovery doesn't auto-start; the view triggers it.
+    init(appFolders: [URL] = InstalledApplications.folders) {
+        self.appFolders = appFolders
     }
 
     // MARK: - Public Methods
@@ -115,6 +117,7 @@ class ApplicationsViewModel: ObservableObject {
 
         discoveryTask = Task(priority: .background) {
             await discoverApplications()
+            guard !Task.isCancelled else { return }
 
             await MainActor.run {
                 discoveryState = .completed
@@ -126,28 +129,48 @@ class ApplicationsViewModel: ObservableObject {
     func startFullAnalysis() {
         guard analysisState == .idle else { return }
 
-        // If discovery hasn't finished, wait for it
-        if discoveryState == .discovering {
-            // Cancel low-priority discovery and restart with high priority
+        // Sizing a partly discovered list would present it as complete, so unfinished discovery
+        // restarts here at high priority; apps already found are kept.
+        let needsDiscovery = discoveryState != .completed
+        if needsDiscovery {
             discoveryTask?.cancel()
+            discoveryTask = nil
+            discoveryState = .discovering
         }
 
         analysisState = .analyzing
         analysisProgress = 0
 
         analysisTask = Task(priority: .userInitiated) {
-            // If we don't have apps yet, discover them first
-            if applications.isEmpty {
+            if needsDiscovery {
                 await discoverApplications()
+                guard !Task.isCancelled else { return }
+                discoveryState = .completed
             }
 
             // Now calculate sizes for all apps
             await calculateAllSizes()
+            guard !Task.isCancelled else { return }
 
             await MainActor.run {
-                discoveryState = .completed
                 analysisState = .completed
             }
+        }
+    }
+
+    /// Leaving the page stops discovery and size analysis; the next visit starts them again.
+    func stopWork() {
+        discoveryTask?.cancel()
+        analysisTask?.cancel()
+        discoveryTask = nil
+        analysisTask = nil
+        if discoveryState == .discovering {
+            discoveryState = .idle
+        }
+        if analysisState == .analyzing {
+            analysisState = .idle
+            analysisProgress = 0
+            currentAppBeingAnalyzed = ""
         }
     }
 
@@ -213,38 +236,21 @@ class ApplicationsViewModel: ObservableObject {
 
     /// Quick discovery - just find apps without calculating sizes
     private func discoverApplications() async {
-        let applicationPaths = [
-            "/Applications",
-            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path
-        ]
+        for itemURL in InstalledApplications.bundleURLs(in: appFolders) {
+            // Check if cancelled
+            if Task.isCancelled { return }
 
-        for path in applicationPaths {
-            let url = URL(fileURLWithPath: path)
-
-            guard let contents = try? FileManager.default.contentsOfDirectory(
-                at: url,
-                includingPropertiesForKeys: [.contentModificationDateKey, .addedToDirectoryDateKey],
-                options: [.skipsHiddenFiles]
-            ) else { continue }
-
-            for itemURL in contents {
-                // Check if cancelled
-                if Task.isCancelled { return }
-
-                guard itemURL.pathExtension == "app" else { continue }
-
-                if let appInfo = await createAppInfoQuick(from: itemURL) {
-                    await MainActor.run {
-                        // Only add if not already present
-                        if !applications.contains(where: { $0.url == appInfo.url }) {
-                            applications.append(appInfo)
-                        }
+            if let appInfo = await createAppInfoQuick(from: itemURL) {
+                await MainActor.run {
+                    // Only add if not already present
+                    if !applications.contains(where: { $0.url == appInfo.url }) {
+                        applications.append(appInfo)
                     }
                 }
-
-                // Small yield to keep UI responsive
-                await Task.yield()
             }
+
+            // Small yield to keep UI responsive
+            await Task.yield()
         }
     }
 
@@ -308,45 +314,9 @@ class ApplicationsViewModel: ObservableObject {
         }
     }
 
-    private func calculateDirectorySize(_ url: URL) async -> Int64 {
-        // Collect file URLs synchronously to avoid Swift 6 async iterator issues
-        let fileURLs: [URL] = await Task.detached {
-            var urls: [URL] = []
-            guard let enumerator = FileManager.default.enumerator(
-                at: url,
-                includingPropertiesForKeys: [.fileSizeKey, .totalFileAllocatedSizeKey],
-                options: [.skipsHiddenFiles]
-            ) else { return urls }
-
-            // Use while let instead of for-in to avoid makeIterator() async issue
-            while let element = enumerator.nextObject() {
-                if let fileURL = element as? URL {
-                    urls.append(fileURL)
-                }
-            }
-            return urls
-        }.value
-
-        var totalSize: Int64 = 0
-        var fileCount = 0
-
-        for fileURL in fileURLs {
-            if Task.isCancelled { return totalSize }
-
-            guard let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .totalFileAllocatedSizeKey]) else {
-                continue
-            }
-
-            totalSize += Int64(resourceValues.totalFileAllocatedSize ?? resourceValues.fileSize ?? 0)
-
-            // Yield occasionally to keep responsive
-            fileCount += 1
-            if fileCount % 100 == 0 {
-                await Task.yield()
-            }
-        }
-
-        return totalSize
+    /// Nonisolated, so the walk runs off the main actor and still stops when the analysis is cancelled.
+    nonisolated private func calculateDirectorySize(_ url: URL) async -> Int64 {
+        DirectorySize.allocatedBytes(at: url) ?? 0
     }
 
 }

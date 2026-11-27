@@ -439,6 +439,9 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "MyMacCleaner reads your Desktop folder to show large files and the space they use. It never changes or moves these files, and nothing leaves your Mac.";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "MyMacCleaner reads your Documents folder to show large files and the space they use. It never changes or moves these files, and nothing leaves your Mac.";
+				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "MyMacCleaner reads your Downloads folder to show large files and the space they use. It never changes or moves these files, and nothing leaves your Mac.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 MyMacCleaner. All rights reserved.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -454,7 +457,7 @@
 				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
 				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
-				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 5.0;
@@ -481,6 +484,9 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "MyMacCleaner reads your Desktop folder to show large files and the space they use. It never changes or moves these files, and nothing leaves your Mac.";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "MyMacCleaner reads your Documents folder to show large files and the space they use. It never changes or moves these files, and nothing leaves your Mac.";
+				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "MyMacCleaner reads your Downloads folder to show large files and the space they use. It never changes or moves these files, and nothing leaves your Mac.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 MyMacCleaner. All rights reserved.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -496,7 +502,7 @@
 				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
 				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
 				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
-				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 5.0;

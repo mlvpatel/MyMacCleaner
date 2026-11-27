@@ -27,6 +27,22 @@ enum BrowserType: String, CaseIterable, Identifiable {
             return FileManager.default.fileExists(atPath: "/Applications/Firefox.app")
         }
     }
+
+    /// Where the browser keeps its data, relative to the home folder. macOS can refuse to open it
+    /// (Safari's needs Full Disk Access), and then nothing inside it can be measured.
+    var dataFolder: String {
+        switch self {
+        case .safari: return "Library/Safari"
+        case .chrome: return "Library/Application Support/Google/Chrome"
+        case .firefox: return "Library/Application Support/Firefox"
+        }
+    }
+}
+
+/// What a browser scan listed, and the installed browsers whose data macOS would not let it read.
+struct BrowserScan: Sendable {
+    let items: [BrowserDataItem]
+    let unreadableBrowsers: [BrowserType]
 }
 
 // MARK: - Browser Data Types
@@ -92,7 +108,6 @@ struct BrowserDataItem: Identifiable {
     let dataType: BrowserDataType
     let path: URL
     let size: Int64
-    var isSelected: Bool = false
 
     var formattedSize: String {
         ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
@@ -108,16 +123,30 @@ actor BrowserCleanerService {
 
     // MARK: - Scanning
 
-    /// Scan all browsers for cleanable data
-    func scanAllBrowsers() async -> [BrowserDataItem] {
+    /// Scan all installed browsers, naming the ones whose data could not be read.
+    func scanAllBrowsers() async -> BrowserScan {
+        let installed = BrowserType.allCases.filter(\.isInstalled)
         var items: [BrowserDataItem] = []
 
-        for browser in BrowserType.allCases where browser.isInstalled {
+        for browser in installed {
             let browserItems = await scanBrowser(browser)
             items.append(contentsOf: browserItems)
         }
 
-        return items
+        return BrowserScan(items: items, unreadableBrowsers: Self.unreadableBrowsers(installed, home: NSHomeDirectory()))
+    }
+
+    /// Browsers whose data folder exists but does not open for reading. A missing folder only
+    /// means the browser has stored nothing there, so it is not a gap.
+    nonisolated static func unreadableBrowsers(
+        _ browsers: [BrowserType],
+        home: String,
+        probe: any PermissionProbing = POSIXPermissionProbe()
+    ) -> [BrowserType] {
+        browsers.filter { browser in
+            let folder = home + "/" + browser.dataFolder
+            return FileManager.default.fileExists(atPath: folder) && !probe.canOpenForReading(atPath: folder)
+        }
     }
 
     /// Scan a specific browser
@@ -363,22 +392,8 @@ actor BrowserCleanerService {
     }
 
     nonisolated func getDirectorySize(at path: String) -> Int64? {
-        guard FileManager.default.fileExists(atPath: path) else { return nil }
-
-        let url = URL(fileURLWithPath: path)
-        guard let enumerator = FileManager.default.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.totalFileAllocatedSizeKey],
-            options: [.skipsHiddenFiles]
-        ) else { return nil }
-
-        var totalSize: Int64 = 0
-        while let fileURL = enumerator.nextObject() as? URL {
-            if let size = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey]).totalFileAllocatedSize {
-                totalSize += Int64(size)
-            }
-        }
-
+        guard FileManager.default.fileExists(atPath: path),
+              let totalSize = DirectorySize.allocatedBytes(at: URL(fileURLWithPath: path)) else { return nil }
         return totalSize > 0 ? totalSize : nil
     }
 

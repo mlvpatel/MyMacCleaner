@@ -67,7 +67,8 @@ class SpaceLensViewModel: ObservableObject {
     @Published var navigationStack: [FileNode] = []
 
     @Published var selectedNode: FileNode?
-    @Published var hoveredNode: FileNode?
+    /// Not published here: a hover re-renders only the views that observe `hover`.
+    let hover = SpaceLensHover()
 
     @Published var errorMessage: String?
 
@@ -77,9 +78,20 @@ class SpaceLensViewModel: ObservableObject {
     /// Readable so tests can await a cancelled scan instead of sleeping.
     private(set) var scanTask: Task<Void, Never>?
 
+    /// How long a finished tree stays in memory after no view shows it.
+    private let treeReleaseDelay: Duration
+    /// Space Lens appears in its own section and as a Disk Cleaner tab, so views are counted.
+    private var visibleViewCount = 0
+    /// Readable so tests can await the release instead of sleeping.
+    private(set) var releaseTask: Task<Void, Never>?
+
     // Filters
     @Published var sizeFilter: SizeFilter = .all
     @Published var ageFilter: AgeFilter = .all
+
+    init(treeReleaseDelay: Duration = SpaceLensScanLimits.treeReleaseDelay) {
+        self.treeReleaseDelay = treeReleaseDelay
+    }
 
     // MARK: - Computed Properties
 
@@ -214,7 +226,40 @@ class SpaceLensViewModel: ObservableObject {
     }
 
     func hoverNode(_ node: FileNode?) {
-        hoveredNode = node
+        hover.node = node
+    }
+
+    // MARK: - Visibility
+
+    func viewDidAppear() {
+        visibleViewCount += 1
+        releaseTask?.cancel()
+        releaseTask = nil
+    }
+
+    /// When no view shows Space Lens any more, stops a running scan and drops the tree after
+    /// `treeReleaseDelay`: a home scan holds up to 500,000 nodes, which should not stay resident
+    /// for the rest of the session. Coming back within the delay keeps it.
+    func viewDidDisappear() {
+        visibleViewCount = max(0, visibleViewCount - 1)
+        guard visibleViewCount == 0 else { return }
+        cancelScan()
+        releaseTask?.cancel()
+        releaseTask = Task { [weak self, treeReleaseDelay] in
+            try? await Task.sleep(for: treeReleaseDelay)
+            guard !Task.isCancelled else { return }
+            self?.releaseTree()
+        }
+    }
+
+    /// The page then shows its start screen, which offers a new scan.
+    private func releaseTree() {
+        releaseTask = nil
+        rootNode = nil
+        currentNode = nil
+        navigationStack = []
+        selectedNode = nil
+        hover.node = nil
     }
 
     func revealInFinder(_ node: FileNode) {
@@ -347,24 +392,35 @@ enum SpaceLensScanLimits {
     static let progressInterval = 200
     /// Entry count used to scale the enumeration progress bar.
     static let progressEstimateEntries = 50_000
+    /// Idle time after leaving Space Lens before its tree is released.
+    static let treeReleaseDelay: Duration = .seconds(120)
 }
 
-struct SpaceLensScanResult {
+struct SpaceLensScanResult: Sendable {
     let root: FileNode
     let isTruncated: Bool
 }
 
+// MARK: - Hover
+
+/// The hovered item, kept apart from `SpaceLensViewModel` so moving the pointer re-renders only the
+/// bubble highlight, the list rows and the details bar.
+final class SpaceLensHover: ObservableObject {
+    @Published var node: FileNode?
+}
+
 // MARK: - File Node
 
-class FileNode: Identifiable, ObservableObject {
+/// Built once off the main actor and never changed, so it is immutable and `Sendable`.
+final class FileNode: Identifiable, Sendable {
     let id = UUID()
     let name: String
     let url: URL
-    @Published var size: Int64
+    let size: Int64
     let isDirectory: Bool
     let lastAccessDate: Date?
     let modificationDate: Date?
-    @Published var children: [FileNode]
+    let children: [FileNode]
 
     init(name: String, url: URL, size: Int64, isDirectory: Bool, lastAccessDate: Date? = nil, modificationDate: Date? = nil, children: [FileNode]) {
         self.name = name

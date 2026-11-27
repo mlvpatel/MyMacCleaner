@@ -16,14 +16,6 @@ struct HomebrewCask: Identifiable {
     }
 }
 
-struct HomebrewFormula: Identifiable {
-    let id: String
-    let name: String
-    let version: String
-    let description: String?
-    let hasUpdate: Bool
-}
-
 // MARK: - Homebrew Service
 
 actor HomebrewService {
