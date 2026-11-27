@@ -21,7 +21,9 @@ defaults:
     shell: bash
 
 env:
-  XCODE_MAJOR: '27'
+  # CI-tested Xcode (README > Requirements): the newest Xcode 26.x on the macos-26 image.
+  # Each Select Xcode step fails when no Xcode_26.x is installed instead of using another one.
+  XCODE_MAJOR: '26'
   APP_NAME: MyMacCleaner
   SCHEME: MyMacCleaner
   DESTINATION: 'platform=macOS'
@@ -43,8 +45,12 @@ jobs:
 
       - name: Select Xcode
         run: |
-          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1 || true); [[ -n "$xcode_app" ]] || xcode_app=$(ls -d /Applications/Xcode*.app | sort -V | tail -1 || true)
-          [[ -n "$xcode_app" ]] || { echo "::error::No Xcode ${XCODE_MAJOR}.x on runner"; exit 1; }
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}.*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -z "$xcode_app" ]]; then
+            echo "::error::Xcode ${XCODE_MAJOR}.x is not installed on this runner, and CI does not fall back to another version. Update XCODE_MAJOR or runs-on. Installed:"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
           sudo xcode-select -s "$xcode_app"
           xcodebuild -version
 
@@ -83,8 +89,14 @@ jobs:
 
       - name: Select Xcode
         run: |
-          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1 || true); [[ -n "$xcode_app" ]] || xcode_app=$(ls -d /Applications/Xcode*.app | sort -V | tail -1 || true)
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}.*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -z "$xcode_app" ]]; then
+            echo "::error::Xcode ${XCODE_MAJOR}.x is not installed on this runner, and CI does not fall back to another version. Update XCODE_MAJOR or runs-on. Installed:"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
           sudo xcode-select -s "$xcode_app"
+          xcodebuild -version
 
       - name: Run Unit Tests
         run: |
@@ -110,6 +122,46 @@ jobs:
             unit-tests.log
 
   # ============================================
+  # Unit Tests on macOS 15 (advisory)
+  # ============================================
+  # Builds and tests on the macos-15 image with its own newest Xcode 26.x, because test products
+  # built with a newer Xcode 26 need a newer Swift Testing runtime than that image has.
+  # GitHub no longer offers a macos-14 image, so the macOS 14 deployment target is not CI-tested.
+  macos-15-tests:
+    name: Unit Tests (macos-15)
+    runs-on: macos-15
+    timeout-minutes: 30
+    # Advisory until this job has passed once; it is not part of PR Checks Complete.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}.*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -z "$xcode_app" ]]; then
+            echo "::error::Xcode ${XCODE_MAJOR}.x is not installed on this runner. Installed:"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode_app"
+          sw_vers
+          xcodebuild -version
+
+      - name: Run Unit Tests
+        run: |
+          xcodebuild test \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -only-testing:MyMacCleanerTests \
+            2>&1 | tee unit-tests.log
+
+  # ============================================
   # UI Tests (advisory: needs a logged-in GUI session)
   # ============================================
   ui-test:
@@ -128,8 +180,14 @@ jobs:
 
       - name: Select Xcode
         run: |
-          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1 || true); [[ -n "$xcode_app" ]] || xcode_app=$(ls -d /Applications/Xcode*.app | sort -V | tail -1 || true)
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}.*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -z "$xcode_app" ]]; then
+            echo "::error::Xcode ${XCODE_MAJOR}.x is not installed on this runner, and CI does not fall back to another version. Update XCODE_MAJOR or runs-on. Installed:"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
           sudo xcode-select -s "$xcode_app"
+          xcodebuild -version
 
       - name: Run UI Tests
         run: |
@@ -167,8 +225,14 @@ jobs:
 
       - name: Select Xcode
         run: |
-          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1 || true); [[ -n "$xcode_app" ]] || xcode_app=$(ls -d /Applications/Xcode*.app | sort -V | tail -1 || true)
+          xcode_app=$(ls -d /Applications/Xcode_${XCODE_MAJOR}.*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -z "$xcode_app" ]]; then
+            echo "::error::Xcode ${XCODE_MAJOR}.x is not installed on this runner, and CI does not fall back to another version. Update XCODE_MAJOR or runs-on. Installed:"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
           sudo xcode-select -s "$xcode_app"
+          xcodebuild -version
 
       - name: Archive Build (ad hoc signing from Config/Signing.xcconfig)
         run: |
@@ -186,6 +250,7 @@ jobs:
           [[ -d "$app" ]] || { echo "::error::App not found in archive"; exit 1; }
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign --display --entitlements - "$app"
+          bash scripts/check-signed-entitlements.sh "$app"
           if [[ -e "$app/Contents/Frameworks/Sparkle.framework" ]]; then
             echo "::error::Sparkle framework must not ship"
             exit 1

@@ -2,14 +2,13 @@ import SwiftUI
 
 // MARK: - Info Card
 
+/// Non-interactive status: no hover effect.
 struct InfoCard: View {
     let icon: String
     let iconColor: Color
     let title: String
     let subtitle: String
     var isLoading: Bool = false
-
-    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -42,7 +41,5 @@ struct InfoCard: View {
         .padding(Theme.Spacing.md)
         .frame(maxWidth: .infinity)
         .glassCard()
-        .hoverEffect(isHovered: isHovered)
-        .onHover { isHovered = $0 }
     }
 }

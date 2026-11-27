@@ -1,0 +1,1208 @@
+{
+  "schema_version": 1,
+  "diagram_type": "class",
+  "meta": {
+    "title": "CleanerCore trust types",
+    "locale": "en",
+    "output": "docs/architecture/cleanercore-trust-types.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/mlvpatel/MyMacCleaner",
+      "revision": "2095f154f4b0c9c40ddac13353afa96942420add",
+      "link_mode": "local-only"
+    }
+  },
+  "layout": {
+    "mode": "grid",
+    "typeMaxW": 380
+  },
+  "types": [
+    {
+      "id": "policy_evaluator",
+      "label": "PolicyEvaluator",
+      "kind": "class",
+      "sublabel": "struct · only source of eligibility",
+      "row": 0,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "cacheOwners",
+          "type": "GeneralMacCacheOwnerCatalog",
+          "visibility": "private"
+        }
+      ],
+      "methods": [
+        {
+          "name": "evaluate",
+          "parameters": "_ finding: GeneralMacFinding, processActive: Bool",
+          "returns": "PolicyEvaluation",
+          "visibility": "public"
+        },
+        {
+          "name": "evaluateCache",
+          "parameters": "_ evidence: GeneralMacPolicyEvidence, detector: DetectorSelection",
+          "returns": "PolicyEvaluation",
+          "visibility": "private"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluator.swift",
+          "line": 1,
+          "end_line": 22,
+          "label": "public entry points"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluator.swift",
+          "line": 65,
+          "end_line": 75,
+          "label": "requires observed inactivity"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluator.swift",
+          "line": 117,
+          "end_line": 170,
+          "label": "evaluateCache creates candidate"
+        }
+      ]
+    },
+    {
+      "id": "eligible_candidate",
+      "label": "EligibleCandidate",
+      "kind": "record",
+      "sublabel": "struct · frozen policy result",
+      "row": 0,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "evidence",
+          "type": "GeneralMacPolicyEvidence",
+          "visibility": "public"
+        },
+        {
+          "name": "rule",
+          "type": "PolicyRuleReference",
+          "visibility": "public"
+        },
+        {
+          "name": "stableIdentity",
+          "type": "StableFindingIdentity",
+          "visibility": "public"
+        }
+      ],
+      "methods": [
+        {
+          "name": "init",
+          "parameters": "evidence:, semanticOwner:, rule:, rationale:, rankFactors:",
+          "visibility": "package"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluation.swift",
+          "line": 187,
+          "end_line": 211,
+          "label": "internal init"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Policy/PolicyEvaluation.swift",
+          "line": 46,
+          "end_line": 98,
+          "label": "15 min inactivity, named scope proof"
+        }
+      ]
+    },
+    {
+      "id": "review_plan_draft",
+      "label": "ReviewPlanDraft",
+      "kind": "record",
+      "sublabel": "struct · sorted, unique, 15 min expiry",
+      "row": 1,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "lifetimeNanoseconds",
+          "type": "Int64",
+          "visibility": "public",
+          "static": true
+        },
+        {
+          "name": "targets",
+          "type": "[ReviewPlanTarget]",
+          "visibility": "public"
+        },
+        {
+          "name": "expiresAt",
+          "type": "WallClockInstant",
+          "visibility": "public"
+        }
+      ],
+      "methods": [
+        {
+          "name": "init",
+          "parameters": "selectedCandidates: [EligibleCandidate], versionContext: ReviewPlanVersionContext, launchSession: ReviewPlanLaunchSession, createdAt: WallClockInstant",
+          "visibility": "public",
+          "returns": "throws"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/ReviewPlan.swift",
+          "line": 98,
+          "end_line": 131,
+          "label": "sorts, dedupes, sets expiry"
+        }
+      ]
+    },
+    {
+      "id": "review_plan_target",
+      "label": "ReviewPlanTarget",
+      "kind": "record",
+      "sublabel": "struct · frozen identity, size, mtime",
+      "row": 0,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "stableIdentity",
+          "type": "StableFindingIdentity",
+          "visibility": "public"
+        },
+        {
+          "name": "resourceIdentity",
+          "type": "FileIdentityEvidence",
+          "visibility": "public"
+        },
+        {
+          "name": "locatorComponents",
+          "type": "[String]",
+          "visibility": "public"
+        },
+        {
+          "name": "logicalBytes",
+          "type": "Int64",
+          "visibility": "public"
+        },
+        {
+          "name": "modificationUnixNanoseconds",
+          "type": "Int64",
+          "visibility": "public"
+        }
+      ],
+      "methods": [
+        {
+          "name": "init",
+          "parameters": "candidate: EligibleCandidate",
+          "visibility": "package",
+          "returns": "throws"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/ReviewPlan.swift",
+          "line": 43,
+          "end_line": 96,
+          "label": "internal init(candidate:)"
+        }
+      ]
+    },
+    {
+      "id": "review_plan",
+      "label": "ReviewPlan",
+      "kind": "record",
+      "sublabel": "struct · canonical bytes + digest",
+      "row": 1,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "targets",
+          "type": "[ReviewPlanTarget]",
+          "visibility": "public"
+        },
+        {
+          "name": "canonicalBytes",
+          "type": "[UInt8]",
+          "visibility": "public"
+        },
+        {
+          "name": "digest",
+          "type": "PlanDigest",
+          "visibility": "public"
+        },
+        {
+          "name": "expiresAt",
+          "type": "WallClockInstant",
+          "visibility": "public"
+        }
+      ],
+      "methods": [
+        {
+          "name": "build",
+          "parameters": "draft: ReviewPlanDraft, digesting: PlanDigesting",
+          "returns": "throws -> Self",
+          "visibility": "public",
+          "static": true
+        },
+        {
+          "name": "init",
+          "parameters": "draft: ReviewPlanDraft, canonicalBytes: [UInt8], digest: PlanDigest",
+          "visibility": "private"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/ReviewPlan.swift",
+          "line": 133,
+          "end_line": 162,
+          "label": "build() and private init"
+        }
+      ]
+    },
+    {
+      "id": "canonical_plan_encoder",
+      "label": "CanonicalPlanEncoder",
+      "kind": "class",
+      "sublabel": "struct · MMCPLAN tagged byte layout",
+      "row": 1,
+      "col": 0,
+      "methods": [
+        {
+          "name": "init",
+          "visibility": "public"
+        },
+        {
+          "name": "encode",
+          "parameters": "_ draft: ReviewPlanDraft",
+          "returns": "throws -> [UInt8]",
+          "visibility": "public"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/CanonicalPlanEncoder.swift",
+          "line": 6,
+          "end_line": 30,
+          "label": "encode and header"
+        }
+      ]
+    },
+    {
+      "id": "plan_digest",
+      "label": "PlanDigest",
+      "kind": "record",
+      "sublabel": "struct · exactly 32 bytes",
+      "row": 2,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "bytes",
+          "type": "[UInt8]",
+          "visibility": "public"
+        }
+      ],
+      "methods": [
+        {
+          "name": "init",
+          "parameters": "bytes: [UInt8]",
+          "visibility": "public",
+          "returns": "throws"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Ports/PlanDigesting.swift",
+          "line": 1,
+          "end_line": 12,
+          "label": "rejects non-32-byte input"
+        }
+      ]
+    },
+    {
+      "id": "plan_digesting",
+      "label": "PlanDigesting",
+      "kind": "interface",
+      "sublabel": "protocol · digest port",
+      "row": 2,
+      "col": 0,
+      "methods": [
+        {
+          "name": "digest",
+          "parameters": "canonicalBytes: [UInt8]",
+          "returns": "throws -> PlanDigest",
+          "visibility": "public",
+          "abstract": true
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Ports/PlanDigesting.swift",
+          "line": 14,
+          "end_line": 16
+        }
+      ]
+    },
+    {
+      "id": "cryptokit_digest_adapter",
+      "label": "CryptoKitPlanDigestAdapter",
+      "kind": "class",
+      "sublabel": "struct · SHA-256 via CryptoKit",
+      "row": 3,
+      "col": 0,
+      "methods": [
+        {
+          "name": "digest",
+          "parameters": "canonicalBytes: [UInt8]",
+          "returns": "throws -> PlanDigest",
+          "visibility": "public"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/CryptoKitPlanDigestAdapter.swift",
+          "line": 5,
+          "end_line": 11
+        }
+      ]
+    },
+    {
+      "id": "approval_attestation",
+      "label": "ApprovalAttestation",
+      "kind": "record",
+      "sublabel": "struct · approval of one digest",
+      "row": 2,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "approvedDigest",
+          "type": "PlanDigest",
+          "visibility": "public"
+        },
+        {
+          "name": "approvedAt",
+          "type": "WallClockInstant",
+          "visibility": "public"
+        },
+        {
+          "name": "launchSession",
+          "type": "ReviewPlanLaunchSession",
+          "visibility": "public"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/ApprovalValidity.swift",
+          "line": 1,
+          "end_line": 15
+        }
+      ],
+      "methods": [
+        {
+          "name": "init",
+          "parameters": "approvedDigest:, approvedAt:, launchSession:",
+          "visibility": "public"
+        }
+      ]
+    },
+    {
+      "id": "approval_validity",
+      "label": "ApprovalValidity",
+      "kind": "enum",
+      "sublabel": "enum · approval gate",
+      "row": 3,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "validForReview"
+        },
+        {
+          "name": "invalid(ApprovalInvalidReason)"
+        }
+      ],
+      "methods": [
+        {
+          "name": "evaluate",
+          "parameters": "approval: ApprovalAttestation?, plan: ReviewPlan, current: ApprovalContext",
+          "returns": "ApprovalValidity",
+          "visibility": "public",
+          "static": true
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/ApprovalValidity.swift",
+          "line": 39,
+          "end_line": 46,
+          "label": "invalid reasons"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/ApprovalValidity.swift",
+          "line": 48,
+          "end_line": 75,
+          "label": "session, expiry, digest, evidence checks"
+        }
+      ]
+    },
+    {
+      "id": "approval_context",
+      "label": "ApprovalContext",
+      "kind": "record",
+      "sublabel": "struct · caller-built check context",
+      "row": 3,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "launchSession",
+          "type": "ReviewPlanLaunchSession",
+          "visibility": "public"
+        },
+        {
+          "name": "now",
+          "type": "WallClockInstant",
+          "visibility": "public"
+        },
+        {
+          "name": "versionContext",
+          "type": "ReviewPlanVersionContext",
+          "visibility": "public"
+        },
+        {
+          "name": "displayedDigest",
+          "type": "PlanDigest",
+          "visibility": "public"
+        },
+        {
+          "name": "currentTargets",
+          "type": "[ReviewPlanTarget]",
+          "visibility": "public"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/ApprovalValidity.swift",
+          "line": 17,
+          "end_line": 37
+        }
+      ]
+    },
+    {
+      "id": "trash_item_outcome",
+      "label": "TrashItemOutcome<Destination>",
+      "kind": "enum",
+      "sublabel": "enum · per-item result",
+      "row": 8,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "moved(destination: Destination)"
+        },
+        {
+          "name": "skippedStale(TrashStaleReason)"
+        },
+        {
+          "name": "failed(TrashExecutionFailure)"
+        },
+        {
+          "name": "cancelled"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/TrashExecutionOutcome.swift",
+          "line": 1,
+          "end_line": 25,
+          "label": "stale reasons and outcomes"
+        }
+      ]
+    },
+    {
+      "id": "approved_operation_factory",
+      "label": "ApprovedTrashOperationFactory",
+      "kind": "class",
+      "sublabel": "struct · only maker of MoveToTrash",
+      "row": 5,
+      "col": 2,
+      "width": 388,
+      "methods": [
+        {
+          "name": "init",
+          "visibility": "public"
+        },
+        {
+          "name": "makeOperations",
+          "parameters": "plan: ReviewPlan, approval: ApprovalAttestation?, current: ApprovalContext",
+          "returns": "Result<[MoveToTrash], ApprovedOperationRejection>",
+          "visibility": "public"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/ApprovedTrashOperationFactory.swift",
+          "line": 1,
+          "end_line": 17
+        }
+      ]
+    },
+    {
+      "id": "fresh_target_evidence",
+      "label": "FreshTargetEvidence",
+      "kind": "record",
+      "sublabel": "struct · re-observed target facts",
+      "row": 8,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "resourceIdentity",
+          "type": "FileIdentityEvidence",
+          "visibility": "public"
+        },
+        {
+          "name": "symlink",
+          "type": "Bool",
+          "visibility": "public"
+        },
+        {
+          "name": "completeness",
+          "type": "GeneralMacEvidenceCompleteness",
+          "visibility": "public"
+        }
+      ],
+      "methods": [
+        {
+          "name": "init",
+          "parameters": "stableIdentity:, …, completeness:",
+          "visibility": "public"
+        },
+        {
+          "name": "observing",
+          "parameters": "target: ReviewPlanTarget, in: [GeneralMacFinding]",
+          "returns": "FreshTargetEvidence?",
+          "visibility": "public",
+          "static": true
+        },
+        {
+          "name": "observing",
+          "parameters": "target: ReviewPlanTarget, eligibleIn: [PolicyEvaluation]",
+          "returns": "FreshTargetEvidence?",
+          "visibility": "public",
+          "static": true
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/FreshEvidenceRevalidator.swift",
+          "line": 1,
+          "end_line": 59,
+          "label": "fields and public memberwise init"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/FreshEvidenceRevalidator.swift",
+          "line": 84,
+          "end_line": 97,
+          "label": "observing(target:in:) takes raw findings"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/FreshEvidenceRevalidator.swift",
+          "line": 99,
+          "end_line": 106,
+          "label": "eligibleIn: only still-eligible findings"
+        }
+      ]
+    },
+    {
+      "id": "trash_execution_port",
+      "label": "TrashExecutionPort",
+      "kind": "interface",
+      "sublabel": "protocol · associatedtype Destination",
+      "row": 8,
+      "col": 1,
+      "methods": [
+        {
+          "name": "revalidateAndMove",
+          "parameters": "_ operation: MoveToTrash, fresh: FreshTargetEvidence?",
+          "returns": "TrashItemOutcome<Destination>",
+          "visibility": "public",
+          "abstract": true
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Ports/TrashExecutionPort.swift",
+          "line": 1,
+          "end_line": 8
+        }
+      ]
+    },
+    {
+      "id": "move_to_trash",
+      "label": "MoveToTrash",
+      "kind": "record",
+      "sublabel": "struct · approved operation token",
+      "row": 6,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "target",
+          "type": "ReviewPlanTarget",
+          "visibility": "package"
+        },
+        {
+          "name": "declaredRootID",
+          "type": "DeclaredRootID",
+          "visibility": "public"
+        },
+        {
+          "name": "locatorComponents",
+          "type": "[String]",
+          "visibility": "public"
+        },
+        {
+          "name": "approvedResourceIdentity",
+          "type": "FileIdentityEvidence",
+          "visibility": "public"
+        },
+        {
+          "name": "approvedLogicalBytes",
+          "type": "Int64",
+          "visibility": "public"
+        },
+        {
+          "name": "approvedModificationUnixNanoseconds",
+          "type": "Int64",
+          "visibility": "public"
+        }
+      ],
+      "methods": [
+        {
+          "name": "init",
+          "parameters": "target: ReviewPlanTarget",
+          "visibility": "package"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/MoveToTrash.swift",
+          "line": 1,
+          "end_line": 17,
+          "label": "internal init and target"
+        }
+      ]
+    },
+    {
+      "id": "fresh_evidence_revalidator",
+      "label": "FreshEvidenceRevalidator",
+      "kind": "class",
+      "sublabel": "struct · fresh vs frozen comparison",
+      "row": 7,
+      "col": 2,
+      "methods": [
+        {
+          "name": "init",
+          "visibility": "public"
+        },
+        {
+          "name": "validate",
+          "parameters": "operation: MoveToTrash, fresh: FreshTargetEvidence?",
+          "returns": "TrashStaleReason?",
+          "visibility": "public"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/FreshEvidenceRevalidator.swift",
+          "line": 153,
+          "end_line": 191
+        }
+      ]
+    },
+    {
+      "id": "foundation_trash_adapter",
+      "label": "FoundationTrashAdapter",
+      "kind": "class",
+      "sublabel": "struct · only caller of trashItem(at:)",
+      "row": 7,
+      "col": 1,
+      "width": 388,
+      "attributes": [
+        {
+          "name": "revalidator",
+          "type": "FreshEvidenceRevalidator",
+          "visibility": "private"
+        },
+        {
+          "name": "resolveRoot",
+          "type": "@Sendable (DeclaredRootID) -> URL?",
+          "visibility": "private"
+        },
+        {
+          "name": "nativeTrash",
+          "type": "(URL) throws -> URL?",
+          "visibility": "private"
+        },
+        {
+          "name": "identityProbe",
+          "type": "(URL, [String]) -> LeafIdentityProbe",
+          "visibility": "private"
+        }
+      ],
+      "methods": [
+        {
+          "name": "init",
+          "parameters": "fileManager:, revalidator:, nativeTrash:, identityProbe:, resolveRoot:",
+          "visibility": "public"
+        },
+        {
+          "name": "revalidateAndMove",
+          "parameters": "_ operation: MoveToTrash, fresh: FreshTargetEvidence?",
+          "returns": "TrashItemOutcome<ReturnedTrashURL>",
+          "visibility": "public"
+        },
+        {
+          "name": "finalIdentityMismatch",
+          "parameters": "root: URL, operation: MoveToTrash",
+          "returns": "TrashStaleReason?",
+          "visibility": "private"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift",
+          "line": 32,
+          "end_line": 87,
+          "label": "public init, revalidate, re-probe, trashItem"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift",
+          "line": 89,
+          "end_line": 108,
+          "label": "final identity mismatch"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift",
+          "line": 136,
+          "end_line": 165,
+          "label": "link count must be 1"
+        }
+      ]
+    },
+    {
+      "id": "receipt_intent",
+      "label": "ReceiptIntent",
+      "kind": "record",
+      "sublabel": "struct · written before any move",
+      "row": 4,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "id",
+          "type": "ReceiptID",
+          "visibility": "public"
+        },
+        {
+          "name": "planDigest",
+          "type": "PlanDigest",
+          "visibility": "public"
+        },
+        {
+          "name": "orderedItemIDs",
+          "type": "[ReceiptItemID]",
+          "visibility": "public"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Receipts/ReceiptSchema.swift",
+          "line": 144,
+          "end_line": 180
+        }
+      ]
+    },
+    {
+      "id": "receipt_history_coordinator",
+      "label": "ReceiptHistoryCoordinator",
+      "kind": "class",
+      "sublabel": "actor · leased, journaled run",
+      "row": 6,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "store",
+          "type": "any ReceiptStorePort",
+          "visibility": "private"
+        },
+        {
+          "name": "lease",
+          "type": "any ReceiptLeasePort",
+          "visibility": "private"
+        },
+        {
+          "name": "execute",
+          "type": "any ReceiptExecutionConsuming",
+          "visibility": "private"
+        }
+      ],
+      "methods": [
+        {
+          "name": "run",
+          "parameters": "intent: ReceiptIntent, operations: [MoveToTrash], freshEvidence: [FreshTargetEvidence?], isCancelled: @escaping @Sendable () -> Bool",
+          "returns": "async -> Result<ReconciledReceipt, ReceiptPersistenceError>",
+          "visibility": "public"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Receipts/ReceiptHistoryCoordinator.swift",
+          "line": 1,
+          "end_line": 33,
+          "label": "ports and leased run"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Receipts/ReceiptHistoryCoordinator.swift",
+          "line": 47,
+          "end_line": 108,
+          "label": "intent, then started/terminal per item"
+        }
+      ]
+    },
+    {
+      "id": "receipt_execution_consuming",
+      "label": "ReceiptExecutionConsuming",
+      "kind": "interface",
+      "sublabel": "protocol · execution port for receipts",
+      "row": 6,
+      "col": 0,
+      "methods": [
+        {
+          "name": "revalidateAndMove",
+          "parameters": "_ operation: MoveToTrash, fresh: FreshTargetEvidence?",
+          "returns": "TrashItemOutcome<PrivateRecoveryDestination>",
+          "visibility": "public",
+          "abstract": true
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Ports/ReceiptHistoryPorts.swift",
+          "line": 43,
+          "end_line": 48
+        }
+      ]
+    },
+    {
+      "id": "foundation_receipt_execution_adapter",
+      "label": "FoundationReceiptExecutionAdapter",
+      "kind": "class",
+      "sublabel": "struct · maps adapter result for receipts",
+      "row": 7,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "adapter",
+          "type": "FoundationTrashAdapter",
+          "visibility": "private"
+        }
+      ],
+      "methods": [
+        {
+          "name": "init",
+          "parameters": "adapter: FoundationTrashAdapter",
+          "visibility": "public"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationReceiptExecutionAdapter.swift",
+          "line": 4,
+          "end_line": 28
+        }
+      ]
+    },
+    {
+      "id": "app_support_receipt_store",
+      "label": "AppSupportReceiptStore",
+      "kind": "class",
+      "sublabel": "struct · JSON files in Application Support",
+      "row": 5,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "fileManager",
+          "type": "FileManager",
+          "visibility": "private"
+        },
+        {
+          "name": "publisher",
+          "type": "DarwinReceiptPublisher",
+          "visibility": "private"
+        }
+      ],
+      "methods": [
+        {
+          "name": "persistIntent",
+          "parameters": "_ intent: ReceiptIntent",
+          "returns": "async -> Result<Void, ReceiptPersistenceError>",
+          "visibility": "public"
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 4,
+          "end_line": 68,
+          "label": "Application Support root, intent.json"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 121,
+          "end_line": 140,
+          "label": "JSON publish and readback"
+        }
+      ]
+    },
+    {
+      "id": "receipt_store_port",
+      "label": "ReceiptStorePort",
+      "kind": "interface",
+      "sublabel": "protocol · receipt persistence port",
+      "row": 5,
+      "col": 1,
+      "methods": [
+        {
+          "name": "persistIntent",
+          "parameters": "_ intent: ReceiptIntent",
+          "returns": "async -> Result<Void, ReceiptPersistenceError>",
+          "visibility": "public",
+          "abstract": true
+        },
+        {
+          "name": "persistTransition",
+          "parameters": "receipt: ReceiptID, _ transition: ReceiptItemTransition",
+          "returns": "async -> Result<Void, ReceiptPersistenceError>",
+          "visibility": "public",
+          "abstract": true
+        }
+      ],
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Ports/ReceiptHistoryPorts.swift",
+          "line": 18,
+          "end_line": 27
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "evaluator_creates_candidate",
+      "from": "policy_evaluator",
+      "to": "eligible_candidate",
+      "kind": "dependency",
+      "label": "creates"
+    },
+    {
+      "id": "target_from_candidate",
+      "from": "review_plan_target",
+      "to": "eligible_candidate",
+      "kind": "dependency",
+      "label": "init(candidate:)"
+    },
+    {
+      "id": "draft_owns_targets",
+      "from": "review_plan_draft",
+      "to": "review_plan_target",
+      "kind": "composition",
+      "label": "targets"
+    },
+    {
+      "id": "plan_builds_from_draft",
+      "from": "review_plan",
+      "to": "review_plan_draft",
+      "kind": "dependency",
+      "label": "build(draft:)"
+    },
+    {
+      "id": "plan_encodes",
+      "from": "review_plan",
+      "to": "canonical_plan_encoder",
+      "kind": "dependency",
+      "label": "encode(draft)"
+    },
+    {
+      "id": "plan_owns_digest",
+      "from": "review_plan",
+      "to": "plan_digest",
+      "kind": "composition",
+      "label": "digest"
+    },
+    {
+      "id": "digesting_returns_digest",
+      "from": "plan_digesting",
+      "to": "plan_digest",
+      "kind": "dependency",
+      "label": "returns"
+    },
+    {
+      "id": "cryptokit_realizes_digesting",
+      "from": "cryptokit_digest_adapter",
+      "to": "plan_digesting",
+      "kind": "realization"
+    },
+    {
+      "id": "attestation_binds_digest",
+      "from": "approval_attestation",
+      "to": "plan_digest",
+      "kind": "association",
+      "label": "approvedDigest"
+    },
+    {
+      "id": "validity_reads_approval",
+      "from": "approval_validity",
+      "to": "approval_attestation",
+      "kind": "dependency",
+      "label": "approval"
+    },
+    {
+      "id": "validity_reads_context",
+      "from": "approval_validity",
+      "to": "approval_context",
+      "kind": "dependency",
+      "label": "current"
+    },
+    {
+      "id": "factory_checks_validity",
+      "from": "approved_operation_factory",
+      "to": "approval_validity",
+      "kind": "dependency",
+      "label": "evaluate first"
+    },
+    {
+      "id": "factory_creates_operations",
+      "from": "approved_operation_factory",
+      "to": "move_to_trash",
+      "kind": "dependency",
+      "label": "creates if valid"
+    },
+    {
+      "id": "coordinator_runs_operations",
+      "from": "receipt_history_coordinator",
+      "to": "move_to_trash",
+      "kind": "dependency",
+      "label": "run(operations:)"
+    },
+    {
+      "id": "store_persists_intent",
+      "from": "receipt_store_port",
+      "to": "receipt_intent",
+      "kind": "dependency",
+      "label": "persistIntent"
+    },
+    {
+      "id": "coordinator_store",
+      "from": "receipt_history_coordinator",
+      "to": "receipt_store_port",
+      "kind": "association",
+      "label": "store"
+    },
+    {
+      "id": "coordinator_execute",
+      "from": "receipt_history_coordinator",
+      "to": "receipt_execution_consuming",
+      "kind": "association",
+      "label": "execute"
+    },
+    {
+      "id": "app_support_realizes_store",
+      "from": "app_support_receipt_store",
+      "to": "receipt_store_port",
+      "kind": "realization"
+    },
+    {
+      "id": "receipt_adapter_realizes_port",
+      "from": "foundation_receipt_execution_adapter",
+      "to": "receipt_execution_consuming",
+      "kind": "realization"
+    },
+    {
+      "id": "receipt_adapter_wraps_trash_adapter",
+      "from": "foundation_receipt_execution_adapter",
+      "to": "foundation_trash_adapter",
+      "kind": "association",
+      "label": "adapter"
+    },
+    {
+      "id": "trash_adapter_realizes_port",
+      "from": "foundation_trash_adapter",
+      "to": "trash_execution_port",
+      "kind": "realization"
+    },
+    {
+      "id": "trash_adapter_revalidator",
+      "from": "foundation_trash_adapter",
+      "to": "fresh_evidence_revalidator",
+      "kind": "association",
+      "label": "revalidator"
+    },
+    {
+      "id": "revalidator_reads_fresh",
+      "from": "fresh_evidence_revalidator",
+      "to": "fresh_target_evidence",
+      "kind": "dependency",
+      "label": "fresh evidence"
+    },
+    {
+      "id": "revalidator_reads_target",
+      "from": "fresh_evidence_revalidator",
+      "to": "move_to_trash",
+      "kind": "dependency",
+      "label": "frozen target"
+    },
+    {
+      "id": "port_returns_outcome",
+      "from": "trash_execution_port",
+      "to": "trash_item_outcome",
+      "kind": "dependency",
+      "label": "returns"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "What the types guarantee",
+      "items": [
+        "Every MoveToTrash target passed PolicyEvaluator's cache rule and an ApprovalValidity consistency check. Evidence and approval are values the caller supplies, not proofs.",
+        "EligibleCandidate.init and ReviewPlanTarget.init(candidate:) are internal, so a target cannot skip evaluateCache (15 min observed inactivity, named cache scope). GeneralMacFinding, Finding and FileObservation have public inits, so the evidence PolicyEvaluator.evaluate reads is caller-built.",
+        "ReviewPlan has a private init; build(draft:digesting:) is the only way to get one, and it carries canonical bytes and the digest from the supplied PlanDigesting (the app uses SHA-256 via CryptoKitPlanDigestAdapter).",
+        "MoveToTrash.init(target:) is internal; ApprovedTrashOperationFactory makes one only after ApprovalValidity returns .validForReview. ApprovalAttestation and ApprovalContext have public inits, and the app sets displayedDigest: plan.digest, currentTargets: plan.targets and approvedAt: now itself, so only the approved-digest and expiry checks can fail there.",
+        "FreshTargetEvidence has a public memberwise init and observing(target:in:) takes raw findings; only observing(target:eligibleIn:), which the app uses, limits evidence to still-eligible findings.",
+        "With the default probe, FoundationTrashAdapter re-validates fresh evidence, then re-probes inode, size, mtime, link count 1 and symlinks before its single trashItem(at:) call. Its public init accepts replacement identityProbe and nativeTrash closures and a caller-injected resolveRoot, and the re-probe does not re-check alias, package, mount, scope or inactivity. The app resolves only ~/Library/Caches and gives no fresh evidence outside com.apple.iconservices.store; a small check/use race remains."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Reading the notation",
+      "items": [
+        "Visibility: + public, ~ Swift internal (module only), - private.",
+        "Each sublabel starts with the Swift kind. The letter badge repeats the diagram kind: C class, I interface, E enumeration, R record. «record» marks a value-type data struct; a plain header is a behaviour type (struct or actor); «interface» is a Swift protocol; «enumeration» is a Swift enum whose rows are its cases.",
+        "A return written throws -> T or async -> T carries the Swift effect; an init marked : throws can fail.",
+        "CryptoKitPlanDigestAdapter, FoundationTrashAdapter, FoundationReceiptExecutionAdapter and AppSupportReceiptStore are in CleanerCoreFoundation; the rest are in CleanerCore."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "References shown in members, not lines",
+      "items": [
+        "ReviewPlan.build takes a PlanDigesting; ReviewPlan also stores the targets.",
+        "ApprovalValidity.evaluate takes the ReviewPlan; ApprovalContext.currentTargets and MoveToTrash.target hold ReviewPlanTarget.",
+        "ReceiptHistoryCoordinator.run(intent:) has the store persist the ReceiptIntent before the first move. ReceiptIntent.planDigest records the caller-supplied plan digest; run() does not verify it.",
+        "ReceiptExecutionConsuming returns TrashItemOutcome<PrivateRecoveryDestination>."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Left out",
+      "items": [
+        "DisplayedPlanFactory.makePlan, which the app calls to rank eligible candidates into a ReviewPlanDraft and ReviewPlan.build.",
+        "TrashExecutionCoordinator and TrashRunResult (both internal init) and ScriptedTrashExecutionPort, a test double shipped in CleanerCore: the app drives moves through ReceiptHistoryCoordinator instead.",
+        "ReceiptLeasePort, ReceiptClock and receipt reconciliation, retention and reduction types."
+      ]
+    }
+  ]
+}

@@ -6,7 +6,7 @@ Startup Items is an offline, read-only inventory of login-related items and laun
 
 The scan reports available background/login-item information, user and system launch-agent files, and running evidence where macOS exposes it. Each row can show a name, label, developer when available, type, status, and a Finder reveal action.
 
-System items are hidden by default and can be included in the view for investigation. The summary cards count user items, enabled and disabled states reported by the system, and currently running evidence.
+System items are hidden by default and can be included in the view for investigation. The summary cards appear once a scan has found items. All four count the same set, user items: the total, enabled and disabled states reported by the system, and currently running evidence, so Running never counts system items that Total leaves out.
 
 ## How to use it
 
@@ -20,6 +20,6 @@ System items are hidden by default and can be included in the view for investiga
 
 Treat unknown entries as evidence to investigate, not a reason to act immediately. Check the developer, label, associated application, and Finder location before deciding what it represents. Apple system items should be reviewed especially carefully.
 
-## Phase-0 limitation
+## What this page does not do
 
 This feature scans, filters, sorts, reveals, and opens the fixed macOS Login Items settings destination. It does not alter startup entries, launch services, processes, or files.

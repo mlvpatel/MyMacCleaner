@@ -122,6 +122,17 @@
         }
       }
     },
+    "duplicates.cloudOnlySkipped %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud files not downloaded to this Mac were left out: %lld"
+          }
+        }
+      }
+    },
     "duplicates.copies %lld": {
       "extractionState": "manual",
       "localizations": {
@@ -151,50 +162,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "No Duplicates Found"
-          }
-        }
-      }
-    },
-    "duplicates.keepNewest": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keep Newest, Select Others"
-          }
-        }
-      }
-    },
-    "duplicates.keepThisCopy": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keep this copy"
-          }
-        }
-      }
-    },
-    "duplicates.keeping": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "KEEPING"
-          }
-        }
-      }
-    },
-    "duplicates.keepingThisCopy": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This copy will be kept"
           }
         }
       }
@@ -238,7 +205,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scan your files to find exact duplicates. Free up space by removing unnecessary copies."
+            "value": "Scan a folder to find files with identical content. Reveal each copy in Finder to decide what to keep."
           }
         }
       }
@@ -320,28 +287,6 @@
         }
       }
     },
-    "duplicates.selectAllDuplicates": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select All Duplicates"
-          }
-        }
-      }
-    },
-    "duplicates.smartSelect": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Smart Select"
-          }
-        }
-      }
-    },
     "duplicates.sort.copiesMost": {
       "extractionState": "manual",
       "localizations": {
@@ -419,17 +364,6 @@
         }
       }
     },
-    "duplicates.selectedCount %lld": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld selected"
-          }
-        }
-      }
-    },
     "duplicates.willDelete": {
       "extractionState": "manual",
       "localizations": {
@@ -459,6 +393,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Delete"
+          }
+        }
+      }
+    },
+    "duplicates.truncated %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compared the first %lld files; very large folders were not fully checked"
           }
         }
       }

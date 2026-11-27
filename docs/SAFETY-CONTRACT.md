@@ -1,6 +1,6 @@
 # Safety Contract
 
-MyMacCleaner is an offline-first macOS storage and memory assistant. Phase 0 is a safety freeze: it removes legacy mutation, elevation, and optimizer behavior before reviewed cleanup plans and Trash-first execution are built in later phases.
+MyMacCleaner is an offline-first macOS storage and memory assistant. The safety contract keeps every surface read-only except one: Adaptive Experience can move approved, re-validated files to the Trash and record a receipt. Legacy deletion, elevation, and optimizer behavior was removed, and the verifiers fail if it returns.
 
 ## Run the local contract
 
@@ -14,9 +14,9 @@ The command runs the source/process audit, fixture verifier, complete SafetyCont
 
 ## Disabled capability matrix
 
-| Capability | Phase-0 behavior |
+| Capability | Behavior |
 |---|---|
-| Permanent deletion, direct cleanup, and Empty Trash | Unavailable; the app provides inventory and explanation only. |
+| Permanent deletion, direct cleanup, and Empty Trash | Unavailable. The only file change is the approved, re-validated move to the Trash in Adaptive Experience, done by `FoundationTrashAdapter`. |
 | Privileged shell work and administrator prompts | Unavailable; no generic command or authorization boundary is exposed. |
 | Memory purge, process termination, port closing, and optimizer claims | Unavailable; memory and process views are observational. |
 | Startup-item, application, and developer-tool mutation | Unavailable; inventory and system guidance remain read-only. |
@@ -24,7 +24,7 @@ The command runs the source/process audit, fixture verifier, complete SafetyCont
 
 ## Five fixed read-only process adapters
 
-Only these local inventory commands are permitted by the source contract. Their executable paths and arguments are fixed in code; no caller supplies a command or shell string.
+Only these local inventory commands are permitted by the source contract. They are the five cases of `ReadOnlyCommand` in `MyMacCleaner/Core/Services/ReadOnlyProcess.swift`, the owner of every entry in `scripts/read-only-process-allowlist.txt` and the only file in the app that may build a `Process`. Their executable paths and arguments are literals in that one file; no caller supplies a command, argument or shell string.
 
 | Adapter | Fixed command | Purpose |
 |---|---|---|
@@ -32,7 +32,9 @@ Only these local inventory commands are permitted by the source contract. Their 
 | Startup inventory | `/bin/launchctl list` | Read launch-service inventory. |
 | Port inventory | `/usr/sbin/lsof -iTCP -sTCP:LISTEN,ESTABLISHED -n -P` | Read listening and established TCP ports. |
 | System health | `/usr/sbin/diskutil info /` | Read root-volume metadata. |
-| Open-file activity | `/usr/sbin/lsof -Fn -n -P -w -b` | Mark scanned files a running process holds open as in-use, so they are never cleanup candidates. A failed listing marks nothing open. |
+| Open-file activity | `/usr/sbin/lsof -Fn -n -P -w -b` | Mark scanned files a running process holds open as in-use, so they are never cleanup candidates. A failed, timed-out or cancelled listing fails closed: every file in a Trash-eligible root counts as open for that run, Adaptive Experience says why nothing can move, and the count-only `OPEN_FILE_ACTIVITY_UNAVAILABLE` diagnostic is logged. |
+
+`ReadOnlyProcess` reads the output pipe to the end before it waits for the command to exit. Waiting first would hang both sides once the output fills the pipe buffer. `SC-PROCESS-DRAIN-ORDER` fails the gate when `waitUntilExit` comes before `readDataToEndOfFile` in the same `Process()` block. A command that runs past 10 seconds, or whose calling task is cancelled, is stopped and reported unavailable, so no screen waits on a stalled tool. `SC-UNLISTED-PROCESS` fails on a child process built anywhere else in the app, and `SC-PROCESS-IDENTITY` fails on any executable or argument that is not in the allowlist.
 
 ## Privacy and diagnostics
 
@@ -42,15 +44,13 @@ Diagnostic records are typed and bounded. Paths, local names, credentials, comma
 
 ### No-network disabled routes
 
-The SafetyContract target and disabled legacy routes contain no URLSession, URLRequest, Network.framework, or URL capability. Update networking is outside this disabled-route boundary and is not evidence that a disabled action can communicate.
+The SafetyContract target and disabled legacy routes contain no URLSession, URLRequest, Network.framework, or URL capability. The app has no update channel (`UpdateCapability.unavailable`), and `bash scripts/verify-safety-contract.sh --diagnostics-network-only` fails if an updater, `URLSession`, Sparkle import, or appcast reference returns.
 
-## Hosted mirror and pending evidence
+## Hosted CI and remaining evidence
 
-`.github/workflows/safety-contract.yml` mirrors the exact local command on `macos-14`. It has `contents: read`, uses only `actions/checkout@v4` with persisted credentials disabled, and has no cache, artifact, signing, notarization, release, publication, or write-permission capability.
+`.github/workflows/safety-contract.yml` runs `bash scripts/verify-all.sh` on a `macos-26` runner with Xcode 26. That script runs `bash scripts/verify-safety-contract.sh`, followed by the CleanerCore gate, the CleanerCore source contract, both Adaptive Experience verifiers, and every verifier self-test. It has `contents: read`, uses only the official `actions/checkout` pinned to a full commit SHA with persisted credentials disabled, and has no cache, artifact, signing, notarization, release, publication, or write-permission capability.
 
-Two gates remain intentionally pending:
+- **First hosted run**: done. The Safety Contract workflow has passed on a recorded commit; see [RELEASE-RUNBOOK.md](RELEASE-RUNBOOK.md).
+- **Full-Xcode**: the app build, unit tests, and archive pass in the PR Checks workflow, and UI tests run there as an advisory job. The manual VoiceOver, keyboard, Reduce Motion, and Increase Contrast walk is still pending.
 
-- **Full-Xcode**: run the app and UI test command recorded in Phase 0 validation on a runner with full Xcode.
-- **First hosted run**: after the authorized private push, confirm the new workflow executes the same local command and passes.
-
-Do not describe either gate as complete until its own current evidence exists.
+[RELEASE-RUNBOOK.md](RELEASE-RUNBOOK.md) is the only place release status is claimed. Do not describe a gate as complete there until its own evidence exists.

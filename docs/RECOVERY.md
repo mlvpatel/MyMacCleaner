@@ -18,12 +18,25 @@ a link count of 1; otherwise the item is skipped, never moved.
 
 Items run one at a time. A partial run is never represented as complete success.
 
+Quit does not cut a run short. While items move, `applicationShouldTerminate`
+asks the user: **Keep Moving** cancels the quit; **Stop and Quit** uses the same
+stop as the Stop button (no item starts after it, the current one finishes and
+is recorded), and the app replies to the quit only after the run has ended and
+its receipt is written. A crash or forced quit can still interrupt a run; the
+next launch reconciles it as described below.
+
 ## After a move
 
-A successful move records the Foundation-returned Trash URL. Finder reveal uses
-that URL through `FinderReceiptRevealAdapter`. The UI must not invent a `.Trash`
-path. If macOS reports the move but returns no URL, the item is still recorded
-as moved and reveal reports its location as unknown.
+A successful move records the Foundation-returned Trash URL. The UI must not
+invent a `.Trash` path. If macOS reports the move but returns no URL, the item
+is still recorded as moved and its location is unknown.
+
+If the journal write fails after an item moved, the run reports
+`receiptIncomplete`: the session keeps each moved item's returned Trash location
+in memory until the app quits and lists them in the receipts sheet, so the user
+can still find what moved. The failure notice has **Open Receipts**, which opens
+that sheet. On the next launch that receipt reconciles to
+needs-attention; the move is never repeated.
 
 ## When recovery is impossible
 
@@ -37,11 +50,21 @@ must say recovery is unavailable. Do not promise restore.
 - Users may delete local history; deletion does not print paths
 - On relaunch, interrupted journals reconcile to terminal or needs-attention
   states without repeating a mutation
+- A crash mid-write leaves only a hidden temp file: the loader ignores it (and
+  `.DS_Store`), and the next history access sweeps it under the lease. A folder
+  holding only temp files never got its intent, so nothing ran and it is removed
+- A run is refused, with nothing moved, when another app instance holds the
+  history lock (`historyBusy`), when 50 unresolved receipts are already kept
+  (`reviewRequired`), or when history cannot be opened or written
+  (`receiptHistoryUnavailable`). When history cannot be listed, the receipts
+  sheet says so and why instead of showing an empty list
+- Each of these logs a closed `RECEIPT_*` event code with counts only, at
+  notice or error level so the unified log keeps it
 
 ## Adaptive Experience
 
-The receipts sheet shows opaque receipt IDs and recovery markers
-(`receipt.recovery.mayBeAvailable`, `receipt.recovery.unavailable`). Its
+The receipts sheet shows opaque receipt IDs, each receipt's item count, and
+recovery markers (`receipt.recovery.mayBeAvailable`, `receipt.recovery.unavailable`). Its
 approve/confirm step is the only path to Trash execute: it passes the reviewed
 digest to `AdaptiveTrustSession.executeDisplayedPlan`.
 
@@ -50,3 +73,5 @@ digest to `AdaptiveTrustSession.executeDisplayedPlan`.
 - `CleanerCore/Tests/CleanerCoreTests/ReceiptTrustCoreTests.swift`
 - `CleanerCore/Tests/CleanerCoreFoundationTests/ReceiptRecoveryTests.swift`
 - `CleanerCore/Tests/CleanerCoreFoundationTests/ReceiptRetentionAndDeletionTests.swift`
+- `CleanerCore/Tests/CleanerCoreFoundationTests/ReceiptStoreHostileFixtureTests.swift`
+- `MyMacCleanerTests/ReceiptHistorySessionTests.swift`

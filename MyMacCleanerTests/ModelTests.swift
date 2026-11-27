@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CleanerCore
 @testable import MyMacCleaner
 
 // MARK: - Scan Category Tests
@@ -7,18 +8,31 @@ import Foundation
 @Suite("Scan Category Tests")
 struct ScanCategoryTests {
 
-    @Test("All scan categories have paths defined")
-    func allCategoriesHavePaths() async throws {
-        for category in ScanCategory.allCases {
-            #expect(!category.paths.isEmpty, "Category \(category.rawValue) should have paths")
-        }
+    @Test("Every scanned root gets its own category, so personal folders are never labelled junk")
+    func everyRootMapsToItsOwnCategory() {
+        let categories = CleanerCoreLiveScan.allRootKinds.map(ScanCategory.init)
+
+        #expect(categories == [.caches, .logs, .temporaryFiles, .downloads, .desktop, .documents])
+        #expect(Set(categories).count == ScanCategory.allCases.count)
     }
 
-    @Test("Categories have localized names")
+    @Test("Downloads, Desktop and Documents are personal folders; the rest are app data")
+    func personalFoldersAreFlagged() {
+        let personal = ScanCategory.allCases.filter(\.isPersonalFolder)
+
+        #expect(personal == [.downloads, .desktop, .documents])
+    }
+
+    @Test("User temp is named Temporary files")
+    func temporaryFolderIsNamedHonestly() {
+        #expect(ScanCategory(.userTemporary).localizedName == "Temporary files")
+    }
+
+    @Test("Categories have localized names and descriptions")
     func categoriesHaveLocalizedNames() async throws {
         for category in ScanCategory.allCases {
-            let name = category.localizedName
-            #expect(!name.isEmpty, "Category \(category.rawValue) should have a localized name")
+            #expect(category.localizedName != "category.\(category.rawValue).name")
+            #expect(category.localizedDescription != "category.\(category.rawValue).description")
         }
     }
 
@@ -29,43 +43,12 @@ struct ScanCategoryTests {
             #expect(!icon.isEmpty, "Category \(category.rawValue) should have an icon")
         }
     }
-
-    @Test("FDA requirement is properly set")
-    func fdaRequirements() async throws {
-        // System cache typically requires FDA
-        #expect(ScanCategory.systemCache.requiresFullDiskAccess == true)
-        // User cache doesn't require FDA
-        #expect(ScanCategory.userCache.requiresFullDiskAccess == false)
-    }
-
-    @Test("User consent requirement is properly set for TCC-protected directories")
-    func userConsentRequirements() async throws {
-        // Downloads and mail attachments require user consent (TCC-protected)
-        #expect(ScanCategory.downloads.requiresUserConsent == true)
-        #expect(ScanCategory.mailAttachments.requiresUserConsent == true)
-        // Other categories don't require explicit user consent
-        #expect(ScanCategory.userCache.requiresUserConsent == false)
-        #expect(ScanCategory.systemCache.requiresUserConsent == false)
-        #expect(ScanCategory.browserCache.requiresUserConsent == false)
-    }
 }
 
 // MARK: - Cleanable Item Tests
 
 @Suite("Cleanable Item Tests")
 struct CleanableItemTests {
-
-    @Test("Item is selected by default")
-    func itemSelectedByDefault() async throws {
-        let item = CleanableItem(
-            name: "test.txt",
-            path: URL(fileURLWithPath: "/tmp/test.txt"),
-            size: 1024,
-            modificationDate: Date(),
-            category: .userCache
-        )
-        #expect(item.isSelected == true)
-    }
 
     @Test("Item has unique ID")
     func itemHasUniqueId() async throws {
@@ -74,14 +57,14 @@ struct CleanableItemTests {
             path: URL(fileURLWithPath: "/tmp/test1.txt"),
             size: 1024,
             modificationDate: Date(),
-            category: .userCache
+            category: .caches
         )
         let item2 = CleanableItem(
             name: "test2.txt",
             path: URL(fileURLWithPath: "/tmp/test2.txt"),
             size: 1024,
             modificationDate: Date(),
-            category: .userCache
+            category: .caches
         )
         #expect(item1.id != item2.id)
     }
@@ -100,41 +83,19 @@ struct ScanResultTests {
                 path: URL(fileURLWithPath: "/tmp/file1.txt"),
                 size: 1000,
                 modificationDate: Date(),
-                category: .userCache
+                category: .caches
             ),
             CleanableItem(
                 name: "file2.txt",
                 path: URL(fileURLWithPath: "/tmp/file2.txt"),
                 size: 2000,
                 modificationDate: Date(),
-                category: .userCache
+                category: .caches
             )
         ]
 
-        let result = ScanResult(category: .userCache, items: items)
+        let result = ScanResult(category: .caches, items: items)
         #expect(result.totalSize == 3000)
-    }
-
-    @Test("Selected size only counts selected items")
-    func selectedSizeCalculation() async throws {
-        var item1 = CleanableItem(
-            name: "file1.txt",
-            path: URL(fileURLWithPath: "/tmp/file1.txt"),
-            size: 1000,
-            modificationDate: Date(),
-            category: .userCache
-        )
-        var item2 = CleanableItem(
-            name: "file2.txt",
-            path: URL(fileURLWithPath: "/tmp/file2.txt"),
-            size: 2000,
-            modificationDate: Date(),
-            category: .userCache
-        )
-        item2.isSelected = false
-
-        var result = ScanResult(category: .userCache, items: [item1, item2])
-        #expect(result.selectedSize == 1000)
     }
 
     @Test("Item count is correct")
@@ -145,11 +106,11 @@ struct ScanResultTests {
                 path: URL(fileURLWithPath: "/tmp/file\(i).txt"),
                 size: Int64(i * 100),
                 modificationDate: Date(),
-                category: .userCache
+                category: .caches
             )
         }
 
-        let result = ScanResult(category: .userCache, items: items)
+        let result = ScanResult(category: .caches, items: items)
         #expect(result.itemCount == 5)
     }
 }
@@ -229,5 +190,11 @@ struct ThemeTests {
         #expect(Theme.Timing.toastDuration > 0)
         #expect(Theme.Timing.clearResultsDelay > 0)
         #expect(Theme.Timing.processRefreshInterval > 0)
+    }
+
+    @Test("Reduce Motion drops the animation; otherwise it passes through")
+    func motionHonoursReduceMotion() {
+        #expect(Theme.Animation.motion(Theme.Animation.spring, reduce: true) == nil)
+        #expect(Theme.Animation.motion(Theme.Animation.spring, reduce: false) == Theme.Animation.spring)
     }
 }

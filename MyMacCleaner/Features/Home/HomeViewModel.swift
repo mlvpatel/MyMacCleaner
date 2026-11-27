@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 @MainActor
@@ -5,50 +6,56 @@ class HomeViewModel: ObservableObject {
     // MARK: - Published Properties
 
     @Published var isScanning = false
-    @Published var scanProgress: Double = 0
-    @Published var currentScanCategory: ScanCategory?
     @Published var scanResults: [ScanResult] = []
     @Published var showScanResults = false
     @Published var scanError: String?
+    /// Folders the last completed Smart Scan could not fully read; nil until a scan completes.
+    @Published private(set) var lastScanCoverage: LegacyScanCoverage?
+    /// True when leaving the page stopped the last scan; cleared by the next scan or result.
+    @Published private(set) var scanStoppedByLeaving = false
 
     // Permission state
     @Published var showPermissionPrompt = false
     @Published var hasFullDiskAccess = false
+    /// Set when the user picks Limited Scan, so the prompt stays away for the rest of the session.
+    private var choseLimitedScan = false
 
     // System stats
     @Published var storageUsed: String = "0 GB"
     @Published var storageTotal: String = "0 GB"
     @Published var storageFree: String = "0 GB"
     @Published var memoryUsed: String = "0 GB"
-    /// Reviewable storage from the last Smart Scan; no figure is shown before a scan runs.
-    @Published var junkSize: String = L("home.stats.scanToCheck")
+    /// Caches, logs and temporary files from the last Smart Scan; personal folders never count.
+    /// No figure is shown before a scan runs.
+    @Published var cacheAndLogSize: String = L("home.stats.scanToCheck")
     @Published var appCount: Int = 0
 
-    // System health
-    @Published var systemHealthStatus: String = L("home.health.healthy")
-    @Published var systemHealthColor: Color = .green
+    /// Disk and memory health from the last completed Smart Scan; shown on Home and in the sidebar.
+    @Published private(set) var healthLevel: SystemHealthLevel = .notScanned
 
-    // Toast notification
-    @Published var showToast = false
-    @Published var toastMessage: String = ""
-    @Published var toastType: ToastType = .success
-    @Published private(set) var latestSafetyNotice: SafetyNoticeState?
-
-    // Navigation callback - set by parent view to handle navigation requests
-    var onNavigateToSection: ((String) -> Void)?
+    let toasts = ToastPresenter()
 
     // MARK: - Private Properties
 
-    private let liveScan: CleanerCoreLiveScan
+    private let scanStore: SharedScanStore
+    private var scanStoreObserver: AnyCancellable?
     private let permissionsService = PermissionsService.shared
     private let safetyNoticePresenter = SafetyNoticePresenter()
-    private var toastPresentationID = UUID()
-    private var scanTask: Task<Void, Never>?
+    /// Readable so tests can await a scan instead of sleeping.
+    private(set) var scanTask: Task<Void, Never>?
+    /// Bumped by every start and cancel, so a late result from an older scan is ignored.
+    private var scanGeneration: UInt64 = 0
 
     // MARK: - Initialization
 
-    init(scan: CleanerCoreLiveScan = CleanerCoreLiveScan()) {
-        liveScan = scan
+    init(scanStore: SharedScanStore = SharedScanStore(scan: { try await CleanerCoreLiveScan().sharedScan() })) {
+        self.scanStore = scanStore
+        scanStoreObserver = scanStore.$latest
+            .compactMap { $0 }
+            .sink { [weak self] scan in
+                // The store publishes from the main actor.
+                MainActor.assumeIsolated { self?.adopt(scan) }
+            }
         Task {
             await loadSystemStats()
             await checkPermissions()
@@ -61,7 +68,7 @@ class HomeViewModel: ObservableObject {
         guard !isScanning else { return }
 
         // Check if we should prompt for permissions
-        if !hasFullDiskAccess && !showPermissionPrompt {
+        if !hasFullDiskAccess && !choseLimitedScan && !showPermissionPrompt {
             showPermissionPrompt = true
             return
         }
@@ -70,6 +77,16 @@ class HomeViewModel: ObservableObject {
     }
 
     func continueWithLimitedScan() {
+        choseLimitedScan = true
+        showPermissionPrompt = false
+        performScan()
+    }
+
+    /// Access granted while the prompt is open: close it and run the scan the user asked for.
+    /// Internal for tests.
+    func updateFullDiskAccess(_ granted: Bool) {
+        hasFullDiskAccess = granted
+        guard granted, showPermissionPrompt else { return }
         showPermissionPrompt = false
         performScan()
     }
@@ -78,11 +95,19 @@ class HomeViewModel: ObservableObject {
         showPermissionPrompt = false
     }
 
-    /// Stops an in-flight Smart Scan and discards its partial results.
+    /// Stops an in-flight Smart Scan, discarding its partial results and keeping the last completed ones.
     func cancelScan() {
         guard isScanning else { return }
+        scanGeneration &+= 1
         scanTask?.cancel()
         finishScan()
+    }
+
+    /// Leaving the page stops a running scan and remembers that it did, so the page can say so.
+    func leavePage() {
+        guard isScanning else { return }
+        cancelScan()
+        scanStoppedByLeaving = true
     }
 
     func refreshPermissions() {
@@ -95,86 +120,40 @@ class HomeViewModel: ObservableObject {
         publishSafetyNotice(safetyNoticePresenter.homeTrashReviewNotice())
     }
 
-    /// Opens the read-only memory guide; this action has no memory-control capability.
-    func openMemoryGuide() {
-        onNavigateToSection?("performance")
-    }
-
-    func viewLargeFiles() {
-        onNavigateToSection?("spaceLens")
-    }
-
-    func explainSelectedStorageReview() {
-        guard scanResults.contains(where: { $0.isSelected }) else {
-            showToastMessage(L("safety.notice.noSelection"), type: .info)
-            return
-        }
-
-        publishSafetyNotice(
-            safetyNoticePresenter.homeSelectedStorageReviewNotice()
-        )
-    }
-
     func showToastMessage(_ message: String, type: ToastType) {
-        latestSafetyNotice = nil
-        presentToast(message, type: type)
-    }
-
-    func dismissToast() {
-        showToast = false
-        latestSafetyNotice = nil
+        toasts.show(message, type: type)
     }
 
     private func publishSafetyNotice(_ notice: SafetyNoticeState) {
-        latestSafetyNotice = notice
-        presentToast(notice.message, type: .info)
-    }
-
-    private func presentToast(_ message: String, type: ToastType) {
-        let presentationID = UUID()
-        toastPresentationID = presentationID
-        toastMessage = message
-        toastType = type
-        showToast = true
-
-        // Auto-hide after 3 seconds
-        Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            guard toastPresentationID == presentationID else { return }
-            dismissToast()
-        }
+        toasts.show(notice)
     }
 
     // MARK: - Private Methods
 
     private func performScan() {
         guard !isScanning else { return }
+        // The last results stay until this scan finishes, so leaving the page or Cancel keeps them.
         isScanning = true
-        scanProgress = 0
-        scanResults = []
         scanError = nil
+        scanStoppedByLeaving = false
+        scanGeneration &+= 1
+        let generation = scanGeneration
 
-        scanTask = Task { [liveScan] in
+        scanTask = Task { [scanStore] in
             do {
-                let results = try await liveScan.scanAllCategories { progress, category in
-                    guard self.isScanning else { return }
-                    self.scanProgress = progress
-                    self.currentScanCategory = category
-                }
-                // A cancelled scan returns partial evidence; never present it as a result.
-                guard !Task.isCancelled else { return }
+                let scan = try await scanStore.refresh()
+                // A cancelled or superseded scan returns partial evidence; never present it.
+                guard generation == scanGeneration, !Task.isCancelled else { return }
 
-                scanResults = results
-                showScanResults = !results.isEmpty
-
-                // Update junk size with actual results
-                let totalJunk = results.reduce(0) { $0 + $1.totalSize }
-                junkSize = formatBytes(totalJunk)
+                show(scan.legacyReport)
+                // Re-sample storage, memory and health at the moment the scan completes.
+                await loadSystemStats()
             } catch {
-                guard !Task.isCancelled else { return }
+                guard generation == scanGeneration, !Task.isCancelled else { return }
                 scanError = LFormat("home.scanFailed %@", error.localizedDescription)
             }
 
+            guard generation == scanGeneration else { return }
             finishScan()
         }
     }
@@ -182,12 +161,31 @@ class HomeViewModel: ObservableObject {
     private func finishScan() {
         scanTask = nil
         isScanning = false
-        currentScanCategory = nil
+    }
+
+    /// Shows a scan another screen ran; a Smart Scan in progress shows its own result instead.
+    private func adopt(_ scan: SharedScan) {
+        guard !isScanning else { return }
+        show(scan.legacyReport)
+        Task { await loadSystemStats() }
+    }
+
+    private func show(_ report: LegacyScanReport) {
+        scanStoppedByLeaving = false
+        scanResults = report.results
+        showScanResults = !report.results.isEmpty
+        lastScanCoverage = report.coverage
+        cacheAndLogSize = formatBytes(Self.cacheAndLogBytes(in: report.results))
+    }
+
+    /// App data only: Downloads, Desktop and Documents are the user's own files.
+    static func cacheAndLogBytes(in results: [ScanResult]) -> Int64 {
+        results.filter { !$0.category.isPersonalFolder }.reduce(0) { $0 + $1.totalSize }
     }
 
     private func checkPermissions() async {
         permissionsService.checkFullDiskAccess()
-        hasFullDiskAccess = permissionsService.hasFullDiskAccess
+        updateFullDiskAccess(permissionsService.hasFullDiskAccess)
     }
 
     private func loadSystemStats() async {
@@ -201,92 +199,32 @@ class HomeViewModel: ObservableObject {
         let memoryStats = getMemoryStats()
         memoryUsed = formatBytes(memoryStats.used)
 
-        // Count installed apps
-        appCount = countInstalledApps()
+        // Count installed apps the way the Applications page does
+        appCount = InstalledApplications.bundleURLs().count
 
         // Determine system health
         updateSystemHealth(diskStats: diskStats, memoryStats: memoryStats)
     }
 
     private func getDiskSpace() -> (total: Int64, used: Int64, free: Int64) {
-        do {
-            let homeURL = FileManager.default.homeDirectoryForCurrentUser
-            let values = try homeURL.resourceValues(forKeys: [
-                .volumeTotalCapacityKey,
-                .volumeAvailableCapacityForImportantUsageKey
-            ])
-
-            let total = Int64(values.volumeTotalCapacity ?? 0)
-            let available = Int64(values.volumeAvailableCapacityForImportantUsage ?? 0)
-            let used = total - available
-
-            return (total, used, available)
-        } catch {
-            return (0, 0, 0)
-        }
+        let disk = SystemStatsProvider.diskUsage()
+        return (disk.total, disk.used, disk.total - disk.used)
     }
 
-    private func getMemoryStats() -> (total: UInt64, used: UInt64, free: UInt64) {
-        let total = ProcessInfo.processInfo.physicalMemory
-
-        // Get actual memory usage via host_statistics64
-        var stats = vm_statistics64()
-        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
-
-        let result = withUnsafeMutablePointer(to: &stats) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
-            }
-        }
-
-        if result == KERN_SUCCESS {
-            let pageSize = UInt64(getpagesize())
-            let free = UInt64(stats.free_count) * pageSize
-            let active = UInt64(stats.active_count) * pageSize
-            let inactive = UInt64(stats.inactive_count) * pageSize
-            let wired = UInt64(stats.wire_count) * pageSize
-            let compressed = UInt64(stats.compressor_page_count) * pageSize
-
-            let used = active + wired + compressed
-            return (total, used, free + inactive)
-        }
-
-        // Fallback estimate
-        let used = UInt64(Double(total) * 0.6)
-        return (total, used, total - used)
+    private func getMemoryStats() -> (total: UInt64, used: UInt64) {
+        let memory = SystemStatsProvider.memoryUsage() ?? (0, ProcessInfo.processInfo.physicalMemory)
+        return (memory.total, memory.used)
     }
 
-    private func countInstalledApps() -> Int {
-        let applicationsURL = URL(fileURLWithPath: "/Applications")
-        do {
-            let contents = try FileManager.default.contentsOfDirectory(
-                at: applicationsURL,
-                includingPropertiesForKeys: nil,
-                options: [.skipsHiddenFiles]
-            )
-            return contents.filter { $0.pathExtension == "app" }.count
-        } catch {
-            return 0
-        }
-    }
-
+    /// Health is only claimed once a Smart Scan has completed; until then it stays "Not scanned yet".
     private func updateSystemHealth(
         diskStats: (total: Int64, used: Int64, free: Int64),
-        memoryStats: (total: UInt64, used: UInt64, free: UInt64)
+        memoryStats: (total: UInt64, used: UInt64)
     ) {
-        let diskUsagePercent = diskStats.total > 0 ? Double(diskStats.used) / Double(diskStats.total) : 0
-        let memoryUsagePercent = memoryStats.total > 0 ? Double(memoryStats.used) / Double(memoryStats.total) : 0
-
-        if diskUsagePercent > 0.9 || memoryUsagePercent > 0.9 {
-            systemHealthStatus = L("home.health.needsAttention")
-            systemHealthColor = .red
-        } else if diskUsagePercent > 0.75 || memoryUsagePercent > 0.8 {
-            systemHealthStatus = L("home.health.fair")
-            systemHealthColor = .yellow
-        } else {
-            systemHealthStatus = L("home.health.healthy")
-            systemHealthColor = .green
-        }
+        guard lastScanCoverage != nil else { return }
+        let diskUsage = diskStats.total > 0 ? Double(diskStats.used) / Double(diskStats.total) : 0
+        let memoryUsage = memoryStats.total > 0 ? Double(memoryStats.used) / Double(memoryStats.total) : 0
+        healthLevel = .assess(diskUsage: diskUsage, memoryUsage: memoryUsage)
     }
 
     private func formatBytes(_ bytes: Int64) -> String {

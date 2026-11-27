@@ -43,3 +43,10 @@ ExportOptions.plist
 *.log
 *.profraw
 *.profdata
+
+# Test results and local tool state (never committed or published)
+*.xcresult
+.swiftpm/
+.archify/
+agentdb.rvf*
+ruvector.db

@@ -78,24 +78,13 @@
         }
       }
     },
-    "orphans.deselectAll": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Deselect All"
-          }
-        }
-      }
-    },
     "orphans.empty.description": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Your system is clean. No leftover files from deleted applications were found."
+            "value": "No leftover files from deleted applications were found."
           }
         }
       }
@@ -183,7 +172,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Find leftover files from applications you deleted in the past. These files take up space but are no longer needed."
+            "value": "Find files that look like leftovers from applications you deleted. Some may still hold settings or licenses, so check each one in Finder."
           }
         }
       }
@@ -228,28 +217,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Search orphaned files..."
-          }
-        }
-      }
-    },
-    "orphans.selectAll": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select All"
-          }
-        }
-      }
-    },
-    "orphans.selected %lld": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld selected"
           }
         }
       }

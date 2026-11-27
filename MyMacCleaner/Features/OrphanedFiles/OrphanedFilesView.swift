@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OrphanedFilesView: View {
     @ObservedObject var viewModel: OrphanedFilesViewModel
+    let openExperience: () -> Void
     @State private var isVisible = false
 
     private let sectionColor = Theme.Colors.orphans
@@ -13,6 +14,9 @@ struct OrphanedFilesView: View {
                     // Header
                     headerSection
                         .staggeredAnimation(index: 0, isActive: isVisible)
+                    if viewModel.scanStoppedByLeaving {
+                        ScanStoppedNotice()
+                    }
 
                     // Content
                     if !viewModel.hasScanned && !viewModel.isScanning {
@@ -29,7 +33,7 @@ struct OrphanedFilesView: View {
                             .staggeredAnimation(index: 2, isActive: isVisible)
 
                         if !viewModel.orphanedFiles.isEmpty {
-                            reviewButtonSection
+                            ExperienceHandoffCard(openExperience: openExperience)
                                 .staggeredAnimation(index: 3, isActive: isVisible)
                         }
                     }
@@ -52,33 +56,18 @@ struct OrphanedFilesView: View {
                     accentColor: sectionColor,
                     onCancel: viewModel.cancelScan
                 )
-                .transition(.scale.combined(with: .opacity))
+                .motionTransition(.scale.combined(with: .opacity))
             }
 
-            // Toast
-            if viewModel.showToast {
-                VStack {
-                    ToastView(
-                        message: viewModel.toastMessage,
-                        type: viewModel.toastType,
-                        safetyNotice: viewModel.latestSafetyNotice,
-                        onDismiss: viewModel.dismissToast
-                    )
-                    .padding(.top, Theme.Spacing.lg)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
         }
         .animation(Theme.Animation.springSmooth, value: viewModel.isScanning)
-        .animation(Theme.Animation.spring, value: viewModel.showToast)
         .onAppear {
             withAnimation(Theme.Animation.springSmooth) {
                 isVisible = true
             }
         }
         .onDisappear {
-            viewModel.cancelScan()
+            viewModel.leavePage()
         }
     }
 
@@ -251,24 +240,6 @@ struct OrphanedFilesView: View {
 
             Spacer()
 
-            // Selection controls
-            Button(L("diskCleaner.selectAll")) {
-                viewModel.selectAll()
-            }
-            .buttonStyle(.plain)
-            .font(Theme.Typography.size12Medium)
-            .foregroundStyle(sectionColor)
-
-            Text("·")
-                .foregroundStyle(.tertiary)
-
-            Button(L("diskCleaner.deselectAll")) {
-                viewModel.deselectAll()
-            }
-            .buttonStyle(.plain)
-            .font(Theme.Typography.size12Medium)
-            .foregroundStyle(sectionColor)
-
             // Rescan
             Button(action: viewModel.startScan) {
                 HStack(spacing: Theme.Spacing.xxs) {
@@ -289,6 +260,10 @@ struct OrphanedFilesView: View {
 
     private var categoryListSection: some View {
         VStack(spacing: Theme.Spacing.sm) {
+            if viewModel.hasNoSearchMatches {
+                NoSearchMatchesView(query: viewModel.searchText, onClear: viewModel.clearSearch)
+            }
+
             ForEach(viewModel.categoriesWithFiles, id: \.self) { category in
                 if let files = viewModel.filesByCategory[category], !files.isEmpty {
                     OrphanCategoryCard(
@@ -297,12 +272,6 @@ struct OrphanedFilesView: View {
                         isExpanded: viewModel.expandedCategory == category,
                         onToggleExpand: {
                             viewModel.toggleCategoryExpansion(category)
-                        },
-                        onToggleFile: { file in
-                            viewModel.toggleSelection(file)
-                        },
-                        onToggleAll: {
-                            viewModel.toggleCategorySelection(category)
                         },
                         onReveal: { file in
                             viewModel.revealInFinder(file)
@@ -314,34 +283,6 @@ struct OrphanedFilesView: View {
         }
     }
 
-    // MARK: - Review Button
-
-    private var reviewButtonSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                Text(LFormat("diskCleaner.selected %@", viewModel.formattedSelectedSize))
-                    .font(Theme.Typography.size15Semibold)
-
-                Text(LFormat("diskCleaner.itemCount %lld", Int64(viewModel.selectedCount)))
-                    .font(Theme.Typography.size11)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            GlassActionButton(
-                LFormat("safety.notice.reviewSelected %@", viewModel.formattedSelectedSize),
-                icon: "info.circle.fill",
-                color: .blue,
-                disabled: viewModel.selectedCount == 0
-            ) {
-                viewModel.explainOrphanReview()
-            }
-        }
-        .padding(Theme.Spacing.lg)
-        .glassCard()
-        .shadow(color: Color.blue.opacity(0.2), radius: 15, y: 5)
-    }
 }
 
 // MARK: - Orphan Category Card
@@ -351,8 +292,6 @@ struct OrphanCategoryCard: View {
     let files: [OrphanedFile]
     let isExpanded: Bool
     let onToggleExpand: () -> Void
-    let onToggleFile: (OrphanedFile) -> Void
-    let onToggleAll: () -> Void
     let onReveal: (OrphanedFile) -> Void
     let accentColor: Color
 
@@ -360,55 +299,10 @@ struct OrphanCategoryCard: View {
         files.reduce(0) { $0 + $1.size }
     }
 
-    var selectedCount: Int {
-        files.filter { $0.isSelected }.count
-    }
-
-    var allSelected: Bool {
-        files.allSatisfy { $0.isSelected }
-    }
-
-    var someSelected: Bool {
-        files.contains { $0.isSelected } && !allSelected
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack(spacing: 0) {
-                // Checkbox for selecting all - separate hit area
-                Button(action: onToggleAll) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                            .stroke(allSelected || someSelected ? accentColor : Color.secondary.opacity(0.5), lineWidth: 1.5)
-                            .frame(width: 20, height: 20)
-
-                        if allSelected {
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                                .fill(accentColor)
-                                .frame(width: 20, height: 20)
-
-                            Image(systemName: "checkmark")
-                                .font(Theme.Typography.size10Bold)
-                                .foregroundStyle(.white)
-                        } else if someSelected {
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                                .fill(accentColor.opacity(0.5))
-                                .frame(width: 20, height: 20)
-
-                            Image(systemName: "minus")
-                                .font(Theme.Typography.size10Bold)
-                                .foregroundStyle(.white)
-                        }
-                    }
-                    .padding(.leading, Theme.Spacing.md)
-                    .padding(.trailing, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                // Expandable area - everything else
                 HStack(spacing: Theme.Spacing.md) {
                     // Category icon
                     ZStack {
@@ -433,28 +327,19 @@ struct OrphanCategoryCard: View {
 
                     Spacer()
 
-                    // Size and selection
-                    VStack(alignment: .trailing, spacing: Theme.Spacing.tiny) {
-                        Text(ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file))
-                            .font(Theme.Typography.size14Semibold)
-                            .foregroundStyle(accentColor)
-
-                        if selectedCount > 0 {
-                            Text(LFormat("orphans.selected %lld", Int64(selectedCount)))
-                                .font(Theme.Typography.size11)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    // Size
+                    Text(ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file))
+                        .font(Theme.Typography.size14Semibold)
+                        .foregroundStyle(accentColor)
 
                     // Expand indicator
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(Theme.Typography.size12Semibold)
                         .foregroundStyle(.tertiary)
                 }
-                .padding(.trailing, Theme.Spacing.md)
+                .padding(.horizontal, Theme.Spacing.md)
                 .padding(.vertical, Theme.Spacing.md)
-                .contentShape(Rectangle())
-                .onTapGesture(perform: onToggleExpand)
+                .expandButton(isExpanded: isExpanded, action: onToggleExpand)
             }
 
             // Expanded content
@@ -463,14 +348,9 @@ struct OrphanCategoryCard: View {
                     .padding(.horizontal, Theme.Spacing.md)
 
                 // File list
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     ForEach(files) { file in
-                        OrphanFileRow(
-                            file: file,
-                            onToggle: { onToggleFile(file) },
-                            onReveal: { onReveal(file) },
-                            accentColor: accentColor
-                        )
+                        OrphanFileRow(file: file, onReveal: { onReveal(file) })
                     }
                 }
                 .padding(.vertical, Theme.Spacing.sm)
@@ -484,34 +364,12 @@ struct OrphanCategoryCard: View {
 
 struct OrphanFileRow: View {
     let file: OrphanedFile
-    let onToggle: () -> Void
     let onReveal: () -> Void
-    let accentColor: Color
 
     @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            // Checkbox
-            Button(action: onToggle) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                        .stroke(file.isSelected ? accentColor : Color.white.opacity(0.3), lineWidth: 1.5)
-                        .frame(width: 18, height: 18)
-
-                    if file.isSelected {
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                            .fill(accentColor)
-                            .frame(width: 18, height: 18)
-
-                        Image(systemName: "checkmark")
-                            .font(Theme.Typography.size10Bold)
-                            .foregroundStyle(.white)
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-
             // File info
             VStack(alignment: .leading, spacing: Theme.Spacing.tiny) {
                 HStack(spacing: Theme.Spacing.xxxs) {
@@ -549,28 +407,26 @@ struct OrphanFileRow: View {
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 60, alignment: .trailing)
 
-            // Reveal button
-            if isHovered {
-                Button(action: onReveal) {
-                    Image(systemName: "folder")
-                        .font(Theme.Typography.size12)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .transition(.opacity)
+            // Always present, so the keyboard and VoiceOver can reach it; hover only brightens it.
+            Button(action: onReveal) {
+                Image(systemName: "folder")
+                    .font(Theme.Typography.size12)
+                    .foregroundStyle(.secondary)
             }
+            .buttonStyle(.plain)
+            .focusRing(cornerRadius: Theme.CornerRadius.small)
+            .opacity(isHovered ? 1 : 0.6)
+            .help(L("common.showInFinder"))
+            .accessibilityLabel(L("common.showInFinder"))
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.xs)
-        .background(isHovered ? Color.white.opacity(0.03) : Color.clear)
+        .background(isHovered ? Theme.Colors.subtleFill : Color.clear)
         .contentShape(Rectangle())
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }
-        }
-        .onTapGesture {
-            onToggle()
         }
     }
 }
@@ -578,6 +434,6 @@ struct OrphanFileRow: View {
 // MARK: - Preview
 
 #Preview {
-    OrphanedFilesView(viewModel: OrphanedFilesViewModel())
+    OrphanedFilesView(viewModel: OrphanedFilesViewModel(), openExperience: {})
         .frame(width: 800, height: 600)
 }

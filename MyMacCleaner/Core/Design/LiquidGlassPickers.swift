@@ -25,12 +25,7 @@ struct GlassControlModifier: ViewModifier {
             .padding(.horizontal, Theme.ControlSize.horizontalPadding)
             .padding(.vertical, Theme.ControlSize.verticalPadding)
             .frame(height: Theme.ControlSize.toolbarHeight)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.ControlSize.controlRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.ControlSize.controlRadius)
-                    .strokeBorder(.white.opacity(0.1), lineWidth: 1)
-            )
+            .modifier(GlassFallback(shape: RoundedRectangle(cornerRadius: Theme.ControlSize.controlRadius)))
     }
 }
 
@@ -42,21 +37,19 @@ extension View {
 
 // MARK: - Glass Toggle (Native Toggle with Glass Styling)
 
+/// The title is the switch's own label, so VoiceOver names the switch.
 struct GlassToggle: View {
     let title: String
     @Binding var isOn: Bool
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.xs) {
+        Toggle(isOn: $isOn) {
             Text(title)
                 .font(Theme.ControlSize.controlFont)
                 .foregroundStyle(.secondary)
-
-            Toggle("", isOn: $isOn)
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .labelsHidden()
         }
+        .toggleStyle(.switch)
+        .controlSize(.small)
         .glassControlStyle()
     }
 }
@@ -113,12 +106,9 @@ struct GlassMenuModifier: ViewModifier {
     }
 
     private func menuFallback(content: Content) -> some View {
-        content
-            .background(isHovered ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.clear))
-            .clipShape(RoundedRectangle(cornerRadius: Theme.ControlSize.controlRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.ControlSize.controlRadius)
-                    .strokeBorder(.white.opacity(isHovered ? 0.15 : 0.1), lineWidth: 1)
-            )
+        content.modifier(GlassFallback(
+            shape: RoundedRectangle(cornerRadius: Theme.ControlSize.controlRadius),
+            material: isHovered ? .ultraThinMaterial : nil
+        ))
     }
 }

@@ -8,15 +8,15 @@ class PermissionsViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var lastChecked: Date?
 
-    private let permissionsService = PermissionsService.shared
+    let toasts = ToastPresenter()
 
-    init() {
+    private let permissionsService = PermissionsService.shared
+    private let openURL: (URL) -> Void
+
+    /// Folder checks start when the Permissions page appears, never at app launch.
+    init(openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) }) {
+        self.openURL = openURL
         buildCategories()
-        // Only check permissions that don't trigger TCC dialogs at startup
-        // This prevents permission prompts from appearing when the app opens
-        Task {
-            await checkAllPermissions(skipTCCTriggerable: true)
-        }
     }
 
     // MARK: - Category Building
@@ -87,16 +87,17 @@ class PermissionsViewModel: ObservableObject {
 
     private func buildSystemFoldersCategory() -> PermissionCategoryState {
         let folders = [
+            // World-readable: Full Disk Access doesn't change access to these.
             FolderAccessInfo(
                 path: "/Library/Caches",
                 displayName: "System Caches",
-                requiresFDA: true,
+                requiresFDA: false,
                 canTriggerTCCDialog: false
             ),
             FolderAccessInfo(
                 path: "/Library/Logs",
                 displayName: "System Logs",
-                requiresFDA: true,
+                requiresFDA: false,
                 canTriggerTCCDialog: false
             ),
             FolderAccessInfo(
@@ -198,7 +199,7 @@ class PermissionsViewModel: ObservableObject {
                     continue
                 }
 
-                let status = await checkFolderAccess(folder.expandedPath)
+                let status = await Self.checkFolderAccess(folder.expandedPath)
 
                 await MainActor.run {
                     categories[categoryIndex].folders[folderIndex].status = status
@@ -214,7 +215,8 @@ class PermissionsViewModel: ObservableObject {
         }
     }
 
-    private func checkFolderAccess(_ path: String) async -> FolderAccessStatus {
+    /// Off the main actor: reading a protected folder blocks while macOS shows its prompt.
+    nonisolated private static func checkFolderAccess(_ path: String) async -> FolderAccessStatus {
         let fileManager = FileManager.default
 
         // Check if path exists
@@ -251,16 +253,23 @@ class PermissionsViewModel: ObservableObject {
     }
 
     func requestFolderAccess(_ folder: FolderAccessInfo) {
-        Task {
-            // Attempting to read triggers TCC dialog
-            let granted = await triggerTCCDialog(for: folder.expandedPath)
-            if granted {
-                await checkAllPermissions()
-            }
-        }
+        Task { await requestAccess(to: folder) }
     }
 
-    private func triggerTCCDialog(for path: String) async -> Bool {
+    /// macOS asks only once per folder. When the folder is still unreadable after asking, the
+    /// Files and Folders pane is the only way left, so open it and say why. Internal for tests.
+    func requestAccess(to folder: FolderAccessInfo) async {
+        // Attempting to read triggers TCC dialog
+        if await Self.triggerTCCDialog(for: folder.expandedPath) {
+            await checkAllPermissions()
+            return
+        }
+        openFilesAndFoldersSettings()
+        toasts.show(LFormat("permissions.folder.stillDenied %@", folder.displayName), type: .error)
+    }
+
+    /// Off the main actor, like `checkFolderAccess`, so the window stays responsive under the prompt.
+    nonisolated private static func triggerTCCDialog(for path: String) async -> Bool {
         let fileManager = FileManager.default
         do {
             _ = try fileManager.contentsOfDirectory(atPath: path)
@@ -279,27 +288,19 @@ class PermissionsViewModel: ObservableObject {
     func revokeFolderAccess(_ folder: FolderAccessInfo) {
         // macOS doesn't allow programmatic revocation of permissions
         // Open the appropriate System Settings pane for the user to revoke manually
+        // Rows offer this only when `isAccessManagedInSystemSettings` is true.
         if folder.requiresFDA {
             // Open Full Disk Access settings
             openFullDiskAccessSettings()
         } else if folder.canTriggerTCCDialog {
             // Open Files and Folders settings for TCC-protected folders
             openFilesAndFoldersSettings()
-        } else {
-            // For standard folders, open Privacy settings
-            openPrivacySettings()
         }
     }
 
     private func openFilesAndFoldersSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    private func openPrivacySettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy") {
-            NSWorkspace.shared.open(url)
+            openURL(url)
         }
     }
 

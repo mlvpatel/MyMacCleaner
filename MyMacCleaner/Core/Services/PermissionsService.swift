@@ -46,12 +46,14 @@ class PermissionsService: ObservableObject {
         let isRequired: Bool
         let features: [String]
 
+        /// Only what the app reads with Full Disk Access: the Smart Scan folders, Safari data in
+        /// Browser Privacy, app containers in Orphaned Files and protected folders in Space Lens.
         var localizedFeatures: [String] {
             [
-                L("permissions.fda.feature.systemCaches"),
-                L("permissions.fda.feature.appLogs"),
+                L("permissions.fda.feature.personalFolders"),
+                L("permissions.fda.feature.protectedCaches"),
+                L("permissions.fda.feature.safari"),
                 L("permissions.fda.feature.leftovers"),
-                L("permissions.fda.feature.mailAttachments"),
                 L("permissions.fda.feature.spaceLens")
             ]
         }
@@ -59,14 +61,14 @@ class PermissionsService: ObservableObject {
 
     static let fullDiskAccessInfo = PermissionInfo(
         name: "Full Disk Access",
-        description: "Allows scanning system caches, logs, and application data for cleanup.",
+        description: "Lets scans read folders macOS protects.",
         isRequired: false,
         features: [
-            "Scan system caches",
-            "Scan application logs",
-            "Detect app leftovers during uninstall",
-            "Access Mail attachments",
-            "Complete Space Lens visualization"
+            "Read Desktop, Documents and Downloads without a prompt for each",
+            "Read protected cache and log folders",
+            "Read Safari history and website data",
+            "Find leftovers inside protected app containers",
+            "Complete Space Lens analysis"
         ]
     )
 }

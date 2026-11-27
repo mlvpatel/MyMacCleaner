@@ -14,10 +14,7 @@ class StartupItemsViewModel: ObservableObject {
     @Published var showSystemItems = false
     @Published var sortOrder: SortOrder = .name
 
-    // Toast
-    @Published var showToast = false
-    @Published var toastMessage = ""
-    @Published var toastType: ToastType = .success
+    let toasts = ToastPresenter()
 
     enum SortOrder: String, CaseIterable {
         case name
@@ -74,6 +71,11 @@ class StartupItemsViewModel: ObservableObject {
         return result
     }
 
+    // Every stat counts the same set, user items, so Running can't exceed Total.
+    var totalCount: Int {
+        items.filter { !$0.isSystemItem }.count
+    }
+
     var enabledCount: Int {
         items.filter { $0.isEnabled && !$0.isSystemItem }.count
     }
@@ -83,7 +85,7 @@ class StartupItemsViewModel: ObservableObject {
     }
 
     var runningCount: Int {
-        items.filter { $0.isRunning }.count
+        items.filter { $0.isRunning && !$0.isSystemItem }.count
     }
 
     var itemsByType: [StartupItemType: [StartupItem]] {
@@ -148,17 +150,6 @@ class StartupItemsViewModel: ObservableObject {
     }
 
     func showToastMessage(_ message: String, type: ToastType) {
-        toastMessage = message
-        toastType = type
-        showToast = true
-
-        Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            showToast = false
-        }
-    }
-
-    func dismissToast() {
-        showToast = false
+        toasts.show(message, type: type)
     }
 }

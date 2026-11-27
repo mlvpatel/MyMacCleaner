@@ -89,6 +89,17 @@
         }
       }
     },
+    "portManagement.lastRead %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read at %@"
+          }
+        }
+      }
+    },
     "portManagement.scanning": {
       "extractionState": "manual",
       "localizations": {
@@ -206,6 +217,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "State"
+          }
+        }
+      }
+    },
+    "portManagement.unavailable.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't Read Connections"
+          }
+        }
+      }
+    },
+    "portManagement.unavailable.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The connection list couldn't be read this time. Choose Refresh to try again."
           }
         }
       }

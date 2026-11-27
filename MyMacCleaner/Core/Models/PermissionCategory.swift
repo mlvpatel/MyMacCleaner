@@ -116,6 +116,11 @@ struct FolderAccessInfo: Identifiable, Equatable {
         (path as NSString).expandingTildeInPath
     }
 
+    /// Only Full Disk Access and Files and Folders let the user change access in System Settings.
+    var isAccessManagedInSystemSettings: Bool {
+        requiresFDA || canTriggerTCCDialog
+    }
+
     static func == (lhs: FolderAccessInfo, rhs: FolderAccessInfo) -> Bool {
         lhs.id == rhs.id &&
         lhs.path == rhs.path &&

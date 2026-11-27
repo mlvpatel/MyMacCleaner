@@ -1,0 +1,522 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Approve plan → Move to Trash: call sequence",
+    "locale": "en",
+    "output": "docs/architecture/approve-move-to-trash.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/mlvpatel/MyMacCleaner",
+      "revision": "2095f154f4b0c9c40ddac13353afa96942420add",
+      "link_mode": "local-only"
+    }
+  },
+  "participants": [
+    {
+      "id": "vm",
+      "type": "frontend",
+      "label": "View model",
+      "sublabel": "AdaptiveExperienceViewModel",
+      "sources": [
+        {
+          "path": "MyMacCleaner/Features/AdaptiveExperience/AdaptiveExperienceViewModel.swift",
+          "line": 173,
+          "end_line": 210,
+          "label": "dispatch: request and confirm approval"
+        },
+        {
+          "path": "MyMacCleaner/Features/AdaptiveExperience/AdaptiveExperienceViewModel.swift",
+          "line": 327,
+          "end_line": 363,
+          "label": "runDisplayedPlan, stopRun, finishRun"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AppState.swift",
+          "line": 78,
+          "end_line": 88,
+          "label": "executeDisplayedPlan closure wiring"
+        }
+      ]
+    },
+    {
+      "id": "session",
+      "type": "backend",
+      "label": "Trust session",
+      "sublabel": "AdaptiveTrustSession actor",
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 141,
+          "end_line": 358,
+          "label": "makeSource, executeDisplayedPlan, refusals"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 407,
+          "end_line": 435,
+          "label": "historyCoordinator, loadReceipts"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/FreshEvidenceRevalidator.swift",
+          "line": 99,
+          "end_line": 106,
+          "label": "FreshTargetEvidence.observing(eligibleIn:)"
+        }
+      ]
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "Approval gate",
+      "sublabel": "Factory → ApprovalValidity",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Execution/ApprovedTrashOperationFactory.swift",
+          "line": 1,
+          "end_line": 17,
+          "label": "ApprovedTrashOperationFactory.makeOperations"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Plans/ApprovalValidity.swift",
+          "line": 48,
+          "end_line": 75,
+          "label": "ApprovalValidity.evaluate"
+        }
+      ]
+    },
+    {
+      "id": "scan",
+      "type": "backend",
+      "label": "Live scan of roots",
+      "sublabel": "CleanerCoreLiveScan",
+      "sources": [
+        {
+          "path": "MyMacCleaner/Core/Services/CleanerCoreLiveScan.swift",
+          "line": 5,
+          "end_line": 43,
+          "label": "six roots, collect and collect(roots:)"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 112,
+          "end_line": 139,
+          "label": "isWithinTrashScope, revalidationRootKinds"
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "type": "backend",
+      "label": "Receipt history",
+      "sublabel": "ReceiptHistoryCoordinator",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Receipts/ReceiptHistoryCoordinator.swift",
+          "line": 19,
+          "end_line": 215,
+          "label": "run, listRedacted, admission, terminal"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/DarwinReceiptLease.swift",
+          "line": 32,
+          "end_line": 66,
+          "label": "non-blocking flock on history.lock"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCore/Receipts/ReceiptReconciliation.swift",
+          "line": 39,
+          "end_line": 72,
+          "label": "planned items cancelled, .interrupted"
+        }
+      ]
+    },
+    {
+      "id": "store",
+      "type": "database",
+      "label": "Receipt store",
+      "sublabel": "AppSupportReceiptStore",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 61,
+          "end_line": 114,
+          "label": "persist, load, delete, recover"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 121,
+          "end_line": 188,
+          "label": "publish, receipt directory, root checks"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift",
+          "line": 277,
+          "end_line": 340,
+          "label": "tombstone rename and recovery"
+        }
+      ]
+    },
+    {
+      "id": "adapter",
+      "type": "backend",
+      "label": "Trash execution",
+      "sublabel": "RecordingReceiptExecution",
+      "sources": [
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift",
+          "line": 54,
+          "end_line": 87,
+          "label": "FileManager.trashItem, revalidateAndMove"
+        },
+        {
+          "path": "CleanerCore/Sources/CleanerCoreFoundation/FoundationReceiptExecutionAdapter.swift",
+          "line": 13,
+          "end_line": 27,
+          "label": "FoundationReceiptExecutionAdapter"
+        },
+        {
+          "path": "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift",
+          "line": 459,
+          "end_line": 506,
+          "label": "RecordingReceiptExecution wrapper"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "from": 158,
+      "to": 551,
+      "label": "Approve"
+    },
+    {
+      "from": 577,
+      "to": 879,
+      "label": "Revalidate"
+    },
+    {
+      "from": 905,
+      "to": 1287,
+      "label": "Receipt run"
+    },
+    {
+      "from": 1313,
+      "to": 1706,
+      "label": "Per item"
+    },
+    {
+      "from": 1732,
+      "to": 2257,
+      "label": "Finish"
+    }
+  ],
+  "messages": [
+    {
+      "id": "execute",
+      "from": "vm",
+      "to": "session",
+      "label": "executeDisplayedPlan(digest, cancellation)",
+      "variant": "emphasis",
+      "note": "digest: pendingApprovalDigestHex from the approval request, via AppState; isExecuting = true",
+      "y": 180
+    },
+    {
+      "id": "make-ops",
+      "from": "session",
+      "to": "gate",
+      "label": "ApprovedTrashOperationFactory().makeOperations",
+      "variant": "security",
+      "note": "evaluates ApprovalValidity; attestation and context come from the displayed plan",
+      "y": 268
+    },
+    {
+      "id": "ops-rejected",
+      "from": "gate",
+      "to": "session",
+      "label": "failure(.invalidApproval / .emptyPlan)",
+      "variant": "return",
+      "note": "Only digest match and plan expiry can fail here; any rejection becomes .planChanged.",
+      "y": 356
+    },
+    {
+      "id": "plan-changed",
+      "from": "session",
+      "to": "vm",
+      "label": "failure(.planChanged)",
+      "variant": "return",
+      "note": "refusedRun: nothing moved; finishRun then calls refresh()",
+      "y": 433
+    },
+    {
+      "id": "ops-ok",
+      "from": "gate",
+      "to": "session",
+      "label": "success([MoveToTrash])",
+      "variant": "return",
+      "note": "one MoveToTrash per plan target",
+      "y": 499
+    },
+    {
+      "id": "rescan",
+      "from": "session",
+      "to": "scan",
+      "label": "revalidate(revalidationRootKinds)",
+      "variant": "emphasis",
+      "note": "plan-target roots only (all six if none); never the shared scan",
+      "y": 599
+    },
+    {
+      "id": "rescan-throws",
+      "from": "scan",
+      "to": "session",
+      "label": "throws",
+      "variant": "return",
+      "y": 665
+    },
+    {
+      "id": "scan-failed",
+      "from": "session",
+      "to": "vm",
+      "label": "failure(.scanFailed)",
+      "variant": "return",
+      "note": "refusedRun before the run: nothing moved",
+      "y": 695
+    },
+    {
+      "id": "rescan-ok",
+      "from": "scan",
+      "to": "session",
+      "label": "AdaptiveScanCollection",
+      "variant": "return",
+      "note": "fresh findings and policy evaluations",
+      "y": 750
+    },
+    {
+      "id": "stopped",
+      "from": "session",
+      "to": "vm",
+      "label": "success(source) via stoppedBeforeRun()",
+      "variant": "return",
+      "note": "Stop seen after makeOperations or after the scan; makeSource() rescans all six roots",
+      "y": 805
+    },
+    {
+      "id": "history-missing",
+      "from": "session",
+      "to": "vm",
+      "label": "failure(history refused)",
+      "variant": "return",
+      "note": ".historyBusy, .reviewRequired or .receiptHistoryUnavailable: lock busy, 50 unresolved receipts, history could not open, makeIntent threw or intent write failed",
+      "y": 927
+    },
+    {
+      "id": "run",
+      "from": "session",
+      "to": "history",
+      "label": "run(intent:operations:freshEvidence:isCancelled:)",
+      "variant": "emphasis",
+      "note": "freshEvidence: FreshTargetEvidence.observing after the second Stop check, only findings the fresh policy pass allows",
+      "y": 1048
+    },
+    {
+      "id": "admission",
+      "from": "history",
+      "to": "store",
+      "label": "recoverDeletingTombstones(), loadAll()",
+      "variant": "default",
+      "note": "under the lease; admission: ReceiptRetention.decide, else .reviewRequired",
+      "y": 1147
+    },
+    {
+      "id": "intent",
+      "from": "history",
+      "to": "store",
+      "label": "persistIntent(intent)",
+      "variant": "emphasis",
+      "note": "writes <receipt id>/intent.json before any move",
+      "y": 1224
+    },
+    {
+      "id": "started",
+      "from": "history",
+      "to": "store",
+      "label": "persistTransition(.started)",
+      "variant": "default",
+      "note": "loop: isCancelled() breaks before the item",
+      "y": 1335
+    },
+    {
+      "id": "move",
+      "from": "history",
+      "to": "adapter",
+      "label": "execute.revalidateAndMove(_:fresh:)",
+      "variant": "emphasis",
+      "note": "records each outcome, then the receipt adapter calls FoundationTrashAdapter",
+      "y": 1390
+    },
+    {
+      "id": "stale",
+      "from": "adapter",
+      "to": "history",
+      "label": "skippedStale(reason)",
+      "variant": "return",
+      "note": "revalidator, unresolved root, or final identity probe",
+      "y": 1456
+    },
+    {
+      "id": "failed",
+      "from": "adapter",
+      "to": "history",
+      "label": "failed(.nativeMoveFailed)",
+      "variant": "return",
+      "note": "FileManager.trashItem threw",
+      "y": 1522
+    },
+    {
+      "id": "moved",
+      "from": "adapter",
+      "to": "history",
+      "label": "moved(destination)",
+      "variant": "return",
+      "note": "after FileManager.trashItem succeeds",
+      "y": 1577
+    },
+    {
+      "id": "terminal",
+      "from": "history",
+      "to": "store",
+      "label": "persistTransition(terminal)",
+      "variant": "default",
+      "note": "Self.terminal: moved, skippedStale, failed or cancelled",
+      "y": 1643
+    },
+    {
+      "id": "prune",
+      "from": "history",
+      "to": "store",
+      "label": "loadAll(), deleteReceipt(id)",
+      "variant": "dashed",
+      "note": "pruneLocked after the loop; result ignored",
+      "y": 1754
+    },
+    {
+      "id": "run-failed",
+      "from": "history",
+      "to": "session",
+      "label": "failure(ReceiptPersistenceError)",
+      "variant": "return",
+      "note": "recorded: .partial, .receiptIncomplete; else refusal",
+      "y": 1809
+    },
+    {
+      "id": "run-ok",
+      "from": "history",
+      "to": "session",
+      "label": "success(ReconciledReceipt)",
+      "variant": "return",
+      "note": "runState(aggregate): complete, interrupted or partial",
+      "y": 1875
+    },
+    {
+      "id": "refresh",
+      "from": "session",
+      "to": "scan",
+      "label": "makeSource(): SharedScanStore.refresh()",
+      "variant": "default",
+      "note": "shared six-root rescan for the next plan",
+      "y": 1941
+    },
+    {
+      "id": "refresh-ok",
+      "from": "scan",
+      "to": "session",
+      "label": "AdaptiveScanCollection",
+      "variant": "return",
+      "note": "session then runs DisplayedPlanFactory.makePlan",
+      "y": 1996
+    },
+    {
+      "id": "list",
+      "from": "session",
+      "to": "history",
+      "label": "listRedacted()",
+      "variant": "default",
+      "note": "separate call; takes the lease again; a failure says why",
+      "y": 2062
+    },
+    {
+      "id": "finish-failed",
+      "from": "session",
+      "to": "vm",
+      "label": "failure(.scanFailed / .presentationFailed)",
+      "variant": "return",
+      "note": "after the run, items may have moved: collect() or makePlan threw",
+      "y": 2128
+    },
+    {
+      "id": "finish",
+      "from": "session",
+      "to": "vm",
+      "label": "success(AdaptiveExperienceSource)",
+      "variant": "return",
+      "note": "finishRun: isExecuting = false; apply(source) shows outcomes",
+      "y": 2194
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Refusals",
+      "items": [
+        ".sessionUnavailable if the launch session or version context could not be built",
+        ".planChanged also when displayedPlan is nil or the approved hex digest does not decode",
+        "Every refusal except .sessionUnavailable goes through refusedRun or refusedByHistory, which clear outcomes; no item has moved",
+        "A .scanFailed or .presentationFailed from the refresh after a run is not a refusal: items may have moved",
+        "finishRun always clears isExecuting; only .planChanged and .receiptIncomplete also call refresh()"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Stop",
+      "items": [
+        "stopRun sets the shared TrashRunCancellation flag; it is not a call into the session",
+        "The session checks it after makeOperations and after the scan (stoppedBeforeRun)",
+        "The coordinator checks it before each item and breaks the loop; later items get no transition",
+        "Items that never ran stay planned; ReceiptReconciliation marks them cancelled and sets the aggregate to .interrupted",
+        "TrashItemOutcome.cancelled is mapped by every wrapper, but FoundationTrashAdapter never returns it"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Single mutation",
+      "items": [
+        "FoundationTrashAdapter is the only caller of FileManager.trashItem(at:resultingItemURL:)",
+        "Before it: FreshEvidenceRevalidator.validate, resolveRoot (user Library Caches only), final identity probe",
+        "The probe compares device, inode, size and mtime, requires link count 1 and rejects symlinked components",
+        "Call chain: RecordingReceiptExecution → FoundationReceiptExecutionAdapter → FoundationTrashAdapter",
+        "FoundationReceiptExecutionAdapter maps ReturnedTrashURL to PrivateRecoveryDestination"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Receipts",
+      "items": [
+        "Stored under Application Support/MyMacCleaner/Receipts, mode 0700, excluded from backup",
+        "Each item persists a started transition, then its terminal transition",
+        "Any persist failure ends the run; outcomes already recorded give a partial state and .receiptIncomplete"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Glossary",
+      "items": [
+        "Digest: SHA-256 of the canonical review plan; approval carries it as hex",
+        "Intent: intent.json with plan digest, versions, ordered item IDs and size estimates, written before any move",
+        "Admission: a new run is admitted only while fewer than 50 receipts are unresolved, else .reviewRequired",
+        "Lease (flock): non-blocking exclusive lock on MyMacCleaner/receipts.lock, beside Receipts, for one run, listing or delete; busy fails with .historyBusy",
+        "Tombstone: a receipt folder renamed .deleting-<id> before removal; leftovers are removed at the next locked access"
+      ]
+    }
+  ]
+}

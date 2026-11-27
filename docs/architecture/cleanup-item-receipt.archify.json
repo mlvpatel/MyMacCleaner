@@ -1,0 +1,297 @@
+{
+  "schema_version": 3,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Cleanup item lifecycle and receipt reconciliation",
+    "output": "docs/architecture/cleanup-item-receipt.html",
+    "locale": "en",
+    "quality_profile": "showcase"
+  },
+  "mainPath": [
+    "admission",
+    "planned",
+    "started",
+    "moved"
+  ],
+  "states": [
+    {
+      "id": "admission",
+      "type": "decision",
+      "label": "Admission",
+      "sublabel": "admits while unresolved < 50",
+      "tag": "under history lease",
+      "step": "01"
+    },
+    {
+      "id": "planned",
+      "type": "waiting",
+      "label": "planned",
+      "sublabel": "intent persisted",
+      "tag": "item state",
+      "step": "02"
+    },
+    {
+      "id": "started",
+      "type": "active",
+      "label": "started",
+      "sublabel": "persisted before move",
+      "tag": "item state",
+      "step": "03"
+    },
+    {
+      "id": "moved",
+      "type": "success",
+      "label": "moved",
+      "sublabel": "in Trash",
+      "tag": "reclaim not observed",
+      "step": "04"
+    },
+    {
+      "id": "reviewRequired",
+      "type": "failure",
+      "label": "reviewRequired",
+      "sublabel": "no intent written",
+      "tag": "run refused"
+    },
+    {
+      "id": "cancelled",
+      "type": "neutral",
+      "label": "cancelled",
+      "sublabel": "never moved",
+      "tag": "item terminal"
+    },
+    {
+      "id": "skippedStale",
+      "type": "neutral",
+      "label": "skippedStale",
+      "sublabel": "target changed since review",
+      "tag": "item terminal"
+    },
+    {
+      "id": "failed",
+      "type": "failure",
+      "label": "failed",
+      "sublabel": "Trash move failed",
+      "tag": "item terminal"
+    },
+    {
+      "id": "needsAttention",
+      "type": "waiting",
+      "label": "needsAttention",
+      "sublabel": "unresolved, never pruned",
+      "tag": "receipt aggregate"
+    },
+    {
+      "id": "complete",
+      "type": "success",
+      "label": "complete",
+      "sublabel": "every item moved, else partial",
+      "tag": "receipt aggregate",
+      "step": "05"
+    },
+    {
+      "id": "interrupted",
+      "type": "neutral",
+      "label": "interrupted",
+      "sublabel": "an item was cancelled",
+      "tag": "receipt aggregate"
+    },
+    {
+      "id": "partial",
+      "type": "neutral",
+      "label": "partial",
+      "sublabel": "no item cancelled or left started",
+      "tag": "not every item moved"
+    },
+    {
+      "id": "quarantined",
+      "type": "failure",
+      "label": "Quarantined",
+      "sublabel": "unreadable record (incl. newer schema)",
+      "tag": "unreadable: counted, hidden from history"
+    },
+    {
+      "id": "pruned",
+      "type": "neutral",
+      "label": "Pruned",
+      "sublabel": "folder deleted: > 90 days or > 500",
+      "tag": "retention"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "admission-planned",
+      "from": "admission",
+      "to": "planned",
+      "label": "admitted"
+    },
+    {
+      "id": "planned-started",
+      "from": "planned",
+      "to": "started",
+      "label": ".started"
+    },
+    {
+      "id": "started-moved",
+      "from": "started",
+      "to": "moved",
+      "label": ".moved",
+      "variant": "emphasis"
+    },
+    {
+      "id": "moved-complete",
+      "from": "moved",
+      "to": "complete"
+    },
+    {
+      "id": "admission-review",
+      "from": "admission",
+      "to": "reviewRequired",
+      "label": "≥ 50 unresolved",
+      "variant": "security"
+    },
+    {
+      "id": "planned-cancelled",
+      "from": "planned",
+      "to": "cancelled",
+      "label": "unstarted at reconcile"
+    },
+    {
+      "id": "started-skipped",
+      "from": "started",
+      "to": "skippedStale",
+      "label": ".skippedStale(reason)"
+    },
+    {
+      "id": "started-failed",
+      "from": "started",
+      "to": "failed",
+      "label": ".failed(reason)"
+    },
+    {
+      "id": "started-cancelled",
+      "from": "started",
+      "to": "cancelled",
+      "label": ".cancelled (not produced in v1)",
+      "variant": "dashed"
+    },
+    {
+      "id": "started-attention",
+      "from": "started",
+      "to": "needsAttention",
+      "label": "no terminal on reload",
+      "variant": "security",
+      "note": "crash or terminal write failed"
+    },
+    {
+      "id": "skipped-partial",
+      "from": "skippedStale",
+      "to": "partial"
+    },
+    {
+      "id": "failed-partial",
+      "from": "failed",
+      "to": "partial"
+    },
+    {
+      "id": "cancelled-interrupted",
+      "from": "cancelled",
+      "to": "interrupted",
+      "label": "any item cancelled"
+    },
+    {
+      "id": "complete-pruned",
+      "from": "complete",
+      "to": "pruned"
+    },
+    {
+      "id": "partial-pruned",
+      "from": "partial",
+      "to": "pruned"
+    },
+    {
+      "id": "interrupted-pruned",
+      "from": "interrupted",
+      "to": "pruned"
+    },
+    {
+      "id": "quarantined-attention",
+      "from": "quarantined",
+      "to": "needsAttention",
+      "label": "log rejected: listed as needsAttention"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Reading the diagram",
+      "items": [
+        "Per item: planned, started, moved, skippedStale, failed, cancelled. Per receipt: complete, partial, interrupted, needsAttention. History level: Admission, reviewRequired, Pruned, Quarantined",
+        "Admission, Pruned and Quarantined are not enum states; quarantine is the isQuarantined flag",
+        "A dashed arrow is allowed by the reducer but not produced in v1",
+        "Arrows into complete, partial and Pruned carry no label: the condition written on the target applies to every arrow into it",
+        "moved leads to complete only when every item moved; a run that mixes moved items with skipped or failed ones ends partial"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Reducer guards",
+      "items": [
+        "Replays the persisted log onto items seeded as planned from the intent",
+        "A terminal on a planned item is terminalBeforeStart",
+        "A second .started is duplicateStart; a second terminal is duplicateTerminal",
+        "A terminal earlier than startedAt is invalidTimeOrder; an unlisted item is unknownItem",
+        "Any rejection quarantines the whole receipt as needsAttention"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Reconciliation",
+      "items": [
+        "Runs at the end of each run and on every history load, at observedAt",
+        "Items still planned become cancelled, so the receipt is interrupted",
+        "An item left started with no terminal makes the receipt needsAttention",
+        "It only reduces records: executionCalls is always 0, so no move is repeated",
+        "Its result is only complete, partial, interrupted or needsAttention; planned and inProgress exist only inside the reducer"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Retention and admission",
+      "items": [
+        "Unresolved means needsAttention or quarantined, plus each unreadable record",
+        "An unreadable record (including a newer schema) is counted but never listed in history",
+        "A new run is admitted only while unresolved < 50 (maximumUnresolvedCount); otherwise reviewRequired",
+        "After each run that finishes recording, complete, partial and interrupted receipts older than 90 days are deleted, then the oldest beyond 500; a pruning failure is ignored",
+        "Unresolved receipts are never pruned and stay counted against admission",
+        "Unresolved is permanent in v1: deleteReceipts has no caller in the app, so once the limit is reached every run is refused with no in-app recovery",
+        "A failed intent write can leave an empty receipt folder, which loads as unreadable"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Run state in AdaptiveTrustSession",
+      "items": [
+        "complete maps to .complete, interrupted to .interrupted, any other aggregate to .partial",
+        "A history failure after at least one recorded outcome reports .partial and .receiptIncomplete",
+        "A failure before any outcome (busy, reviewRequired, intent write) is a refusal with no run state",
+        "The user sees busy and reviewRequired as .historyBusy and .reviewRequired; other history errors as .receiptHistoryUnavailable"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Source evidence (main, November 2026)",
+      "items": [
+        "CleanerCore/Sources/CleanerCore/Receipts/ReceiptSchema.swift 1-25, 68-106, 182-230",
+        "CleanerCore/Sources/CleanerCore/Receipts/ReceiptReducer.swift 1-117",
+        "CleanerCore/Sources/CleanerCore/Receipts/ReceiptReconciliation.swift 1-72",
+        "CleanerCore/Sources/CleanerCore/Receipts/ReceiptRetention.swift 1-91",
+        "CleanerCore/Sources/CleanerCore/Receipts/ReceiptHistoryCoordinator.swift 19-45, 47-175, 200-215",
+        "CleanerCore/Sources/CleanerCore/Execution/TrashExecutionOutcome.swift 1-25, 27-31",
+        "CleanerCore/Sources/CleanerCoreFoundation/FoundationTrashAdapter.swift 61-87",
+        "CleanerCore/Sources/CleanerCoreFoundation/AppSupportReceiptStore.swift 142-156, 190-275, 277-340, 478-479",
+        "MyMacCleaner/Core/Services/AdaptiveTrustSession.swift 121-125, 278-307, 437-446"
+      ]
+    }
+  ]
+}

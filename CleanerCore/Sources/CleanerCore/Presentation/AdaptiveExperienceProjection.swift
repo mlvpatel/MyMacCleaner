@@ -103,6 +103,11 @@ public struct AdaptiveExperienceSource: Equatable, Sendable {
     /// `operation: Never?`, so these can never become a cleanup candidate; they
     /// exist only to display the protected-workflow byte breakdown.
     public let modelInventory: [ModelStoreProjection]
+    /// Why receipt history could not be read; nil when `receipts` is the whole history.
+    public let receiptHistoryError: ReceiptPersistenceError?
+    /// Where items moved this session sit in the Trash when their receipt could not be completed.
+    /// For the user only: never logged, never part of a redacted summary.
+    public let unrecordedMoveDestinations: [PrivateRecoveryDestination]
 
     public init(
         scanState: ProjectedScanState,
@@ -117,7 +122,9 @@ public struct AdaptiveExperienceSource: Equatable, Sendable {
         capabilities: [CapabilityCard],
         permissionGaps: [AdaptivePermissionGap],
         developerInventory: [AdaptiveDeveloperInventoryFact],
-        modelInventory: [ModelStoreProjection] = []
+        modelInventory: [ModelStoreProjection] = [],
+        receiptHistoryError: ReceiptPersistenceError? = nil,
+        unrecordedMoveDestinations: [PrivateRecoveryDestination] = []
     ) {
         self.scanState = scanState
         self.findings = findings
@@ -132,7 +139,30 @@ public struct AdaptiveExperienceSource: Equatable, Sendable {
         self.permissionGaps = permissionGaps
         self.developerInventory = developerInventory
         self.modelInventory = modelInventory
+        self.receiptHistoryError = receiptHistoryError
+        self.unrecordedMoveDestinations = unrecordedMoveDestinations
     }
+}
+
+/// One item of the displayed review plan, named the way a person recognises it.
+public struct AdaptivePlanItem: Equatable, Sendable {
+    /// Evidence identity (hex). For focus and Technical detail only, never a display name.
+    public let identity: String
+    public let name: String
+    /// Folder that holds the item, or nil when it sits at the top of its scanned location.
+    public let parentName: String?
+    public let conservativeBytes: Int64
+    public let recoveryPath: PolicyRecoveryPath
+}
+
+/// A receipt's id, status and recovery travel together so they can never be paired with another receipt.
+public struct AdaptiveReceiptRow: Equatable, Sendable {
+    public let id: String
+    public let createdAtUnixNanoseconds: Int64
+    public let statusMarker: String
+    public let recoveryMarker: String
+    /// How many items the receipt covers.
+    public let itemCount: Int
 }
 
 public struct AdaptiveExperienceAuthority: Equatable, Sendable {
@@ -146,14 +176,15 @@ public struct AdaptiveExperienceAuthority: Equatable, Sendable {
     public let recoveryPaths: [PolicyRecoveryPath]
     public let confidences: [EvidenceConfidence]
     public let expectedConservativeBytes: AdaptiveByteTotal
+    /// The items the displayed plan would move, in plan order.
+    public let planItems: [AdaptivePlanItem]
     public let planDigestHex: String?
     public let planExpiresAtNanoseconds: Int64?
     public let approvalValidity: ApprovalValidity
     public let executionState: TrashRunState?
     public let executionOutcomes: [AdaptiveExecutionOutcomeKind]
-    public let receiptIDs: [String]
-    public let receiptStatusMarkers: [String]
-    public let receiptRecoveryMarkers: [String]
+    /// One row per receipt, in history order (newest first).
+    public let receipts: [AdaptiveReceiptRow]
     public let memoryOutcome: MemorySnapshotOutcome?
     public let memoryUnavailable: [String]
     public let capabilityAuthorities: [CapabilityAuthority]
@@ -161,6 +192,11 @@ public struct AdaptiveExperienceAuthority: Equatable, Sendable {
     public let permissionGaps: [AdaptivePermissionGap]
     public let modelInventoryAccounting: [ModelStoreAccountingSummary]
     public let cardKinds: [AdaptiveCardKind]
+
+    /// Findings that are shown for review but are not in the plan.
+    public var reviewOnlyFindingCount: Int {
+        max(0, evidenceIdentities.count - planItems.count)
+    }
 }
 
 public struct AdaptiveExperienceProjection: Equatable, Sendable {
@@ -179,14 +215,20 @@ public struct AdaptiveExperienceProjector: Sendable {
         _ source: AdaptiveExperienceSource,
         mode: PresentationMode
     ) throws -> AdaptiveExperienceProjection {
-        let identities = try AdaptiveExperienceIdentity.uniqueSorted(from: source.findings)
+        project(try authority(from: source), mode: mode)
+    }
+
+    /// The mode-independent part of a projection. It scales with the number of findings
+    /// (tens of thousands on a large home folder), so build it once per source and reuse it
+    /// for every Guided/Standard/Technical switch.
+    public func authority(from source: AdaptiveExperienceSource) throws -> AdaptiveExperienceAuthority {
+        let keyed = try AdaptiveExperienceIdentity.keyedUniqueSorted(source.findings)
         let bytes = try AdaptiveExperienceBytes.total(from: source.evaluations)
         let cards = AdaptiveExperienceCards.membership(from: source)
-        let authority = AdaptiveExperienceAuthority(
+        return AdaptiveExperienceAuthority(
             scanState: source.scanState,
-            evidenceIdentities: identities,
-            boundarySummaries: AdaptiveExperienceIdentity.sortedByKey(source.findings)
-                .map(AdaptiveExperienceIdentity.boundary(from:)),
+            evidenceIdentities: keyed.map(\.key),
+            boundarySummaries: keyed.map { AdaptiveExperienceIdentity.boundary(identity: $0.key, finding: $0.finding) },
             dispositions: source.evaluations.map(\.disposition),
             eligibilities: source.evaluations.map(\.eligibility),
             semanticOwners: source.evaluations.map(\.semanticOwner),
@@ -194,14 +236,29 @@ public struct AdaptiveExperienceProjector: Sendable {
             recoveryPaths: source.evaluations.map(\.recoveryPath),
             confidences: source.evaluations.map(\.confidence),
             expectedConservativeBytes: bytes,
+            planItems: (source.reviewPlan?.targets ?? []).map {
+                AdaptivePlanItem(
+                    identity: AdaptiveExperienceIdentity.hex($0.stableIdentity.utf8Bytes),
+                    name: $0.locatorComponents.last ?? "",
+                    parentName: $0.locatorComponents.dropLast().last,
+                    conservativeBytes: $0.conservativeReclaimableBytes,
+                    recoveryPath: $0.recoveryPath
+                )
+            },
             planDigestHex: source.reviewPlan.map { AdaptiveExperienceIdentity.hex($0.digest.bytes) },
             planExpiresAtNanoseconds: source.reviewPlan.map(\.expiresAt.unixNanoseconds),
             approvalValidity: source.approvalValidity,
             executionState: source.executionState,
             executionOutcomes: source.executionOutcomes,
-            receiptIDs: source.receipts.map(\.id.value).sorted(),
-            receiptStatusMarkers: source.receipts.map(\.statusMarker),
-            receiptRecoveryMarkers: source.receipts.map(\.recoveryMarker),
+            receipts: source.receipts.map {
+                AdaptiveReceiptRow(
+                    id: $0.id.value,
+                    createdAtUnixNanoseconds: $0.createdAt.unixNanoseconds,
+                    statusMarker: $0.statusMarker,
+                    recoveryMarker: $0.recoveryMarker,
+                    itemCount: $0.itemCount
+                )
+            },
             memoryOutcome: source.memory?.outcome,
             memoryUnavailable: AdaptiveExperienceMemory.unavailableMarkers(from: source.memory),
             capabilityAuthorities: source.capabilities.map(\.authority),
@@ -210,6 +267,13 @@ public struct AdaptiveExperienceProjector: Sendable {
             modelInventoryAccounting: source.modelInventory.map(\.accounting),
             cardKinds: cards
         )
+    }
+
+    /// Picks the presentation keys for `mode`; the authority passes through unchanged.
+    public func project(
+        _ authority: AdaptiveExperienceAuthority,
+        mode: PresentationMode
+    ) -> AdaptiveExperienceProjection {
         let formatting = AdaptiveExperienceFormatting.table(mode: mode, authority: authority)
         return AdaptiveExperienceProjection(
             mode: mode,
@@ -218,128 +282,6 @@ public struct AdaptiveExperienceProjector: Sendable {
             disclosureDepth: formatting.disclosureDepth,
             groupingKeys: formatting.groupingKeys,
             detailRowKeys: formatting.detailRowKeys
-        )
-    }
-}
-
-public protocol AdaptiveClocking: Sendable {
-    func now() async -> ClockReading
-}
-
-public protocol AdaptiveCancelling: Sendable {
-    func isCancellationRequested() async -> Bool
-}
-
-public struct AdaptiveScanCollection: Equatable, Sendable {
-    public let scanState: ProjectedScanState
-    public let findings: [ProjectedFinding]
-    public let evaluations: [PolicyEvaluation]
-}
-
-public actor AdaptiveScanSession {
-    private let coordinator: ScanCoordinator
-    private let clock: any AdaptiveClocking
-    private let processActivity: any ProcessActivityObserving
-
-    public init(
-        fileSystem: any FileSystemPort,
-        clock: any AdaptiveClocking,
-        cancellation: any AdaptiveCancelling,
-        processActivity: any ProcessActivityObserving = NoProcessActivity()
-    ) throws {
-        self.clock = clock
-        self.processActivity = processActivity
-        coordinator = try ScanCoordinator(
-            dependencies: ScanDependencies(
-                fileSystem: fileSystem,
-                clock: AdaptiveClockPortAdapter(clock),
-                cancellation: AdaptiveCancellationPortAdapter(cancellation),
-                diagnostics: AdaptiveSilentDiagnostics(),
-                metrics: AdaptiveSilentMetrics()
-            ),
-            shippedDetector: GeneralMacRegistryDetector(catalog: .current)
-        )
-    }
-
-    public func collect(request: ScanRequest) async -> AdaptiveScanCollection {
-        // Ages are measured from scan start: never later than any observation, so this can
-        // only understate how long a file has been inactive.
-        let scanStart = await clock.now().wallClockInstant
-        var findings: [Finding] = []
-        var terminalState: ProjectedScanState = .complete
-        while true {
-            let step = await coordinator.nextBatch(for: request)
-            switch step {
-            case let .batch(batch):
-                findings.append(contentsOf: batch.findings)
-                if let outcome = batch.terminalOutcome {
-                    terminalState = ProjectedScanState(outcome)
-                    return classify(findings: findings, state: terminalState, scanStart: scanStart)
-                }
-            case let .terminal(outcome):
-                terminalState = ProjectedScanState(outcome)
-                return classify(findings: findings, state: terminalState, scanStart: scanStart)
-            }
-        }
-    }
-
-    private func classify(
-        findings: [Finding],
-        state: ProjectedScanState,
-        scanStart: WallClockInstant
-    ) -> AdaptiveScanCollection {
-        let projected = AdaptiveExperienceIdentity.sortedByKey(findings.map(ProjectedFinding.init))
-        let catalog = GeneralMacScopeCatalog.current
-        let evaluator = PolicyEvaluator()
-        var evaluations: [PolicyEvaluation] = []
-        for finding in findings {
-            let kind: GeneralMacRootKind
-            do {
-                kind = try catalog.rootKind(for: finding.declaredRoot.id)
-            } catch {
-                continue
-            }
-            let request: ScanRequest
-            do {
-                request = try catalog.scanRequest(for: [kind])
-            } catch {
-                continue
-            }
-            let observation = FileObservation(
-                rootID: finding.declaredRoot.id,
-                locator: finding.locator,
-                resourceIdentity: finding.resourceIdentity,
-                sizes: finding.sizes,
-                modification: finding.modification,
-                fileKind: finding.fileKind,
-                volume: finding.volume,
-                linkCount: finding.linkCount,
-                boundaries: finding.boundaries
-            )
-            switch GeneralMacEvidenceDetector(scope: kind, catalog: catalog).makeFinding(
-                from: observation,
-                request: request,
-                clockReading: ClockReading(
-                    observationInstant: finding.observationInstant,
-                    wallClockInstant: scanStart
-                )
-            ) {
-            case let .success(maybeFinding):
-                if let macFinding = maybeFinding {
-                    let processActive = processActivity.isFileOpen(
-                        rootID: finding.locator.rootID,
-                        components: finding.locator.components
-                    )
-                    evaluations.append(evaluator.evaluate(macFinding, processActive: processActive))
-                }
-            case .failure:
-                continue
-            }
-        }
-        return AdaptiveScanCollection(
-            scanState: state,
-            findings: projected,
-            evaluations: evaluations
         )
     }
 }
@@ -354,26 +296,30 @@ enum AdaptiveExperienceIdentity {
         findings.map { (key(from: $0), $0) }.sorted { $0.0 < $1.0 }.map(\.1)
     }
 
-    static func uniqueSorted(from findings: [ProjectedFinding]) throws -> [String] {
-        var seen: [String: Int] = [:]
-        var ordered: [String] = []
+    /// Each finding paired with its key, built once, unique and sorted by key.
+    static func keyedUniqueSorted(
+        _ findings: [ProjectedFinding]
+    ) throws -> [(key: String, finding: ProjectedFinding)] {
+        var seen: Set<String> = []
+        seen.reserveCapacity(findings.count)
+        var keyed: [(key: String, finding: ProjectedFinding)] = []
+        keyed.reserveCapacity(findings.count)
         for finding in findings {
             let identity = key(from: finding)
             if identity.isEmpty {
                 throw AdaptiveExperienceProjectionError.malformedSource
             }
-            if seen[identity] != nil {
+            if !seen.insert(identity).inserted {
                 throw AdaptiveExperienceProjectionError.duplicateEvidenceIdentity
             }
-            seen[identity] = 1
-            ordered.append(identity)
+            keyed.append((identity, finding))
         }
-        return ordered.sorted()
+        return keyed.sorted { $0.key < $1.key }
     }
 
-    static func boundary(from finding: ProjectedFinding) -> AdaptiveBoundarySummary {
+    static func boundary(identity: String, finding: ProjectedFinding) -> AdaptiveBoundarySummary {
         AdaptiveBoundarySummary(
-            identity: key(from: finding),
+            identity: identity,
             symlink: flag(finding.boundaries.symlink),
             alias: flag(finding.boundaries.alias),
             package: flag(finding.boundaries.package),
@@ -392,8 +338,17 @@ enum AdaptiveExperienceIdentity {
         }
     }
 
+    private static let hexDigits = Array("0123456789abcdef".utf8)
+
+    /// Lower-case hex built in one buffer; one String per byte made large scans slow.
     static func hex(_ bytes: [UInt8]) -> String {
-        bytes.map { ($0 < 16 ? "0" : "") + String($0, radix: 16) }.joined()
+        var digits: [UInt8] = []
+        digits.reserveCapacity(bytes.count * 2)
+        for byte in bytes {
+            digits.append(hexDigits[Int(byte >> 4)])
+            digits.append(hexDigits[Int(byte & 0x0F)])
+        }
+        return String(decoding: digits, as: UTF8.self)
     }
 
     private static func flag(_ value: EvidenceValue<Bool>) -> AdaptiveBoundaryFlag {
@@ -595,36 +550,4 @@ enum AdaptiveExperienceFormatting {
         case .unsupportedLayout: return "\(prefix).unsupportedLayout"
         }
     }
-}
-
-private struct AdaptiveClockPortAdapter: ClockPort {
-    let clock: any AdaptiveClocking
-
-    init(_ clock: any AdaptiveClocking) {
-        self.clock = clock
-    }
-
-    func now() async -> ClockReading {
-        await clock.now()
-    }
-}
-
-private struct AdaptiveCancellationPortAdapter: CancellationPort {
-    let cancellation: any AdaptiveCancelling
-
-    init(_ cancellation: any AdaptiveCancelling) {
-        self.cancellation = cancellation
-    }
-
-    func isCancellationRequested() async -> Bool {
-        await cancellation.isCancellationRequested()
-    }
-}
-
-private struct AdaptiveSilentDiagnostics: DiagnosticPort {
-    func record(_ event: ScanDiagnosticEvent) async {}
-}
-
-private struct AdaptiveSilentMetrics: MetricPort {
-    func record(_ event: ScanMetricEvent) async {}
 }

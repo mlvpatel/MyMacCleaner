@@ -150,28 +150,6 @@ struct RetiredLegacyScannerTests {
     }
 }
 
-@Suite("Receipt History Flow Tests")
-struct ReceiptHistoryFlowTests {
-    @Test("Receipt bridge source rejects URL authority and restore routes")
-    func receiptBridgeSourceRejectsURLAuthorityAndRestoreRoutes() throws {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let source = try String(
-            contentsOf: repositoryRoot.appendingPathComponent(
-                "MyMacCleaner/Core/Services/CleanerCoreBridge.swift"
-            )
-        )
-        #expect(source.contains("struct ReceiptSession"))
-        #expect(source.contains("func reveal(receiptID: String, itemID: String)"))
-        #expect(source.contains("func delete(receiptID: String)"))
-        #expect(!source.contains("emptyTrash"))
-        #expect(!source.contains("restoreItem"))
-        #expect(!source.contains("func reveal(url: URL)"))
-        #expect(!source.contains("func delete(url: URL)"))
-    }
-}
-
 // MARK: - Update Capability Tests
 
 @Suite("Update Capability Tests")

@@ -57,7 +57,7 @@ struct AppCard: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, Theme.Spacing.sm)
                         .padding(.vertical, Theme.Spacing.xxs)
-                        .background(Color.white.opacity(0.08))
+                        .background(Theme.Colors.surfaceMedium)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny))
                 }
                 .buttonStyle(.plain)
@@ -95,7 +95,7 @@ struct AppPreviewCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(Theme.Spacing.sm)
-        .background(Color.white.opacity(0.03))
+        .background(Theme.Colors.subtleFill)
         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
     }
 }
@@ -109,7 +109,7 @@ struct MoreAppsCard: View {
         VStack(spacing: Theme.Spacing.xs) {
             ZStack {
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.medium)
-                    .fill(Color.white.opacity(0.1))
+                    .fill(Theme.Colors.surfaceHover)
                     .frame(width: 44, height: 44)
 
                 Text("+\(count)")
@@ -123,7 +123,7 @@ struct MoreAppsCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(Theme.Spacing.sm)
-        .background(Color.white.opacity(0.03))
+        .background(Theme.Colors.subtleFill)
         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
     }
 }

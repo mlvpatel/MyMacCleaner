@@ -331,35 +331,35 @@
         }
       }
     },
-    "applications.stats.systemApps": {
+    "applications.stats.inApplications": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "System Apps"
+            "value": "In /Applications"
           }
         }
       }
     },
-    "applications.stats.toAnalyze": {
+    "applications.stats.notMeasured": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Click to Analyze"
+            "value": "Sizes not measured yet"
           }
         }
       }
     },
-    "applications.stats.userApps": {
+    "applications.stats.inUserApplications": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "User Apps"
+            "value": "In ~/Applications"
           }
         }
       }

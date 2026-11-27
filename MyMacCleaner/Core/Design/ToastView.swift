@@ -32,19 +32,23 @@ struct ToastView: View {
     let message: String
     let type: ToastType
     let safetyNotice: SafetyNoticeState?
+    let onLearnWhy: (() -> Void)?
     let onDismiss: () -> Void
 
     @State private var isVisible = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         message: String,
         type: ToastType,
         safetyNotice: SafetyNoticeState? = nil,
+        onLearnWhy: (() -> Void)? = nil,
         onDismiss: @escaping () -> Void
     ) {
         self.message = message
         self.type = type
         self.safetyNotice = safetyNotice
+        self.onLearnWhy = onLearnWhy
         self.onDismiss = onDismiss
     }
 
@@ -64,13 +68,14 @@ struct ToastView: View {
                         .font(Theme.Typography.subheadline)
                         .foregroundStyle(.secondary)
 
-                    Text(notice.actionTitle)
-                        .font(Theme.Typography.caption.weight(.medium))
-                        .foregroundStyle(.tertiary)
+                    if let onLearnWhy {
+                        Button(notice.actionTitle, action: onLearnWhy)
+                            .buttonStyle(.link)
+                            .font(Theme.Typography.caption.weight(.medium))
+                    }
                 }
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier(notice.accessibilityIdentifier)
-                .accessibilityHint(notice.actionTitle)
             } else {
                 Text(message)
                     .font(Theme.Typography.subheadline)
@@ -85,6 +90,8 @@ struct ToastView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(L("common.dismiss"))
+            .help(L("common.dismiss"))
         }
         .padding(Theme.Spacing.md)
         .frame(maxWidth: 400)
@@ -98,11 +105,46 @@ struct ToastView: View {
         )
         .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
         .opacity(isVisible ? 1 : 0)
-        .offset(y: isVisible ? 0 : -20)
+        .offset(y: isVisible || reduceMotion ? 0 : -20)
         .onAppear {
-            withAnimation(Theme.Animation.spring) {
+            withAnimation(Theme.Animation.motion(Theme.Animation.spring, reduce: reduceMotion)) {
                 isVisible = true
             }
+        }
+    }
+}
+
+// MARK: - Toast Overlay
+
+/// A screen's toast, pinned to the top. "Learn why" clears the notice before it navigates.
+struct ToastOverlay: View {
+    @ObservedObject var presenter: ToastPresenter
+    var onLearnWhy: (() -> Void)?
+
+    var body: some View {
+        VStack {
+            if let toast = presenter.current {
+                ToastView(
+                    message: toast.message,
+                    type: toast.type,
+                    safetyNotice: toast.safetyNotice,
+                    onLearnWhy: learnWhyAction,
+                    onDismiss: presenter.dismiss
+                )
+                .id(toast.id)
+                .padding(.top, Theme.Spacing.lg)
+                .motionTransition(.move(edge: .top).combined(with: .opacity))
+            }
+            Spacer()
+        }
+        .animation(Theme.Animation.spring, value: presenter.current?.id)
+    }
+
+    private var learnWhyAction: (() -> Void)? {
+        guard let onLearnWhy else { return nil }
+        return {
+            presenter.dismiss()
+            onLearnWhy()
         }
     }
 }

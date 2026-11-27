@@ -2,6 +2,8 @@ import SwiftUI
 
 struct HomeView: View {
     @ObservedObject var viewModel: HomeViewModel
+    /// Opens a link in this window. Each window passes its own, since the view model is shared.
+    let open: (HomeLink) -> Void
     @State private var isVisible = false
 
     private let sectionColor = Theme.Colors.home
@@ -13,6 +15,9 @@ struct HomeView: View {
                     // Header
                     headerSection
                         .staggeredAnimation(index: 0, isActive: isVisible)
+                    if viewModel.scanStoppedByLeaving {
+                        ScanStoppedNotice()
+                    }
 
                     // Smart Scan Button
                     smartScanSection
@@ -21,8 +26,8 @@ struct HomeView: View {
                     // Scan Results (if available)
                     if viewModel.showScanResults {
                         ScanResultsCard(
-                            results: $viewModel.scanResults,
-                            onReviewSelection: viewModel.explainSelectedStorageReview
+                            results: viewModel.scanResults,
+                            onOpenExperience: { open(.experience) }
                         )
                         .staggeredAnimation(index: 2, isActive: isVisible)
                     }
@@ -40,46 +45,22 @@ struct HomeView: View {
                 .padding(.top, Theme.Spacing.pageTopPadding)
             }
 
-            // Permission prompt overlay
-            if viewModel.showPermissionPrompt {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-
-                PermissionPromptView(
-                    permissionsService: PermissionsService.shared,
-                    onDismiss: viewModel.dismissPermissionPrompt,
-                    onContinueWithoutPermission: viewModel.continueWithLimitedScan
-                )
-                .transition(.scale.combined(with: .opacity))
-            }
-
-            // Toast notification
-            if viewModel.showToast {
-                VStack {
-                    ToastView(
-                        message: viewModel.toastMessage,
-                        type: viewModel.toastType,
-                        safetyNotice: viewModel.latestSafetyNotice,
-                        onDismiss: viewModel.dismissToast
-                    )
-                    .padding(.top, Theme.Spacing.lg)
-
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
+            ToastOverlay(presenter: viewModel.toasts, onLearnWhy: { open(.trashExplanation) })
         }
-        .animation(Theme.Animation.springSmooth, value: viewModel.showPermissionPrompt)
-        .animation(Theme.Animation.spring, value: viewModel.showToast)
+        .sheet(isPresented: $viewModel.showPermissionPrompt) {
+            PermissionPromptView(
+                permissionsService: PermissionsService.shared,
+                onDismiss: viewModel.dismissPermissionPrompt,
+                onContinueWithoutPermission: viewModel.continueWithLimitedScan
+            )
+        }
         .onAppear {
             withAnimation(Theme.Animation.springSmooth) {
                 isVisible = true
             }
         }
         .onDisappear {
-            viewModel.cancelScan()
+            viewModel.leavePage()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             viewModel.refreshPermissions()
@@ -102,10 +83,7 @@ struct HomeView: View {
             Spacer()
 
             // System status indicator
-            SystemHealthPill(
-                status: viewModel.systemHealthStatus,
-                color: viewModel.systemHealthColor
-            )
+            SystemHealthPill(level: viewModel.healthLevel)
         }
     }
 
@@ -155,17 +133,22 @@ struct HomeView: View {
                 }
 
                 if viewModel.isScanning {
-                    VStack(spacing: Theme.Spacing.xs) {
-                        ProgressView(value: viewModel.scanProgress)
-                            .progressViewStyle(.linear)
-                            .tint(sectionColor)
-                            .frame(maxWidth: 300)
+                    // The engine reports no per-folder progress, so the spinner above is the
+                    // indicator; a caption sets expectations and Cancel is always reachable.
+                    VStack(spacing: Theme.Spacing.sm) {
+                        Text(L("scan.inProgress.caption"))
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: 400)
 
-                        if let category = viewModel.currentScanCategory {
-                            Text(LFormat("home.scan.scanningCategory %@", category.localizedName))
-                                .font(Theme.Typography.caption)
-                                .foregroundStyle(.tertiary)
-                        }
+                        GlassActionButton(
+                            L("common.cancel"),
+                            icon: "xmark.circle",
+                            color: .secondary,
+                            action: viewModel.cancelScan
+                        )
+                        .accessibilityIdentifier("home.scan.cancel")
                     }
                 } else {
                     GlassActionButton(
@@ -175,27 +158,51 @@ struct HomeView: View {
                     ) {
                         viewModel.startSmartScan()
                     }
+                    .accessibilityIdentifier("home.scan.start")
                 }
             }
             .padding(Theme.Spacing.xxl)
             .frame(maxWidth: .infinity)
             .glassCard()
 
-            // Error display
             if let error = viewModel.scanError {
-                HStack(spacing: Theme.Spacing.xs) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                ScanErrorNotice(message: error)
+            }
 
-                    Text(error)
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(.secondary)
+            if let coverage = viewModel.lastScanCoverage {
+                if !coverage.isComplete {
+                    ScanCoverageNotice(coverage: coverage, openPermissions: { open(.permissions) })
                 }
-                .padding(Theme.Spacing.sm)
-                .glassCard(tint: .orange, cornerRadius: Theme.CornerRadius.medium)
+
+                if viewModel.scanResults.isEmpty {
+                    emptyResultSection(isComplete: coverage.isComplete)
+                }
             }
         }
         .animation(Theme.Animation.spring, value: viewModel.isScanning)
+    }
+
+    /// A finished scan with nothing to show says so, instead of leaving an unexplained blank.
+    private func emptyResultSection(isComplete: Bool) -> some View {
+        VStack(spacing: Theme.Spacing.xs) {
+            Image(systemName: "tray")
+                .font(Theme.Typography.size32Medium)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+
+            Text(L("scan.empty.title"))
+                .font(Theme.Typography.size20Semibold)
+
+            Text(L(isComplete ? "scan.empty.complete" : "scan.empty.incomplete"))
+                .font(Theme.Typography.size14)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(Theme.Spacing.xl)
+        .frame(maxWidth: .infinity)
+        .glassCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home.scan.empty")
     }
 
     // MARK: - Quick Stats Section
@@ -229,9 +236,9 @@ struct HomeView: View {
                 )
 
                 StatCard(
-                    title: L("home.stats.junkFiles"),
-                    value: viewModel.junkSize,
-                    subtitle: L("safety.notice.reviewable"),
+                    title: L("home.stats.cachesAndLogs"),
+                    value: viewModel.cacheAndLogSize,
+                    subtitle: L("home.stats.excludesPersonal"),
                     icon: "doc.text.magnifyingglass",
                     color: Theme.Colors.storage
                 )
@@ -267,14 +274,14 @@ struct HomeView: View {
                     title: L("home.actions.memoryGuide"),
                     icon: "memorychip",
                     color: Theme.Colors.memory,
-                    action: viewModel.openMemoryGuide
+                    action: { open(.memoryGuide) }
                 )
 
                 QuickActionButton(
                     title: L("home.actions.largeFiles"),
                     icon: "doc.fill",
                     color: Theme.Colors.home,
-                    action: viewModel.viewLargeFiles
+                    action: { open(.largeFiles) }
                 )
 
                 Spacer()
@@ -285,45 +292,37 @@ struct HomeView: View {
 
 // MARK: - System Health Pill
 
+/// Non-interactive status: no hover effect, one combined accessibility element.
 struct SystemHealthPill: View {
-    let status: String
-    let color: Color
-
-    @State private var isHovered = false
+    let level: SystemHealthLevel
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
-                .shadow(color: color.opacity(0.5), radius: 4)
+        HStack(spacing: Theme.Spacing.xs) {
+            Image(systemName: level.icon)
+                .font(Theme.Typography.caption)
+                .foregroundStyle(level.color)
 
-            Text(status)
+            Text(level.label)
                 .font(Theme.Typography.caption)
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, Theme.Spacing.sm)
         .padding(.vertical, Theme.Spacing.xs)
         .glassPill()
-        .scaleEffect(isHovered ? 1.02 : 1.0)
-        .onHover { hovering in
-            withAnimation(Theme.Animation.fast) {
-                isHovered = hovering
-            }
-        }
+        .help(L("home.health.basis"))
+        .accessibilityElement(children: .combine)
     }
 }
 
 // MARK: - Stat Card
 
+/// Non-interactive status: no hover effect.
 struct StatCard: View {
     let title: String
     let value: String
     let subtitle: String
     let icon: String
     let color: Color
-
-    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -365,12 +364,7 @@ struct StatCard: View {
         .frame(height: 160)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard()
-        .scaleEffect(isHovered ? 1.02 : 1.0)
-        .shadow(color: color.opacity(isHovered ? 0.25 : 0.1), radius: isHovered ? 15 : 8, y: 5)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-        .onHover { hovering in
-            isHovered = hovering
-        }
+        .shadow(color: color.opacity(0.1), radius: 8, y: 5)
     }
 }
 
@@ -383,7 +377,6 @@ struct QuickActionButton: View {
     let action: () -> Void
 
     @State private var isHovered = false
-    @State private var isPressed = false
 
     var body: some View {
         Button(action: action) {
@@ -406,25 +399,19 @@ struct QuickActionButton: View {
             .frame(width: 120, height: 100)
             .glassCard()
         }
-        .buttonStyle(.plain)
-        .scaleEffect(isPressed ? 0.95 : (isHovered ? 1.02 : 1.0))
+        .buttonStyle(GlassPressStyle(isHovered: isHovered, pressedScale: 0.95))
+        .focusRing(cornerRadius: Theme.CornerRadius.large)
         .shadow(color: .black.opacity(isHovered ? 0.15 : 0.1), radius: isHovered ? 12 : 6, y: 4)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
         .onHover { hovering in
             isHovered = hovering
         }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    HomeView(viewModel: HomeViewModel())
+    HomeView(viewModel: HomeViewModel(), open: { _ in })
         .frame(width: 800, height: 600)
 }

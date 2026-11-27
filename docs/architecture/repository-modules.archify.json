@@ -1,0 +1,470 @@
+{
+  "schema_version": 1,
+  "diagram_type": "tree",
+  "meta": {
+    "title": "MyMacCleaner repository and module map",
+    "locale": "en",
+    "output": "docs/architecture/repository-modules.html",
+    "quality_profile": "showcase"
+  },
+  "layout": {
+    "direction": "right",
+    "nodeMaxW": 300,
+    "gapX": 32
+  },
+  "nodes": [
+    {
+      "id": "repo",
+      "label": "MyMacCleaner",
+      "sublabel": "macOS utility; Trash is the only mutation"
+    },
+    {
+      "id": "xcodeproj",
+      "label": "MyMacCleaner.xcodeproj",
+      "parent": "repo",
+      "sublabel": "Xcode project and shared scheme"
+    },
+    {
+      "id": "unit_tests",
+      "label": "MyMacCleanerTests/",
+      "parent": "repo",
+      "sublabel": "App unit tests"
+    },
+    {
+      "id": "ui_tests",
+      "label": "MyMacCleanerUITests/",
+      "parent": "repo",
+      "sublabel": "UI tests, advisory in CI"
+    },
+    {
+      "id": "config",
+      "label": "Config/",
+      "parent": "repo",
+      "sublabel": "Ad hoc signing, local override"
+    },
+    {
+      "id": "docs",
+      "label": "docs/",
+      "parent": "repo",
+      "sublabel": "Safety, threat model, feature docs"
+    },
+    {
+      "id": "workflows",
+      "label": ".github/workflows/",
+      "parent": "repo",
+      "sublabel": "CI pipelines"
+    },
+    {
+      "id": "sc",
+      "label": "SafetyContract/",
+      "parent": "repo",
+      "sublabel": "Local package: disabled operations"
+    },
+    {
+      "id": "app",
+      "label": "MyMacCleaner/",
+      "parent": "repo",
+      "sublabel": "SwiftUI app target"
+    },
+    {
+      "id": "cc",
+      "label": "CleanerCore/",
+      "parent": "repo",
+      "sublabel": "Local package: scan to receipt"
+    },
+    {
+      "id": "scripts",
+      "label": "scripts/",
+      "parent": "repo",
+      "sublabel": "Verifiers, coverage gates, release"
+    },
+    {
+      "id": "app_app",
+      "label": "App/",
+      "parent": "app",
+      "sublabel": "App entry, sidebar navigation"
+    },
+    {
+      "id": "app_core",
+      "label": "Core/",
+      "parent": "app",
+      "sublabel": "Shared design, services, models"
+    },
+    {
+      "id": "core_design",
+      "label": "Design/",
+      "parent": "app_core",
+      "sublabel": "Theme, Liquid Glass, toasts"
+    },
+    {
+      "id": "core_services",
+      "label": "Services/",
+      "parent": "app_core",
+      "sublabel": "App state, scanners, CleanerCore bridge, Adaptive trust session"
+    },
+    {
+      "id": "core_models",
+      "label": "Models/",
+      "parent": "app_core",
+      "sublabel": "Scan results, permissions, update capability"
+    },
+    {
+      "id": "app_features",
+      "label": "Features/",
+      "parent": "app",
+      "sublabel": "One view + view model per screen"
+    },
+    {
+      "id": "f_adaptive",
+      "label": "AdaptiveExperience/",
+      "parent": "app_features",
+      "sublabel": "Review, approve, Trash, receipt"
+    },
+    {
+      "id": "f_home",
+      "label": "Home/",
+      "parent": "app_features",
+      "sublabel": "Smart Scan dashboard"
+    },
+    {
+      "id": "f_disk",
+      "label": "DiskCleaner/",
+      "parent": "app_features",
+      "sublabel": "Cache and log review, browser privacy"
+    },
+    {
+      "id": "f_spacelens",
+      "label": "SpaceLens/",
+      "parent": "app_features",
+      "sublabel": "Read-only storage bubble map"
+    },
+    {
+      "id": "f_orphaned",
+      "label": "OrphanedFiles/",
+      "parent": "app_features",
+      "sublabel": "Leftovers from removed apps"
+    },
+    {
+      "id": "f_duplicates",
+      "label": "Duplicates/",
+      "parent": "app_features",
+      "sublabel": "Hash-based duplicate triage"
+    },
+    {
+      "id": "f_performance",
+      "label": "Performance/",
+      "parent": "app_features",
+      "sublabel": "CPU, memory, process observations"
+    },
+    {
+      "id": "f_applications",
+      "label": "Applications/",
+      "parent": "app_features",
+      "sublabel": "App and Homebrew cask inventory"
+    },
+    {
+      "id": "f_ports",
+      "label": "PortManagement/",
+      "parent": "app_features",
+      "sublabel": "Read-only TCP connection list"
+    },
+    {
+      "id": "f_health",
+      "label": "SystemHealth/",
+      "parent": "app_features",
+      "sublabel": "Disk, battery, system summary"
+    },
+    {
+      "id": "f_startup",
+      "label": "StartupItems/",
+      "parent": "app_features",
+      "sublabel": "Login items, launch agents"
+    },
+    {
+      "id": "f_permissions",
+      "label": "Permissions/",
+      "parent": "app_features",
+      "sublabel": "Full Disk Access and folder access review"
+    },
+    {
+      "id": "app_menubar",
+      "label": "MenuBar/",
+      "parent": "app",
+      "sublabel": "Live CPU, RAM, disk stats"
+    },
+    {
+      "id": "app_resources",
+      "label": "Resources/",
+      "parent": "app",
+      "sublabel": "Assets, per-feature String Catalogs"
+    },
+    {
+      "id": "cc_sources",
+      "label": "Sources/",
+      "parent": "cc",
+      "sublabel": "Four library targets"
+    },
+    {
+      "id": "cc_core",
+      "label": "Sources/CleanerCore/",
+      "parent": "cc_sources",
+      "sublabel": "Evidence, policy, plans, receipts"
+    },
+    {
+      "id": "cc_scanning",
+      "label": "Scanning/",
+      "parent": "cc_core",
+      "sublabel": "Scan coordinator, detector registry"
+    },
+    {
+      "id": "cc_detectors",
+      "label": "Detectors/",
+      "parent": "cc_core",
+      "sublabel": "General-Mac evidence, triage"
+    },
+    {
+      "id": "cc_policy",
+      "label": "Policy/",
+      "parent": "cc_core",
+      "sublabel": "PolicyEvaluator: sole eligibility gate"
+    },
+    {
+      "id": "cc_plans",
+      "label": "Plans/",
+      "parent": "cc_core",
+      "sublabel": "Digest-bound review plan, approval"
+    },
+    {
+      "id": "cc_execution",
+      "label": "Execution/",
+      "parent": "cc_core",
+      "sublabel": "Revalidate, then hand off to the Trash port"
+    },
+    {
+      "id": "cc_receipts",
+      "label": "Receipts/",
+      "parent": "cc_core",
+      "sublabel": "Receipt journal and retention"
+    },
+    {
+      "id": "cc_presentation",
+      "label": "Presentation/",
+      "parent": "cc_core",
+      "sublabel": "Adaptive Experience projection"
+    },
+    {
+      "id": "cc_capability",
+      "label": "Capability/",
+      "parent": "cc_core",
+      "sublabel": "Capability card projection"
+    },
+    {
+      "id": "cc_bridge",
+      "label": "Bridge/",
+      "parent": "cc_core",
+      "sublabel": "Maps CleanerCore results to read-only screens"
+    },
+    {
+      "id": "cc_models",
+      "label": "ModelInventory/",
+      "parent": "cc_core",
+      "sublabel": "Hugging Face, Ollama store parsing"
+    },
+    {
+      "id": "cc_memory",
+      "label": "MemoryCoach/",
+      "parent": "cc_core",
+      "sublabel": "Memory pressure coaching rules"
+    },
+    {
+      "id": "cc_devinv",
+      "label": "DeveloperInventory/",
+      "parent": "cc_core",
+      "sublabel": "Developer tool presence registry"
+    },
+    {
+      "id": "cc_ports",
+      "label": "Ports/",
+      "parent": "cc_core",
+      "sublabel": "Filesystem, Trash, receipt protocols"
+    },
+    {
+      "id": "cc_domain",
+      "label": "Domain/",
+      "parent": "cc_core",
+      "sublabel": "Evidence and error types"
+    },
+    {
+      "id": "cc_foundation",
+      "label": "CleanerCoreFoundation/",
+      "parent": "cc_sources",
+      "sublabel": "Filesystem and receipt store adapters; FoundationTrashAdapter holds the only trashItem call"
+    },
+    {
+      "id": "cc_content",
+      "label": "CleanerCoreContentAdapter/",
+      "parent": "cc_sources",
+      "sublabel": "Read-only content evidence sessions"
+    },
+    {
+      "id": "cc_darwin",
+      "label": "CleanerCoreDarwin/",
+      "parent": "cc_sources",
+      "sublabel": "Darwin memory and workload sampling"
+    },
+    {
+      "id": "cc_tests",
+      "label": "Tests/",
+      "parent": "cc",
+      "sublabel": "Four Swift Testing targets"
+    },
+    {
+      "id": "cct_core",
+      "label": "CleanerCoreTests/",
+      "parent": "cc_tests",
+      "sublabel": "Policy, plan, Trash, receipt tests"
+    },
+    {
+      "id": "cct_foundation",
+      "label": "CleanerCoreFoundationTests/",
+      "parent": "cc_tests",
+      "sublabel": "Adapter and receipt persistence tests"
+    },
+    {
+      "id": "cct_content",
+      "label": "CleanerCoreContentAdapterTests/",
+      "parent": "cc_tests",
+      "sublabel": "Content evidence adapter tests"
+    },
+    {
+      "id": "cct_darwin",
+      "label": "CleanerCoreDarwinTests/",
+      "parent": "cc_tests",
+      "sublabel": "Darwin memory adapter tests"
+    },
+    {
+      "id": "sc_sources",
+      "label": "Sources/SafetyContract/",
+      "parent": "sc",
+      "sublabel": "Disabled-operation gateway, redaction"
+    },
+    {
+      "id": "sc_tests",
+      "label": "Tests/SafetyContractTests/",
+      "parent": "sc",
+      "sublabel": "Redaction, denied-network, mutation tests"
+    },
+    {
+      "id": "s_runcc",
+      "label": "run-cleanercore-tests.sh",
+      "parent": "scripts",
+      "sublabel": "CleanerCore test runner"
+    },
+    {
+      "id": "s_runsafety",
+      "label": "run-safety-tests.sh",
+      "parent": "scripts",
+      "sublabel": "SafetyContract test runner"
+    },
+    {
+      "id": "s_vsafety",
+      "label": "verify-safety-contract.sh",
+      "parent": "scripts",
+      "sublabel": "Source audit, tests, coverage"
+    },
+    {
+      "id": "s_vcc",
+      "label": "verify-cleanercore.sh",
+      "parent": "scripts",
+      "sublabel": "Tests and 80% coverage gate"
+    },
+    {
+      "id": "s_vcccontract",
+      "label": "verify-cleanercore-contract.sh",
+      "parent": "scripts",
+      "sublabel": "CleanerCore source contract"
+    },
+    {
+      "id": "s_vbridge",
+      "label": "verify-adaptive-bridge.sh",
+      "parent": "scripts",
+      "sublabel": "Forbidden APIs in Adaptive view model"
+    },
+    {
+      "id": "s_vae",
+      "label": "verify-adaptive-experience.sh",
+      "parent": "scripts",
+      "sublabel": "Adaptive string catalog and view IDs"
+    },
+    {
+      "id": "s_baseline",
+      "label": "app-coverage-baseline.txt",
+      "parent": "scripts",
+      "sublabel": "App coverage ratchet baseline"
+    },
+    {
+      "id": "s_capp",
+      "label": "check-app-coverage.sh",
+      "parent": "scripts",
+      "sublabel": "App coverage ratchet"
+    },
+    {
+      "id": "s_ccc",
+      "label": "check-cleanercore-coverage.swift",
+      "parent": "scripts",
+      "sublabel": "CleanerCore coverage checker"
+    },
+    {
+      "id": "s_csafety",
+      "label": "check-safety-coverage.swift",
+      "parent": "scripts",
+      "sublabel": "SafetyContract coverage checker"
+    },
+    {
+      "id": "s_release",
+      "label": "release.sh",
+      "parent": "scripts",
+      "sublabel": "Developer ID build, notarize, draft release"
+    },
+    {
+      "id": "s_allowlist",
+      "label": "read-only-process-allowlist.txt",
+      "parent": "scripts",
+      "sublabel": "Permitted read-only processes"
+    },
+    {
+      "id": "s_tests",
+      "label": "tests/",
+      "parent": "scripts",
+      "sublabel": "Verifier self-tests and fixtures"
+    },
+    {
+      "id": "docs_arch",
+      "label": "architecture/",
+      "parent": "docs",
+      "sublabel": "Interactive architecture diagrams"
+    },
+    {
+      "id": "w_pr",
+      "label": "pr-checks.yml",
+      "parent": "workflows",
+      "sublabel": "Build, tests, coverage, SwiftLint"
+    },
+    {
+      "id": "w_safety",
+      "label": "safety-contract.yml",
+      "parent": "workflows",
+      "sublabel": "Safety, CleanerCore, Adaptive verifiers"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "slate",
+      "title": "How to read this map",
+      "items": [
+        "Every node is a tracked path in this repository; large folders are shown as one node.",
+        "Not shown: root files (README, CONTRIBUTING, SECURITY, RELEASE, CHANGELOG, LICENSE, CODE_OF_CONDUCT, CLAUDE.md, AGENTS.md, ROADMAP.md, .swiftlint.yml, .env.example), app entitlements, .github/dependabot.yml, and smaller scripts such as verify-all.sh."
+      ]
+    }
+  ]
+}

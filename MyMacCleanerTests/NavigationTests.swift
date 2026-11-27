@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import SwiftUI
 @testable import MyMacCleaner
 
 // MARK: - Navigation Section Tests
@@ -30,5 +31,14 @@ struct NavigationSectionTests {
         let rawValues = NavigationSection.allCases.map { $0.rawValue }
         let uniqueValues = Set(rawValues)
         #expect(rawValues.count == uniqueValues.count)
+    }
+
+    @Test("The Go menu gives the first nine sections Command-1 to Command-9, in sidebar order")
+    func goMenuShortcuts() {
+        #expect(NavigationSection.home.goShortcut == KeyboardShortcut("1"))
+        #expect(NavigationSection.adaptiveExperience.goShortcut == KeyboardShortcut("2"))
+        #expect(NavigationSection.startupItems.goShortcut == KeyboardShortcut("9"))
+        #expect(NavigationSection.portManagement.goShortcut == nil)
+        #expect(NavigationSection.allCases.compactMap(\.goShortcut).count == 9)
     }
 }

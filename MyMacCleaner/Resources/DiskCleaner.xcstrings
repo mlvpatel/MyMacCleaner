@@ -1,101 +1,13 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "category.applicationLogs.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "App crash reports and logs"
-          }
-        }
-      }
-    },
-    "category.applicationLogs.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Application Logs"
-          }
-        }
-      }
-    },
-    "category.browserCache.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Safari, Chrome, Firefox caches"
-          }
-        }
-      }
-    },
-    "category.browserCache.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Browser Cache"
-          }
-        }
-      }
-    },
-    "category.cocoapodsCache.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "CocoaPods dependency cache"
-          }
-        }
-      }
-    },
-    "category.cocoapodsCache.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "CocoaPods Cache"
-          }
-        }
-      }
-    },
-    "category.dockerData.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Docker container data and images"
-          }
-        }
-      }
-    },
-    "category.dockerData.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Docker Data"
-          }
-        }
-      }
-    },
     "category.downloads.description": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Files older than 30 days"
+            "value": "Your Downloads folder, listed for review only"
           }
         }
       }
@@ -106,227 +18,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Old Downloads"
-          }
-        }
-      }
-    },
-    "category.homebrewCache.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Homebrew download cache"
-          }
-        }
-      }
-    },
-    "category.homebrewCache.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Homebrew Cache"
-          }
-        }
-      }
-    },
-    "category.iosBackups.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone and iPad device backups"
-          }
-        }
-      }
-    },
-    "category.iosBackups.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iOS Backups"
-          }
-        }
-      }
-    },
-    "category.iosSimulators.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iOS Simulator devices and caches"
-          }
-        }
-      }
-    },
-    "category.iosSimulators.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iOS Simulators"
-          }
-        }
-      }
-    },
-    "category.mailAttachments.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Downloaded email attachments"
-          }
-        }
-      }
-    },
-    "category.mailAttachments.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mail Attachments"
-          }
-        }
-      }
-    },
-    "category.npmCache.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "NPM package cache"
-          }
-        }
-      }
-    },
-    "category.npmCache.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "NPM Cache"
-          }
-        }
-      }
-    },
-    "category.systemCache.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "System-level cached data"
-          }
-        }
-      }
-    },
-    "category.systemCache.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "System Cache"
-          }
-        }
-      }
-    },
-    "category.trash.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Items in your Trash"
-          }
-        }
-      }
-    },
-    "category.trash.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trash"
-          }
-        }
-      }
-    },
-    "category.userCache.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "User application caches"
-          }
-        }
-      }
-    },
-    "category.userCache.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "User Cache"
-          }
-        }
-      }
-    },
-    "category.xcodeData.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "DerivedData and build files"
-          }
-        }
-      }
-    },
-    "category.xcodeData.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Xcode Data"
-          }
-        }
-      }
-    },
-    "category.yarnCache.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yarn package cache"
-          }
-        }
-      }
-    },
-    "category.yarnCache.name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yarn Cache"
+            "value": "Downloads"
           }
         }
       }
@@ -397,50 +89,6 @@
         }
       }
     },
-    "diskCleaner.deselectAll": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Deselect All"
-          }
-        }
-      }
-    },
-    "diskCleaner.empty.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No junk files were found. Your Mac is running efficiently."
-          }
-        }
-      }
-    },
-    "diskCleaner.empty.title": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your Disk is Clean!"
-          }
-        }
-      }
-    },
-    "diskCleaner.itemCount %lld": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld items"
-          }
-        }
-      }
-    },
     "diskCleaner.itemsFound %lld": {
       "extractionState": "manual",
       "localizations": {
@@ -469,18 +117,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Find cache files, logs, and other junk that's taking up space"
-          }
-        }
-      }
-    },
-    "diskCleaner.scan.preparing": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Preparing..."
+            "value": "List caches, logs, temporary files and your Downloads, Desktop and Documents folders by size"
           }
         }
       }
@@ -525,28 +162,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Search files..."
-          }
-        }
-      }
-    },
-    "diskCleaner.selectAll": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select All"
-          }
-        }
-      }
-    },
-    "diskCleaner.selected %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Selected: %@"
           }
         }
       }
@@ -634,7 +249,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Free up space by removing junk files"
+            "value": "See what the scanned folders hold"
           }
         }
       }
@@ -645,7 +260,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cleaner"
+            "value": "Storage"
           }
         }
       }
@@ -975,7 +590,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Clean browsing history, cookies, cache and other data from your browsers"
+            "value": "See how much history, cookies, cache and other data each browser stores"
           }
         }
       }
@@ -986,7 +601,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No browser data found to clean."
+            "value": "No readable browser data was found."
           }
         }
       }
@@ -997,7 +612,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "All Clean!"
+            "value": "No Browser Data Found"
           }
         }
       }
@@ -1042,17 +657,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scanning browsers..."
-          }
-        }
-      }
-    },
-    "privacy.selected %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ selected"
           }
         }
       }
@@ -1383,6 +987,204 @@
           "stringUnit": {
             "state": "translated",
             "value": "Over 1 year"
+          }
+        }
+      }
+    },
+    "spaceLens.back": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        }
+      }
+    },
+    "spaceLens.rescan": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan again"
+          }
+        }
+      }
+    },
+    "spaceLens.filter.size": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Size"
+          }
+        }
+      }
+    },
+    "spaceLens.filter.age": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last opened"
+          }
+        }
+      }
+    },
+    "spaceLens.row.openHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens this folder"
+          }
+        }
+      }
+    },
+    "category.caches.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Caches"
+          }
+        }
+      }
+    },
+    "category.caches.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App caches in your Library folder"
+          }
+        }
+      }
+    },
+    "category.logs.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logs"
+          }
+        }
+      }
+    },
+    "category.logs.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App logs in your Library folder"
+          }
+        }
+      }
+    },
+    "category.temporaryFiles.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temporary files"
+          }
+        }
+      }
+    },
+    "category.temporaryFiles.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your user temporary folder"
+          }
+        }
+      }
+    },
+    "category.desktop.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop"
+          }
+        }
+      }
+    },
+    "category.desktop.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Desktop folder, listed for review only"
+          }
+        }
+      }
+    },
+    "category.documents.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documents"
+          }
+        }
+      }
+    },
+    "category.documents.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Documents folder, listed for review only"
+          }
+        }
+      }
+    },
+    "privacy.coverage.denied %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not read %@ data. Allow Full Disk Access in Permissions to include it."
+          }
+        }
+      }
+    },
+    "privacy.empty.incomplete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing was found in the browser data that could be read."
+          }
+        }
+      }
+    },
+    "spaceLens.filter.preset %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Size filter: %@. You can change it after the scan."
           }
         }
       }

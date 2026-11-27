@@ -19,10 +19,14 @@ enum Theme {
         static let secondaryBackground = Color(nsColor: .controlBackgroundColor)
         static let tertiaryBackground = Color(nsColor: .underPageBackgroundColor)
 
-        // Surface colors (for cards)
-        static let surfaceLight = Color.white.opacity(0.05)
-        static let surfaceMedium = Color.white.opacity(0.08)
-        static let surfaceHover = Color.white.opacity(0.12)
+        // Surface fills, tracks and outlines. Primary is white in Dark and black in Light,
+        // so these read in both appearances.
+        static let subtleFill = Color.primary.opacity(0.03)
+        static let surfaceLight = Color.primary.opacity(0.05)
+        static let surfaceMedium = Color.primary.opacity(0.08)
+        static let track = Color.primary.opacity(0.1)
+        static let surfaceHover = Color.primary.opacity(0.12)
+        static let glassStroke = Color(nsColor: .separatorColor)
 
         // Text colors
         static let textPrimary = Color(nsColor: .labelColor)
@@ -208,6 +212,11 @@ enum Theme {
         static let spring = SwiftUI.Animation.spring(response: 0.4, dampingFraction: 0.75)
         static let springBouncy = SwiftUI.Animation.spring(response: 0.5, dampingFraction: 0.6)
         static let springSmooth = SwiftUI.Animation.spring(response: 0.6, dampingFraction: 0.85)
+
+        /// The animation, or nil when Reduce Motion is on (pass `accessibilityReduceMotion`).
+        static func motion(_ animation: SwiftUI.Animation, reduce: Bool) -> SwiftUI.Animation? {
+            reduce ? nil : animation
+        }
     }
 
     // MARK: - Thresholds & Constants
@@ -222,6 +231,18 @@ enum Theme {
             static let criticalFreeSpace: Int64 = 20 * 1024 * 1024 * 1024
             /// Below this is warning (50 GB)
             static let warningFreeSpace: Int64 = 50 * 1024 * 1024 * 1024
+            /// Share of the volume in use above which is warning (75%)
+            static let warningUsage: Double = 0.75
+            /// Share of the volume in use above which is critical (90%)
+            static let criticalUsage: Double = 0.90
+        }
+
+        /// CPU usage thresholds (share of all cores)
+        enum CPU {
+            /// Above this is warning (50%)
+            static let warningUsage: Double = 0.50
+            /// Above this is critical (80%)
+            static let criticalUsage: Double = 0.80
         }
 
         /// Startup items thresholds for health score
@@ -256,6 +277,8 @@ enum Theme {
         static let toastDuration: UInt64 = 3_000_000_000
         /// Clear results delay (5s)
         static let clearResultsDelay: UInt64 = 5_000_000_000
+        /// Pause in typing before a search filters a long list (250ms)
+        static let searchDebounce: UInt64 = 250_000_000
         /// Process refresh interval (seconds)
         static let processRefreshInterval: TimeInterval = 2.0
     }
@@ -282,8 +305,8 @@ extension LinearGradient {
 
     static let glassGradient = LinearGradient(
         colors: [
-            Color.white.opacity(0.15),
-            Color.white.opacity(0.05)
+            Color.primary.opacity(0.15),
+            Color.primary.opacity(0.05)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -292,7 +315,7 @@ extension LinearGradient {
     static let shimmerGradient = LinearGradient(
         colors: [
             Color.clear,
-            Color.white.opacity(0.1),
+            Color.primary.opacity(0.1),
             Color.clear
         ],
         startPoint: .leading,

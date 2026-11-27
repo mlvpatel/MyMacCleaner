@@ -36,6 +36,7 @@ struct SystemHealthView: View {
             withAnimation(Theme.Animation.springSmooth) {
                 isVisible = true
             }
+            viewModel.loadIfNeeded()
         }
     }
 
@@ -79,7 +80,7 @@ struct SystemHealthView: View {
             ZStack {
                 // Background circle
                 Circle()
-                    .stroke(Color.white.opacity(0.1), lineWidth: 12)
+                    .stroke(Theme.Colors.track, lineWidth: 12)
                     .frame(width: 140, height: 140)
 
                 // Progress circle - border (drawn first, slightly wider)
@@ -146,19 +147,10 @@ struct SystemHealthView: View {
     }
 
     private var healthSummary: String {
-        let passed = viewModel.healthChecks.filter { $0.status == .passed }.count
-        let warnings = viewModel.healthChecks.filter { $0.status == .warning }.count
-        let failed = viewModel.healthChecks.filter { $0.status == .failed }.count
-
         if viewModel.isLoading {
             return L("systemHealth.summary.running")
-        } else if failed > 0 {
-            return LFormat("systemHealth.summary.failed %lld", failed)
-        } else if warnings > 0 {
-            return LFormat("systemHealth.summary.warnings %lld %lld", passed, warnings)
-        } else {
-            return LFormat("systemHealth.summary.passed %lld", passed)
         }
+        return SystemHealthViewModel.summary(for: viewModel.healthChecks.map(\.status))
     }
 
     // MARK: - Health Checks Section
@@ -208,7 +200,6 @@ struct SystemHealthView: View {
 
 struct HealthCheckCard: View {
     let check: HealthCheck
-    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -249,8 +240,6 @@ struct HealthCheckCard: View {
         }
         .padding(Theme.Spacing.md)
         .glassCard()
-        .hoverEffect(isHovered: isHovered)
-        .onHover { isHovered = $0 }
     }
 }
 
@@ -258,7 +247,6 @@ struct HealthCheckCard: View {
 
 struct DiskInfoCard: View {
     let disk: DiskInfo
-    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
@@ -277,7 +265,7 @@ struct DiskInfoCard: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
-                        .fill(Color.white.opacity(0.1))
+                        .fill(Theme.Colors.track)
                         .frame(height: 8)
 
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.tiny)
@@ -302,8 +290,6 @@ struct DiskInfoCard: View {
         .padding(Theme.Spacing.md)
         .frame(maxWidth: .infinity)
         .glassCard()
-        .hoverEffect(isHovered: isHovered)
-        .onHover { isHovered = $0 }
     }
 
     private var diskColor: Color {
@@ -321,7 +307,6 @@ struct DiskInfoCard: View {
 
 struct BatteryInfoCard: View {
     let battery: BatteryInfo
-    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
@@ -378,8 +363,6 @@ struct BatteryInfoCard: View {
         .padding(Theme.Spacing.md)
         .frame(maxWidth: .infinity)
         .glassCard()
-        .hoverEffect(isHovered: isHovered)
-        .onHover { isHovered = $0 }
     }
 
     private var batteryIcon: String {
@@ -416,8 +399,6 @@ struct BatteryInfoCard: View {
 // MARK: - Mac Info Card
 
 struct MacInfoCard: View {
-    @State private var isHovered = false
-
     private var macOSVersion: String {
         let version = ProcessInfo.processInfo.operatingSystemVersion
         return "macOS \(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
@@ -473,8 +454,6 @@ struct MacInfoCard: View {
         .padding(Theme.Spacing.md)
         .frame(maxWidth: .infinity)
         .glassCard()
-        .hoverEffect(isHovered: isHovered)
-        .onHover { isHovered = $0 }
     }
 }
 

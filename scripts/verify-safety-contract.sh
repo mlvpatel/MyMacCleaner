@@ -10,6 +10,11 @@ readonly fixture_root="$repository_root/scripts/tests/fixtures/safety-contract"
 readonly default_manifest="$repository_root/scripts/read-only-process-allowlist.txt"
 readonly safety_package_root="$repository_root/SafetyContract"
 readonly coverage_checker="$script_directory/check-safety-coverage.swift"
+# The one file allowed to build a Process, relative to MyMacCleaner/ (or a fixture app root).
+readonly process_owner_relative="Core/Services/ReadOnlyProcess.swift"
+readonly process_owner="$repository_root/MyMacCleaner/$process_owner_relative"
+# Any way to build or launch a child process.
+readonly process_pattern='Process[[:space:]]*\(|(^|[^[:alnum:]_])Process[.]run|NSTask|posix_spawn'
 
 fail() {
     local rule_id="$1"
@@ -20,6 +25,7 @@ fail() {
     else
         printf '%s\n' "$rule_id" >&2
     fi
+    printf '  see docs/VERIFIER-RULES.md#%s\n' "$(printf '%s' "$rule_id" | /usr/bin/tr '[:upper:]' '[:lower:]')" >&2
     exit 1
 }
 
@@ -60,6 +66,40 @@ first_match_line() {
     local file="$2"
 
     /usr/bin/grep -nE -- "$pattern" "$file" | /usr/bin/head -n 1 | /usr/bin/cut -d: -f1
+}
+
+# Prints the line of a waitUntilExit that comes before the pipe drain in the same Process( block,
+# ignoring // comments. Waiting first deadlocks once the child fills the pipe buffer: the child
+# blocks on write and the parent blocks in waitUntilExit.
+first_wait_before_drain_line() {
+    /usr/bin/awk '
+        { code = $0; sub(/\/\/.*/, "", code) }
+        code ~ /Process[ \t]*\(/ { wait_line = 0 }
+        code ~ /waitUntilExit/ && !wait_line { wait_line = NR }
+        code ~ /readDataToEndOfFile|readToEnd[ \t]*\(/ && wait_line { print wait_line; exit }
+    ' "$1"
+}
+
+# The process owner stops its own child on timeout or cancellation with exactly one bare
+# `process.terminate()` line. Every other system-mutation token, there or anywhere, still fails.
+first_system_mutation_line() {
+    local file="$1"
+    local pattern='/usr/sbin/purge|purge[[:space:]]*\(|kill[[:space:]]*\(|terminate[[:space:]]*\(|setItemEnabled[[:space:]]*\(|removeStartupItem[[:space:]]*\('
+    local own_child_stop='^[0-9]+:[[:space:]]*process[.]terminate\(\)[[:space:]]*$'
+    local stop_count
+
+    if [[ "$file" == "$process_owner" ]]; then
+        stop_count=$(/usr/bin/grep -nE -- "$pattern" "$file" | /usr/bin/grep -cE "$own_child_stop" || true)
+        if [[ "$stop_count" -eq 1 ]]; then
+            /usr/bin/grep -nE -- "$pattern" "$file" \
+                | /usr/bin/grep -vE "$own_child_stop" \
+                | /usr/bin/head -n 1 \
+                | /usr/bin/cut -d: -f1
+            return
+        fi
+    fi
+
+    first_match_line "$pattern" "$file"
 }
 
 first_permanent_mutation_line() {
@@ -122,7 +162,7 @@ scan_file() {
         report_match "SC-PERMANENT-MUTATION" "$file" "$line_number"
     fi
 
-    line_number=$(first_match_line '/usr/sbin/purge|purge[[:space:]]*\(|kill[[:space:]]*\(|terminate[[:space:]]*\(|setItemEnabled[[:space:]]*\(|removeStartupItem[[:space:]]*\(' "$file" || true)
+    line_number=$(first_system_mutation_line "$file" || true)
     if [[ -n "$line_number" ]]; then
         report_match "SC-SYSTEM-MUTATION" "$file" "$line_number"
     fi
@@ -137,8 +177,13 @@ scan_file() {
         report_match "SC-DESTRUCTIVE-UI" "$file" "$line_number"
     fi
 
+    line_number=$(first_wait_before_drain_line "$file" || true)
+    if [[ -n "$line_number" ]]; then
+        report_match "SC-PROCESS-DRAIN-ORDER" "$file" "$line_number"
+    fi
+
     if [[ "${2:-deny}" != "allow" ]]; then
-        line_number=$(first_match_line 'Process[[:space:]]*\(' "$file" || true)
+        line_number=$(first_match_line "$process_pattern" "$file" || true)
         if [[ -n "$line_number" ]]; then
             report_match "SC-UNLISTED-PROCESS" "$file" "$line_number"
         fi
@@ -238,11 +283,11 @@ validate_forbidden_targets() {
 validate_manifest() {
     local manifest_path="$1"
     local expected_entries=(
-        'startup.sfltool.dumpbtm|/usr/bin/sfltool|dumpbtm|MyMacCleaner/Core/Services/StartupItemsService.swift|parseBackgroundItems|Fixed local read-only inventory; no network access.'
-        'startup.launchctl.list|/bin/launchctl|list|MyMacCleaner/Core/Services/StartupItemsService.swift|parseLaunchctlItems|Fixed local read-only inventory; no network access.'
-        'ports.lsof.tcp-list|/usr/sbin/lsof|-iTCP,-sTCP:LISTEN,ESTABLISHED,-n,-P|MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift|parsePorts|Fixed local read-only inventory; no network access.'
-        'health.diskutil.root-info|/usr/sbin/diskutil|info,/|MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift|parseDiskInfo|Fixed local read-only inventory; no network access.'
-        'activity.lsof.open-files|/usr/sbin/lsof|-Fn,-n,-P,-w,-b|MyMacCleaner/Core/Services/OpenFileActivityObserver.swift|parseOpenFilePaths|Fixed local read-only inventory; no network access.'
+        'startup.sfltool.dumpbtm|/usr/bin/sfltool|dumpbtm|MyMacCleaner/Core/Services/ReadOnlyProcess.swift|parseBackgroundItems|Fixed local read-only inventory; no network access.'
+        'startup.launchctl.list|/bin/launchctl|list|MyMacCleaner/Core/Services/ReadOnlyProcess.swift|parseLaunchctlItems|Fixed local read-only inventory; no network access.'
+        'ports.lsof.tcp-list|/usr/sbin/lsof|-iTCP,-sTCP:LISTEN,ESTABLISHED,-n,-P|MyMacCleaner/Core/Services/ReadOnlyProcess.swift|parsePorts|Fixed local read-only inventory; no network access.'
+        'health.diskutil.root-info|/usr/sbin/diskutil|info,/|MyMacCleaner/Core/Services/ReadOnlyProcess.swift|parseDiskInfo|Fixed local read-only inventory; no network access.'
+        'activity.lsof.open-files|/usr/sbin/lsof|-Fn,-n,-P,-w,-b|MyMacCleaner/Core/Services/ReadOnlyProcess.swift|parseOpenFilePaths|Fixed local read-only inventory; no network access.'
     )
     local entries=()
     local line identifier executable arguments owner parser rationale extra prior_entry entry index
@@ -317,7 +362,7 @@ mode_targets() {
             printf '%s\0' 'MyMacCleaner/Core/Services/BrowserCleanerService.swift' 'MyMacCleaner/Core/Services/DuplicateScanner.swift' 'MyMacCleaner/Core/Services/OrphanedFilesScanner.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensViewModel.swift'
             ;;
         --system-process-only)
-            printf '%s\0' 'MyMacCleaner/Core/Services/HomebrewService.swift' 'MyMacCleaner/Core/Services/StartupItemsService.swift' 'MyMacCleaner/Features/Performance/PerformanceViewModel.swift' 'MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift' 'MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift' 'MyMacCleaner/Core/Services/OpenFileActivityObserver.swift'
+            printf '%s\0' 'MyMacCleaner/Core/Services/HomebrewService.swift' 'MyMacCleaner/Core/Services/StartupItemsService.swift' 'MyMacCleaner/Features/Performance/PerformanceViewModel.swift' 'MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift' 'MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift' 'MyMacCleaner/Core/Services/OpenFileActivityObserver.swift' 'MyMacCleaner/Core/Services/ReadOnlyProcess.swift'
             ;;
         --storage-ui-home-only)
             printf '%s\0' 'MyMacCleaner/Core/Design/SafetyNoticePresenter.swift' 'MyMacCleaner/Features/Home/HomeViewModel.swift' 'MyMacCleaner/Features/Home/HomeView.swift' 'MyMacCleaner/Features/Home/Components/ScanResultsCard.swift'
@@ -344,7 +389,7 @@ mode_targets() {
             printf '%s\0' 'MyMacCleaner/Core/Services/StartupItemsService.swift' 'MyMacCleaner/Core/Models/UpdateCapability.swift'
             ;;
         --source-only)
-            printf '%s\0' 'MyMacCleaner/Core/Design/SafetyNoticePresenter.swift' 'MyMacCleaner/Core/Design/UpdateCapabilityView.swift' 'MyMacCleaner/Core/Services/AppState.swift' 'MyMacCleaner/Core/Services/LocalizationManager.swift' 'MyMacCleaner/Core/Services/BrowserCleanerService.swift' 'MyMacCleaner/Core/Services/DuplicateScanner.swift' 'MyMacCleaner/Core/Services/OrphanedFilesScanner.swift' 'MyMacCleaner/Core/Services/HomebrewService.swift' 'MyMacCleaner/Core/Services/StartupItemsService.swift' 'MyMacCleaner/Features/Performance/PerformanceViewModel.swift' 'MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift' 'MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift' 'MyMacCleaner/Features/Home/HomeViewModel.swift' 'MyMacCleaner/Features/Home/HomeView.swift' 'MyMacCleaner/Features/Home/Components/ScanResultsCard.swift' 'MyMacCleaner/Features/DiskCleaner/DiskCleanerViewModel.swift' 'MyMacCleaner/Features/DiskCleaner/DiskCleanerView.swift' 'MyMacCleaner/Features/DiskCleaner/BrowserPrivacyView.swift' 'MyMacCleaner/Features/DiskCleaner/Components/CleanupCategoryCard.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensViewModel.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensView.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensSectionView.swift' 'MyMacCleaner/Features/SpaceLens/Components/SidebarFileRow.swift' 'MyMacCleaner/Features/SpaceLens/Components/BubblePackingView.swift' 'MyMacCleaner/Features/SpaceLens/Components/SingleBubbleView.swift' 'MyMacCleaner/Features/Duplicates/DuplicatesViewModel.swift' 'MyMacCleaner/Features/Duplicates/DuplicatesView.swift' 'MyMacCleaner/Features/OrphanedFiles/OrphanedFilesViewModel.swift' 'MyMacCleaner/Features/OrphanedFiles/OrphanedFilesView.swift' 'MyMacCleaner/Features/Applications/ApplicationsViewModel.swift' 'MyMacCleaner/Features/Applications/ApplicationsView.swift' 'MyMacCleaner/Features/Applications/Components/AppCard.swift' 'MyMacCleaner/Features/Applications/Components/HomebrewCaskRow.swift' 'MyMacCleaner/Features/Performance/PerformanceView.swift' 'MyMacCleaner/Features/Performance/Components/ProcessRow.swift' 'MyMacCleaner/Features/StartupItems/StartupItemsViewModel.swift' 'MyMacCleaner/Features/StartupItems/StartupItemsView.swift' 'MyMacCleaner/Features/PortManagement/PortManagementView.swift' 'MyMacCleaner/Core/Models/UpdateCapability.swift' 'MyMacCleaner/Core/Services/OpenFileActivityObserver.swift'
+            printf '%s\0' 'MyMacCleaner/Core/Design/SafetyNoticePresenter.swift' 'MyMacCleaner/Core/Design/UpdateCapabilityView.swift' 'MyMacCleaner/Core/Services/AppState.swift' 'MyMacCleaner/Core/Services/LocalizationManager.swift' 'MyMacCleaner/Core/Services/BrowserCleanerService.swift' 'MyMacCleaner/Core/Services/DuplicateScanner.swift' 'MyMacCleaner/Core/Services/OrphanedFilesScanner.swift' 'MyMacCleaner/Core/Services/HomebrewService.swift' 'MyMacCleaner/Core/Services/StartupItemsService.swift' 'MyMacCleaner/Features/Performance/PerformanceViewModel.swift' 'MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift' 'MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift' 'MyMacCleaner/Features/Home/HomeViewModel.swift' 'MyMacCleaner/Features/Home/HomeView.swift' 'MyMacCleaner/Features/Home/Components/ScanResultsCard.swift' 'MyMacCleaner/Features/DiskCleaner/DiskCleanerViewModel.swift' 'MyMacCleaner/Features/DiskCleaner/DiskCleanerView.swift' 'MyMacCleaner/Features/DiskCleaner/BrowserPrivacyView.swift' 'MyMacCleaner/Features/DiskCleaner/Components/CleanupCategoryCard.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensViewModel.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensView.swift' 'MyMacCleaner/Features/SpaceLens/SpaceLensSectionView.swift' 'MyMacCleaner/Features/SpaceLens/Components/SidebarFileRow.swift' 'MyMacCleaner/Features/SpaceLens/Components/BubblePackingView.swift' 'MyMacCleaner/Features/SpaceLens/Components/SingleBubbleView.swift' 'MyMacCleaner/Features/Duplicates/DuplicatesViewModel.swift' 'MyMacCleaner/Features/Duplicates/DuplicatesView.swift' 'MyMacCleaner/Features/OrphanedFiles/OrphanedFilesViewModel.swift' 'MyMacCleaner/Features/OrphanedFiles/OrphanedFilesView.swift' 'MyMacCleaner/Features/Applications/ApplicationsViewModel.swift' 'MyMacCleaner/Features/Applications/ApplicationsView.swift' 'MyMacCleaner/Features/Applications/Components/AppCard.swift' 'MyMacCleaner/Features/Applications/Components/HomebrewCaskRow.swift' 'MyMacCleaner/Features/Performance/PerformanceView.swift' 'MyMacCleaner/Features/Performance/Components/ProcessRow.swift' 'MyMacCleaner/Features/StartupItems/StartupItemsViewModel.swift' 'MyMacCleaner/Features/StartupItems/StartupItemsView.swift' 'MyMacCleaner/Features/PortManagement/PortManagementView.swift' 'MyMacCleaner/Core/Models/UpdateCapability.swift' 'MyMacCleaner/Core/Services/OpenFileActivityObserver.swift' 'MyMacCleaner/Core/Services/ReadOnlyProcess.swift'
             ;;
         *)
             return 1
@@ -432,7 +477,7 @@ process_policy_for_target() {
     local target="$1"
 
     case "$target" in
-        MyMacCleaner/Core/Services/StartupItemsService.swift|MyMacCleaner/Core/Services/HomebrewService.swift|MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift|MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift|MyMacCleaner/Features/Performance/PerformanceViewModel.swift|MyMacCleaner/Core/Services/OpenFileActivityObserver.swift)
+        "MyMacCleaner/$process_owner_relative")
             printf '%s\n' 'allow'
             ;;
         *)
@@ -457,14 +502,16 @@ validate_home_memory_guidance() {
     local catalog="$repository_root/MyMacCleaner/Resources/Home.xcstrings"
     local source="$repository_root/MyMacCleaner/Features/Home/HomeViewModel.swift"
     local view="$repository_root/MyMacCleaner/Features/Home/HomeView.swift"
+    local routing="$repository_root/MyMacCleaner/Core/Services/AppState.swift"
     local line_number
 
     [[ -f "$catalog" && -r "$catalog" ]] || fail "SC-MISSING-TARGET" "MyMacCleaner/Resources/Home.xcstrings"
 
-    /usr/bin/grep -Fq 'func openMemoryGuide()' "$source" || fail "SC-HOME-MEMORY-GUIDANCE" "MyMacCleaner/Features/Home/HomeViewModel.swift"
-    /usr/bin/grep -Fq 'onNavigateToSection?("performance")' "$source" || fail "SC-HOME-MEMORY-GUIDANCE" "MyMacCleaner/Features/Home/HomeViewModel.swift"
+    # Memory Guide is a link to the read-only Performance page, routed per window by AppState.
+    /usr/bin/grep -Fq 'case .memoryGuide:' "$routing" || fail "SC-HOME-MEMORY-GUIDANCE" "MyMacCleaner/Core/Services/AppState.swift"
+    /usr/bin/grep -Fq 'return .performance' "$routing" || fail "SC-HOME-MEMORY-GUIDANCE" "MyMacCleaner/Core/Services/AppState.swift"
     /usr/bin/grep -Fq 'L("home.actions.memoryGuide")' "$view" || fail "SC-HOME-MEMORY-GUIDANCE" "MyMacCleaner/Features/Home/HomeView.swift"
-    /usr/bin/grep -Fq 'action: viewModel.openMemoryGuide' "$view" || fail "SC-HOME-MEMORY-GUIDANCE" "MyMacCleaner/Features/Home/HomeView.swift"
+    /usr/bin/grep -Fq 'action: { open(.memoryGuide) }' "$view" || fail "SC-HOME-MEMORY-GUIDANCE" "MyMacCleaner/Features/Home/HomeView.swift"
 
     line_number=$(first_match_line 'freeMemory|free[[:space:]_-]*memory|purge[[:space:]_-]*(disk[[:space:]_-]*)?cache|RAM[[:space:]_-]*(clean|free|optim)' "$source" || true)
     if [[ -n "$line_number" ]]; then
@@ -646,7 +693,6 @@ validate_system_ui_actions() {
     local port_view="$repository_root/MyMacCleaner/Features/PortManagement/PortManagementView.swift"
     local line_number
 
-    /usr/bin/grep -Fq 'performanceViewModel.stopMonitoring()' "$app_state" || fail "SC-PERFORMANCE-CLEANUP" "MyMacCleaner/Core/Services/AppState.swift"
     if /usr/bin/grep -Fq 'stopProcessMonitoring' "$app_state"; then
         fail "SC-PERFORMANCE-CLEANUP" "MyMacCleaner/Core/Services/AppState.swift"
     fi
@@ -791,47 +837,83 @@ validate_read_only_documentation() {
     if [[ -n "$line_number" ]]; then
         report_match "SC-DOCS-UNSAFE-CLAIM" "$health_doc" "$line_number"
     fi
+
+    # A fenced code example is how a doc teaches a pattern, so no repository doc may show a
+    # forbidden deletion or elevation API inside one. Prose and inline-code mentions stay allowed.
+    while IFS= read -r -d '' file; do
+        line_number=$(first_forbidden_code_example_line "$file" || true)
+        if [[ -n "$line_number" ]]; then
+            report_match "SC-DOCS-UNSAFE-CLAIM" "$file" "$line_number"
+        fi
+    done < <(
+        /usr/bin/find "$repository_root" -maxdepth 1 -type f -name '*.md' -print0
+        /usr/bin/find "$repository_root/docs" -type f -name '*.md' -print0
+    )
+}
+
+first_forbidden_code_example_line() {
+    /usr/bin/awk '
+        /^[[:space:]]*(```|~~~)/ { fenced = !fenced; next }
+        fenced && /removeItem[[:space:]]*[(]|AuthorizationService|runWithAdminPrivileges|Authorization(Create|Execute)|NSAppleScript|osascript|with administrator privileges/ {
+            print FNR
+            exit
+        }
+    ' "$1"
+}
+
+# Every child process in the app is built in one owner file, from exactly the allowlisted
+# executables and arguments. `app_root` is MyMacCleaner/ or a fixture tree laid out the same way.
+validate_process_owner() {
+    local app_root="$1"
+    local owner="$app_root/$process_owner_relative"
+    local expected_invocations=(
+        'case .backgroundItems: ("/usr/bin/sfltool", ["dumpbtm"])'
+        'case .launchServices: ("/bin/launchctl", ["list"])'
+        'case .tcpPorts: ("/usr/sbin/lsof", ["-iTCP", "-sTCP:LISTEN,ESTABLISHED", "-n", "-P"])'
+        'case .rootDiskInfo: ("/usr/sbin/diskutil", ["info", "/"])'
+        'case .openFiles: ("/usr/sbin/lsof", ["-Fn", "-n", "-P", "-w", "-b"])'
+    )
+    local file line_number count actual expected
+
+    while IFS= read -r -d '' file; do
+        [[ "$file" == "$owner" ]] && continue
+        line_number=$(first_match_line "$process_pattern" "$file" || true)
+        if [[ -n "$line_number" ]]; then
+            report_match "SC-UNLISTED-PROCESS" "$file" "$line_number"
+        fi
+    done < <(/usr/bin/find "$app_root" -type f -name '*.swift' -print0)
+
+    [[ -f "$owner" && -r "$owner" ]] || fail "SC-MISSING-TARGET" "$(location_for "$owner")"
+    count=$(/usr/bin/grep -Ec -- "$process_pattern" "$owner" || true)
+    [[ "$count" -eq 1 ]] || fail "SC-PROCESS-COUNT" "$(location_for "$owner")"
+
+    # The one Process takes its executable and arguments only from the closed command set.
+    count=$(/usr/bin/grep -c 'executableURL' "$owner" || true)
+    [[ "$count" -eq 1 ]] || fail "SC-PROCESS-IDENTITY" "$(location_for "$owner")"
+    /usr/bin/grep -Fq 'process.executableURL = URL(fileURLWithPath: command.invocation.executable)' "$owner" \
+        || fail "SC-PROCESS-IDENTITY" "$(location_for "$owner")"
+    count=$(/usr/bin/grep -Ec '[.]arguments[[:space:]]*=' "$owner" || true)
+    [[ "$count" -eq 1 ]] || fail "SC-PROCESS-IDENTITY" "$(location_for "$owner")"
+    /usr/bin/grep -Fq 'process.arguments = command.invocation.arguments' "$owner" \
+        || fail "SC-PROCESS-IDENTITY" "$(location_for "$owner")"
+
+    # Every line holding a literal path or string array must be one allowlisted invocation, and
+    # every allowlisted invocation must be there: an extra executable or argument fails.
+    actual=$(
+        { /usr/bin/grep -E '"/[^"]|\["' "$owner" || true; } \
+            | /usr/bin/sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
+            | /usr/bin/sort
+    )
+    expected=$(printf '%s\n' "${expected_invocations[@]}" | /usr/bin/sort)
+    [[ "$actual" == "$expected" ]] || fail "SC-PROCESS-IDENTITY" "$(location_for "$owner")"
 }
 
 validate_fixed_process_adapters() {
-    local startup="$repository_root/MyMacCleaner/Core/Services/StartupItemsService.swift"
-    local ports="$repository_root/MyMacCleaner/Features/PortManagement/PortManagementViewModel.swift"
     local health="$repository_root/MyMacCleaner/Features/SystemHealth/SystemHealthViewModel.swift"
-    local homebrew="$repository_root/MyMacCleaner/Core/Services/HomebrewService.swift"
-    local performance="$repository_root/MyMacCleaner/Features/Performance/PerformanceViewModel.swift"
     local activity="$repository_root/MyMacCleaner/Core/Services/OpenFileActivityObserver.swift"
-    local file expected count
 
-    for file in "$startup" "$ports" "$health" "$homebrew" "$performance" "$activity"; do
-        [[ -f "$file" && -r "$file" ]] || fail "SC-MISSING-TARGET" "$(location_for "$file")"
-    done
-
-    expected=2
-    count=$(/usr/bin/grep -Ec 'Process[[:space:]]*\(' "$startup" || true)
-    [[ "$count" -eq "$expected" ]] || fail "SC-PROCESS-COUNT" "$(location_for "$startup")"
-    count=$(/usr/bin/grep -Ec 'Process[[:space:]]*\(' "$ports" || true)
-    [[ "$count" -eq 1 ]] || fail "SC-PROCESS-COUNT" "$(location_for "$ports")"
-    count=$(/usr/bin/grep -Ec 'Process[[:space:]]*\(' "$health" || true)
-    [[ "$count" -eq 1 ]] || fail "SC-PROCESS-COUNT" "$(location_for "$health")"
-    count=$(/usr/bin/grep -Ec 'Process[[:space:]]*\(' "$activity" || true)
-    [[ "$count" -eq 1 ]] || fail "SC-PROCESS-COUNT" "$(location_for "$activity")"
-    count=$((
-        $(/usr/bin/grep -Ec 'Process[[:space:]]*\(' "$homebrew" || true) +
-        $(/usr/bin/grep -Ec 'Process[[:space:]]*\(' "$performance" || true)
-    ))
-    [[ "$count" -eq 0 ]] || fail "SC-PROCESS-COUNT" 'unapproved source'
-
-    /usr/bin/grep -Fq 'URL(fileURLWithPath: "/usr/bin/sfltool")' "$startup" || fail "SC-PROCESS-IDENTITY" "$(location_for "$startup")"
-    /usr/bin/grep -Fq 'process.arguments = ["dumpbtm"]' "$startup" || fail "SC-PROCESS-IDENTITY" "$(location_for "$startup")"
-    /usr/bin/grep -Fq 'URL(fileURLWithPath: "/bin/launchctl")' "$startup" || fail "SC-PROCESS-IDENTITY" "$(location_for "$startup")"
-    /usr/bin/grep -Fq 'process.arguments = ["list"]' "$startup" || fail "SC-PROCESS-IDENTITY" "$(location_for "$startup")"
-    /usr/bin/grep -Fq 'URL(fileURLWithPath: "/usr/sbin/lsof")' "$ports" || fail "SC-PROCESS-IDENTITY" "$(location_for "$ports")"
-    /usr/bin/grep -Fq 'process.arguments = ["-iTCP", "-sTCP:LISTEN,ESTABLISHED", "-n", "-P"]' "$ports" || fail "SC-PROCESS-IDENTITY" "$(location_for "$ports")"
-    /usr/bin/grep -Fq 'URL(fileURLWithPath: "/usr/sbin/diskutil")' "$health" || fail "SC-PROCESS-IDENTITY" "$(location_for "$health")"
-    /usr/bin/grep -Fq 'process.arguments = ["info", "/"]' "$health" || fail "SC-PROCESS-IDENTITY" "$(location_for "$health")"
+    validate_process_owner "$repository_root/MyMacCleaner"
     /usr/bin/grep -Eq 'func[[:space:]]+parseDiskInfo' "$health" || fail "SC-PROCESS-IDENTITY" "$(location_for "$health")"
-    /usr/bin/grep -Fq 'URL(fileURLWithPath: "/usr/sbin/lsof")' "$activity" || fail "SC-PROCESS-IDENTITY" "$(location_for "$activity")"
-    /usr/bin/grep -Fq 'process.arguments = ["-Fn", "-n", "-P", "-w", "-b"]' "$activity" || fail "SC-PROCESS-IDENTITY" "$(location_for "$activity")"
     /usr/bin/grep -Eq 'func[[:space:]]+parseOpenFilePaths' "$activity" || fail "SC-PROCESS-IDENTITY" "$(location_for "$activity")"
 }
 
@@ -847,6 +929,7 @@ validate_foundation_contract() {
 validate_diagnostics_and_network() {
     local scoped_sources=(
         'MyMacCleaner/Core/Services/StartupItemsService.swift'
+        'MyMacCleaner/Core/Services/OpenFileActivityObserver.swift'
     )
     local disabled_route_sources=(
         'MyMacCleaner/Core/Design/SafetyNoticePresenter.swift'
@@ -1011,6 +1094,7 @@ run_canonical_gate() (
 
 fixture_input=""
 fixture_manifest=""
+fixture_process_root=""
 product_mode=""
 fixture_forbidden_target_contract=0
 fixture_mode_target_contract=0
@@ -1025,6 +1109,11 @@ while [[ $# -gt 0 ]]; do
         --fixture-manifest)
             [[ $# -ge 2 && -z "$fixture_manifest" ]] || fail "SC-INVALID-INPUT"
             fixture_manifest="$2"
+            shift 2
+            ;;
+        --fixture-process-root)
+            [[ $# -ge 2 && -z "$fixture_process_root" ]] || fail "SC-INVALID-INPUT"
+            fixture_process_root="$2"
             shift 2
             ;;
         --product-root)
@@ -1055,6 +1144,24 @@ done
 
 if [[ $fixture_forbidden_target_contract -eq 1 && $fixture_mode_target_contract -eq 1 ]]; then
     fail "SC-MIXED-ROOTS"
+fi
+
+# Runs the process owner contract against a fixture app tree (self-tests only).
+if [[ -n "$fixture_process_root" ]]; then
+    [[ -z "$fixture_input" && -z "$fixture_manifest" && -z "$product_mode" && $fixture_forbidden_target_contract -eq 0 && $fixture_mode_target_contract -eq 0 ]] || fail "SC-MIXED-ROOTS"
+    is_fixture_authorized || fail "SC-FIXTURE-AUTHORIZATION"
+    canonical_fixture=$(canonical_path "$fixture_process_root" || true)
+    [[ -n "$canonical_fixture" && -d "$canonical_fixture" ]] || fail "SC-INVALID-INPUT"
+    case "$canonical_fixture" in
+        "$fixture_root"/*)
+            ;;
+        *)
+            fail "SC-FIXTURE-AUTHORIZATION"
+            ;;
+    esac
+    validate_process_owner "$canonical_fixture"
+    printf 'SC-PASS: process owner fixture verification passed\n'
+    exit 0
 fi
 
 if [[ -n "$fixture_input" ]]; then

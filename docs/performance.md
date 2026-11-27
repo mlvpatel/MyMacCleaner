@@ -13,11 +13,11 @@ macOS manages memory itself. These figures are context for deciding whether to c
 
 ## How to use it
 
-1. Open **Performance** and wait for the first observation timestamp.
+1. Open **Performance** and wait for the first observation timestamp. Home's **Memory Guide** opens the page at its read-only guidance, the last section.
 2. Compare memory and swap values while the workload you care about is running.
 3. Refresh your understanding over a few observations rather than reacting to one value.
 4. Use the information alongside Activity Monitor or the relevant application when you need to change a workload.
 
-## Phase-0 limitation
+## What this page does not do
 
 This page observes CPU, memory, and swap state only. It does not alter memory, run maintenance actions, control processes, or request an administrator password.

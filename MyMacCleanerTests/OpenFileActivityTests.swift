@@ -27,7 +27,7 @@ struct OpenFileActivityTests {
 
     @Test("Parser keeps only files strictly under the scanned roots and decodes escapes")
     func parserKeepsFilesUnderRoots() {
-        let paths = OpenFileActivityReader.parseOpenFilePaths(Self.listing, under: [Self.caches])
+        let paths = OpenFileActivityReader.parseOpenFilePaths(Data(Self.listing.utf8), under: [Self.caches])
 
         #expect(paths == [
             "/Users/u/Library/Caches/com.apple.iconservices.store/a.bin",
@@ -37,16 +37,16 @@ struct OpenFileActivityTests {
 
     @Test("lsof byte escapes decode to UTF-8; malformed escapes stay literal")
     func lsofNamesDecode() {
-        #expect(OpenFileActivityReader.decodeLsofName("Caf\\xc3\\xa9") == "Café")
-        #expect(OpenFileActivityReader.decodeLsofName("plain/path") == "plain/path")
-        #expect(OpenFileActivityReader.decodeLsofName("odd\\xzz") == "odd\\xzz")
+        #expect(OpenFileActivityReader.decodeLsofName("Caf\\xc3\\xa9".utf8) == "Café")
+        #expect(OpenFileActivityReader.decodeLsofName("plain/path".utf8) == "plain/path")
+        #expect(OpenFileActivityReader.decodeLsofName("odd\\xzz".utf8) == "odd\\xzz")
     }
 
     @Test("Snapshot marks exactly the open file under its declared root")
     func snapshotMatchesRootAndComponents() throws {
         let root = try GeneralMacScopeCatalog.current.declaredRoot(for: .userLibraryCaches).id
         let other = try GeneralMacScopeCatalog.current.declaredRoot(for: .userLibraryLogs).id
-        let snapshot = OpenFileActivityReader.snapshot(roots: [root: Self.caches], listing: Self.listing)
+        let snapshot = OpenFileActivityReader.snapshot(roots: [root: Self.caches], listing: Data(Self.listing.utf8))
 
         #expect(snapshot.isFileOpen(rootID: root, components: ["com.apple.iconservices.store", "a.bin"]))
         #expect(snapshot.isFileOpen(rootID: root, components: ["com.apple.iconservices.store", "b.bin"]) == false)
@@ -54,12 +54,23 @@ struct OpenFileActivityTests {
         #expect(snapshot.isFileOpen(rootID: root, components: []) == false)
     }
 
-    @Test("A failed lsof read yields an empty snapshot, so activity falls back to today's rule")
-    func failedListingMarksNothingOpen() throws {
-        let root = try GeneralMacScopeCatalog.current.declaredRoot(for: .userLibraryCaches).id
-        let snapshot = OpenFileActivityReader.snapshot(roots: [root: Self.caches], listing: nil)
+    /// An open file is never eligible (CleanerCore `ProcessActivityContractTests`), so counting every
+    /// file in a Trash-eligible root as open holds all of them back for the run: it only narrows.
+    @Test("An unavailable listing fails closed for Trash-eligible roots only")
+    func unavailableListingFailsClosed() throws {
+        let caches = try GeneralMacScopeCatalog.current.declaredRoot(for: .userLibraryCaches).id
+        let documents = try GeneralMacScopeCatalog.current.declaredRoot(for: .userDocuments).id
+        let roots = [caches: Self.caches, documents: "/Users/u/Documents"]
 
-        #expect(snapshot.isFileOpen(rootID: root, components: ["com.apple.iconservices.store", "a.bin"]) == false)
+        let unavailable = OpenFileActivityReader.snapshot(roots: roots, listing: nil)
+        #expect(unavailable.isListingAvailable == false)
+        #expect(unavailable.isFileOpen(rootID: caches, components: ["com.apple.iconservices.store", "a.bin"]))
+        // Documents is never Trash-eligible, so its activity still comes from the modification time.
+        #expect(unavailable.isFileOpen(rootID: documents, components: ["x.txt"]) == false)
+
+        let emptyListing = OpenFileActivityReader.snapshot(roots: roots, listing: Data())
+        #expect(emptyListing.isListingAvailable)
+        #expect(emptyListing.isFileOpen(rootID: caches, components: ["com.apple.iconservices.store", "a.bin"]) == false)
     }
 
     @Test("Roots resolve to the real path lsof reports")

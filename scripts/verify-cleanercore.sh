@@ -13,6 +13,7 @@ readonly fixture_sentinel="CLEANERCORE-GATE-SELF-TEST"
 fail() {
     local rule_id="$1"
     printf '%s\n' "$rule_id" >&2
+    printf '  see docs/VERIFIER-RULES.md#%s\n' "$(printf '%s' "$rule_id" | /usr/bin/tr '[:upper:]' '[:lower:]')" >&2
     exit 1
 }
 
@@ -125,64 +126,64 @@ run_stage "coverage-parser-self-tests" /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$
 run_stage "source-contract" /bin/bash "$repository_root/scripts/verify-cleanercore-contract.sh"
 
 run_stage \
-    "phase-5-01" \
+    "policy-disposition-and-ranking" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter 'PolicyDispositionTests|PolicyRankingTests|CapabilityCardTests'
 run_stage \
-    "phase-5-02" \
+    "cleanup-plan-and-approval" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter 'CleanupPlanTests|ApprovalBindingTests'
 run_stage \
-    "phase-5-03" \
+    "policy-golden-and-plan-invalidation" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter 'PolicyGoldenTests|PlanInvalidationPropertyTests'
 run_stage \
-    "phase-6-01" \
+    "trash-operation-authority" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter TrashOperationAuthorityTests
 run_stage \
-    "phase-6-02" \
+    "trash-revalidation" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter TrashRevalidationTests
 run_stage \
-    "phase-6-03" \
+    "trash-execution" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter TrashExecutionTests
 run_stage \
-    "phase-6-04" \
+    "foundation-trash-adapter" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter FoundationTrashAdapterTests
 run_stage \
-    "phase-6-05" \
+    "trash-hostile-fixtures" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter TrashExecutionHostileFixtureTests
 run_stage \
-    "phase-7-receipts" \
+    "receipts" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter 'ReceiptTransitionTests|ReceiptStoreAdapterTests|ReceiptCoordinatorTests|ReceiptReconciliationTests|ReceiptPrivacyTests|ReceiptRetentionTests|ReceiptHistoryDeletionTests|ReceiptRecoveryTests|ReceiptHostileFixtureTests'
 
 run_stage \
-    "phase-3-01-01" \
+    "hugging-face-inventory" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter HuggingFaceInventoryTests
 run_stage \
-    "phase-3-01-02" \
+    "hugging-face-hostile-and-model-authority" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter 'HuggingFaceHostileFixtureTests|ModelStoreAuthorityTests'
 run_stage \
-    "phase-3-02-01" \
+    "ollama-inventory" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter OllamaInventoryTests
 run_stage \
-    "phase-3-02-02" \
+    "selected-model-root-and-model-authority" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter 'SelectedModelRootTests|ModelStoreAuthorityTests'
 run_stage \
-    "phase-3-03-01" \
+    "ai-model-hostile-fixtures" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter AIModelHostileFixtureTests
 run_stage \
-    "phase-3-03-02" \
+    "model-authority-and-hostile-fixtures" \
     /usr/bin/env CODEX_SANDBOX=1 /bin/bash "$repository_root/scripts/run-cleanercore-tests.sh" \
     --filter 'ModelStoreAuthorityTests|AIModelHostileFixtureTests'
 

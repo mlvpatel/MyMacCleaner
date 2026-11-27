@@ -61,7 +61,7 @@ struct HomebrewCaskRow: View {
             }
         }
         .padding(Theme.Spacing.sm)
-        .background(Color.white.opacity(isHovered ? 0.05 : 0))
+        .background(isHovered ? Theme.Colors.surfaceLight : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium))
         .onHover { isHovered = $0 }
     }

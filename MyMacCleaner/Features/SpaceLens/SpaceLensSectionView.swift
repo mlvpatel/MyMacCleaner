@@ -5,6 +5,7 @@ import SwiftUI
 /// Sidebar destination for Space Lens. Shares the same view model as the Disk Cleaner tab.
 struct SpaceLensSectionView: View {
     @ObservedObject var viewModel: SpaceLensViewModel
+    let openExperience: () -> Void
     @State private var isVisible = false
 
     var body: some View {
@@ -13,7 +14,7 @@ struct SpaceLensSectionView: View {
                 headerSection
                     .staggeredAnimation(index: 0, isActive: isVisible)
 
-                SpaceLensView(viewModel: viewModel)
+                SpaceLensView(viewModel: viewModel, openExperience: openExperience)
                     .staggeredAnimation(index: 1, isActive: isVisible)
             }
             .padding(.horizontal, Theme.Spacing.lg)
